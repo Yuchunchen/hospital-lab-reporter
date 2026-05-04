@@ -1,5 +1,129 @@
 # WORKLOG
 
+## 2026-05-05 — Revision 1：UI 簡化 + 長格式合併 CSV 匯出
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis、shell、ui、sync-script
+- 變更：新增、修改、移除
+- 檔案：
+  - 修改 `hospital-lab-data.html`（皆在 `__PATTERNS__` / `__GROUPS__`
+    標記區塊外）：
+    - `parseOrdersPage()`：每筆 order 新增 `effectiveTime`（cells[4] 生效時間
+      ISO 字串）與 `signOffTime`（cells[5] 簽收時間 ISO 字串）兩個具名欄位。
+      `orderDate` / `receiveDate` 原始字串保留作 back-compat。
+    - `extractLabValues()`：每筆 entry 額外保存 `effectiveTime` 與
+      `signOffTime`。去重 key 改為優先用 `signOffTime`，退回
+      `reportDateTime`，最終退回 `date+value`。`reportDateTime` 暫時保留作
+      過渡期。
+    - 病人清單分頁：移除「+ 新增病患」、「更新全部資料」、「匯出 JSON」、
+      「匯入 JSON」、「匯出檢驗資料」5 個按鈕；改為「病歷號清單」textarea
+      ＋「更新」按鈕（批次抓取）＋「匯出 CSV」按鈕（合併長格式）。
+    - 病人列表欄位由 `洗腎頻率/時段` 改為 `洗腎日期/班別`，兩者均為
+      inline `<select>`，`onchange` 直接持久化。預設 `未設定`。
+    - 病人列「操作」由「更新／編輯／刪除」三按鈕改為單一 ✕（移除追蹤＋
+      刪除檢驗資料）。
+    - 移除整個 `#patientModal`（新增/編輯病患的 modal）與隱藏的
+      `<input type="file" id="importFile">`。
+    - 檢驗資料分頁：移除右上角「匯出 CSV」按鈕（改由病人清單頁的單一
+      合併匯出取代）。`viewPatientLab()` header 改顯示
+      `性別 ｜ 年齡歲 ｜ 洗腎日期 ｜ 班別`。
+    - 移除函式：`showAddPatient`、`showEditPatient`、`closeModal`、
+      `savePatient`、`_editIndex`、`confirmDeletePatient`、
+      `updatePatient`（單筆）、`updateAllPatients`、`exportPatients`、
+      `importPatients`、`exportAllLabData`、`exportPatientLabCSV`、
+      `CURRENT_LAB_CHARTNO`。
+    - 新增函式：`escAttr`（select option 值跳脫）、`updatePatientField`
+      （inline select 持久化）、`confirmRemovePatient`、`parseChartNoList`
+      （split + formatChartNo + dedupe）、`fetchAndStore`、
+      `addAndUpdateFromInput`（更新按鈕主邏輯：parse → 加入新追蹤 →
+      逐筆 fetch → demographics 自動填入）、`exportCombinedCSV`。
+    - Demographics 自動填入策略：每次 fetch 都覆寫 `name` / `sex` / `age`
+      （`sex` 取代舊的 `gender` / `genderCode`，存單一字母 M / F）；
+      不再可由 UI 手動編輯。舊 `genderCode` 仍會被讀取作 fallback。
+  - 重寫 `groups/dialysis.js`：
+    - `patientFields` 縮為 `dialysisDays` + `shift` 兩項；丟棄
+      `startDate / frequency / access / primaryDx / note`（舊資料留在
+      localStorage 但 UI 忽略）。
+    - `monthlyDetection` 改為 `{ minMonthlyOverlapRatio: 0.5,
+      requireBUN: true }`。原 `clusterDayWindow` / `minTestsForMonthly`
+      移除 — 月檢的 cluster key 直接是 exact `effectiveTime`。
+    - `resolveBUN()` 改為依 `signOffTime` 排序（早 = 前、晚 = 後）；
+      tie-break 規則保留（值較大 = pre）；3+ 筆 / 缺 signOffTime 仍
+      console.warn；全部缺 signOffTime 才退回 legacy orderName 規則。
+    - 新增 `_flattenEntriesByCluster()`：把 stored 結構 bucket 為
+      `{effectiveTime → {byTestId → entries}}`，後續所有 cluster 邏輯共用。
+    - 新增 `detectMonthlyDrawsFromStored(labDataForPatient)`：依
+      effectiveTime cluster → 過 overlap 與 requireBUN 門檻 → resolveBUN →
+      計算 URR。回傳 `[{ effectiveTime, drawDate, yyyymm, labs, computed }]`。
+    - 新增 `pickEarliestPerMonth(monthlyDraws)`：每個 YYYYMM 取
+      effectiveTime 最早者（per user 2026-05-04）。
+    - 重寫 `resolveBunClustersFromStored()`：cluster key 改用
+      effectiveTime，shape 與 lab table 既有 override map 相容
+      （`{drawDate → {pre, post, urr, preDate, postDate, effectiveTime}}`）。
+    - 重寫 `exporter`：移除 `buildDraws` / `format`（per-patient wide），
+      改為單一 `formatAll(patients, allLabData, opts)`。輸出長格式：
+      `id, YYYYMM, <test>.value, <test>.unit, <test>.lower, <test>.higher,
+       ..., URR value, URR unit, URR lower, URR higher`。每測試 4-tuple
+      順序為 value / unit / lower / higher（lower 在 higher 之前，符合
+      brief）。`filename()` 預設 `dialysis_export_YYYYMMDD.csv`。
+    - 移除 `DIALYSIS_FLAGS`（revision 1 一律走 signOffTime；不需 flag）。
+  - 修改 `.gitignore`：新增 `TASK_revision*_BRIEF.md` 規則
+    （原 `TASK_BRIEF*.md` 不會 match `TASK_revision1_BRIEF.md`）。
+- 原因：
+  - 透析室實際工作流程是「護理師每月拿到一份病歷號清單去追資料」，
+    與舊 UI 的「逐筆 CRUD + JSON 互傳」差距很大。Revision 1 把 UI 對
+    齊使用情境：貼清單 → 更新 → 匯 CSV → 上傳「下一個系統」。
+  - ±2 天 cluster window 太鬆 — 同一張醫囑的 labs 共享 exactly equal
+    生效時間，這比日期視窗更精確。
+  - BUN 前/後依「簽收時間」最可靠：洗腎前的 BUN 上午簽收，洗腎後的
+    BUN 下午/傍晚簽收。先前 Step 2 用的是 `reportDateTime`（從 RESDTTM
+    解析），但臨床語意上 `簽收時間 (cells[5] receiveDate)` 才是正確欄位。
+  - 同月多筆月檢取「最早」：月初的抽血更接近常規月檢時間點。
+- 測試：
+  - `node sync-patterns.js` 乾淨（patterns + groups blocks 皆更新）。
+  - `new Function(inlineScript)` parse 通過。
+  - 內嵌 smoke test 10 / 10 全綠：
+    1. patientFields 縮為 2 項
+    2. monthlyDetection 新形狀，clusterDayWindow 已移除
+    3. resolveBUN 依 signOffTime 排序（亂序輸入仍正確判 pre/post）
+    4. 同筆 BUN 在 BUN_pre + BUN_post 兩 testId 重複時 dedupe 為單筆
+    5. detectMonthlyDrawsFromStored 對完整月檢 draw 偵測成功，URR 計算
+       正確（pre=78, post=18 → URR ≈ 76.9）
+    6. pickEarliestPerMonth 在同月兩 draw 中取較早 effectiveTime
+    7. 只抽 2 項（Na, K, BUN）的 sparse cluster 因 overlap < 50% 被拒
+    8. 完整月檢但缺 BUN 因 requireBUN 被拒
+    9. CSV header 為 `id,YYYYMM,...,WBC value,WBC unit,WBC lower,WBC higher,
+       ...,URR value,URR unit,URR lower,URR higher`，4-tuple 順序正確
+    10. filename 符合 `dialysis_export_YYYYMMDD.csv` pattern
+  - **尚待 YC 在實機瀏覽器手動驗證：**
+    1. 開啟 `hospital-lab-data.html` → 病人清單分頁 UI 已是新樣貌
+       （textarea + 更新 + 匯出 CSV，列表含 dialysisDays / shift selects
+       與 ✕）；舊 JSON 按鈕全部消失。
+    2. 貼一個已知 chartNo（如 `000810385G`）→ 按「更新」→ 出現該病患
+       row，name / sex / age 自動填入；dialysisDays / shift = 未設定。
+    3. 貼三筆 newline-separated chartNos → 更新 → 三筆 row，皆自動填入。
+    4. 點選 chartNo → 檢驗資料表渲染，BUN(BD) / BUN(AD) / URR 顯示正確。
+    5. 按「匯出 CSV」→ 開檔確認：`id,YYYYMM,...` 表頭、4 cols/test、
+       一 row per (chartNo×YYYYMM)、空 cell 留白、同月多月檢取較早一筆。
+    6. ✕ 移除 → 確認 modal 出現 → 確定 → 該 row 與 lab data 一併消失。
+    7. DevTools console 除可預期的 `[dialysis.resolveBUN]` 警告（3+ 筆
+       或缺 signOffTime 的叢集）外應乾淨。
+- 相依：
+  - 不需要 `hospital-lab-patterns` 先發版（patterns block 內容未變）。
+  - 不影響其他 disease group（目前只有 dialysis）。
+  - localStorage migration 路徑（`hd_*` → `patients_dialysis` /
+    `labs_dialysis`）保留。舊 `gender` / `genderCode` 仍會被讀作 fallback；
+    重抓一次後即進入 `sex` 路徑。
+  - 舊 stored entries 沒有 `effectiveTime` / `signOffTime`，會 fallback
+    到 date-bucket（一次 console.warn）+ legacy BUN 規則。重抓一次後即
+    進入 revision 1 路徑。
+- 已知/刻意保留：
+  - `computeDerivedValues()` 的 URR 計算仍存在（lab table 與 CSV 都已
+    改走 dialysis group resolver），目前是 dead code，未來步驟再清。
+  - `parsePatientInfo()` 仍輸出 `gender`（中文「男/女」）+ `genderCode`
+    （M/F），新程式只取 `genderCode → sex`。這個轉換在 fetchAndStore
+    內處理。
+
 ## 2026-05-04 — BUN 前/後判定切換為報告時間制（Step 2，驗證待補）
 
 - 作者：claude（與 YC 共同）
