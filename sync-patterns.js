@@ -2,14 +2,18 @@
 'use strict';
 
 /**
- * sync-patterns.js — Inline catalog + reporter manifest + resolver into
- * hospital-lab-data.html between the __HOSPITAL_LAB_PATTERNS_BEGIN__ /
- * __HOSPITAL_LAB_PATTERNS_END__ markers, preserving the single-file design.
+ * sync-patterns.js — Inline two auto-generated blocks into
+ * hospital-lab-data.html, preserving the single-file design:
  *
- * Source of truth: hospital-lab-patterns repo
- *   https://github.com/Yuchunchen/hospital-lab-patterns
+ *   1. Patterns block (catalog + reporter manifest + resolver),
+ *      sourced from sibling repo ../hospital-lab-patterns/patterns/.
+ *      Bracketed by __HOSPITAL_LAB_PATTERNS_BEGIN__ / END__.
  *
- * Run after every change in ../hospital-lab-patterns:
+ *   2. Groups block (concatenated groups/*.js from this repo).
+ *      Bracketed by __HOSPITAL_LAB_GROUPS_BEGIN__ / END__.
+ *      Each group module exposes itself via window.GROUPS[id].
+ *
+ * Run after editing patterns repo or any groups/*.js:
  *   node sync-patterns.js
  *   # then refresh the HTML in your browser
  */
@@ -18,10 +22,14 @@ const fs   = require('fs');
 const path = require('path');
 
 const PATTERNS_DIR = path.resolve(__dirname, '..', 'hospital-lab-patterns', 'patterns');
+const GROUPS_DIR   = path.join(__dirname, 'groups');
 const HTML_FILE    = path.join(__dirname, 'hospital-lab-data.html');
 
 const BEGIN = '// __HOSPITAL_LAB_PATTERNS_BEGIN__';
 const END   = '// __HOSPITAL_LAB_PATTERNS_END__';
+
+const GROUPS_BEGIN = '// __HOSPITAL_LAB_GROUPS_BEGIN__';
+const GROUPS_END   = '// __HOSPITAL_LAB_GROUPS_END__';
 
 if (!fs.existsSync(PATTERNS_DIR)) {
   console.error('✗ patterns repo not found at: ' + PATTERNS_DIR);
@@ -85,22 +93,66 @@ const manifestSrc = read('reporter.js');
 const blockBody = banner + catalogSrc + manifestSrc + resolverAndAliases;
 const replacementBlock = BEGIN + '\n' + blockBody + END;
 
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
 let html = fs.readFileSync(HTML_FILE, 'utf8');
 
+// ─── 1. Patterns block ────────────────────────────────────────────────────
 if (html.includes(BEGIN) && html.includes(END)) {
-  function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   const re = new RegExp(escapeRegex(BEGIN) + '[\\s\\S]*?' + escapeRegex(END), 'm');
   html = html.replace(re, replacementBlock);
-  console.log('✓ Updated existing pattern block (markers present)');
+  console.log('✓ Updated patterns block (markers present)');
 } else {
-  console.error('✗ Markers not found — please add manually around your data block:');
+  console.error('✗ Patterns markers not found — please add manually:');
   console.error('  ' + BEGIN);
   console.error('  ... your catalog + manifest + aliases ...');
   console.error('  ' + END);
   process.exit(1);
 }
 
+// ─── 2. Groups block ──────────────────────────────────────────────────────
+if (!fs.existsSync(GROUPS_DIR)) {
+  console.warn('! groups/ directory not found at: ' + GROUPS_DIR + ' — skipping groups block');
+} else if (!html.includes(GROUPS_BEGIN) || !html.includes(GROUPS_END)) {
+  console.error('✗ Groups markers not found — please add manually:');
+  console.error('  ' + GROUPS_BEGIN);
+  console.error('  ' + GROUPS_END);
+  process.exit(1);
+} else {
+  const groupFiles = fs.readdirSync(GROUPS_DIR)
+    .filter(f => f.endsWith('.js'))
+    .sort();
+
+  const groupsBanner = [
+    '// ════════════════════════════════════════════════════════════════════════════',
+    '// AUTO-GENERATED BLOCK — DO NOT EDIT BETWEEN THE __GROUPS__ MARKERS',
+    '//',
+    '// Source: groups/*.js in this repo (alpha-sorted, concatenated)',
+    '//',
+    '// To update:',
+    '//   1. Edit groups/<id>.js',
+    '//   2. node sync-patterns.js',
+    '//   3. Reload hospital-lab-data.html in your browser',
+    '//',
+    '// Synced at: ' + new Date().toISOString(),
+    '// Files:    ' + (groupFiles.length ? groupFiles.join(', ') : '(none)'),
+    '// ════════════════════════════════════════════════════════════════════════════',
+    '',
+  ].join('\n');
+
+  const groupsBody = groupFiles
+    .map(f => '\n// ─── groups/' + f + ' ' + '─'.repeat(60 - f.length) + '\n' +
+              fs.readFileSync(path.join(GROUPS_DIR, f), 'utf8'))
+    .join('\n');
+
+  const groupsReplacement = GROUPS_BEGIN + '\n' + groupsBanner + groupsBody + '\n' + GROUPS_END;
+  const groupsRe = new RegExp(escapeRegex(GROUPS_BEGIN) + '[\\s\\S]*?' + escapeRegex(GROUPS_END), 'm');
+  html = html.replace(groupsRe, groupsReplacement);
+  console.log('✓ Updated groups block (' + groupFiles.length + ' file' +
+    (groupFiles.length === 1 ? '' : 's') + ')');
+}
+
 fs.writeFileSync(HTML_FILE, html, 'utf8');
 console.log('  ↳ ' + HTML_FILE);
 console.log('');
-console.log('✓ Sync complete. Refresh the HTML in your browser to load new patterns.');
+console.log('✓ Sync complete. Refresh the HTML in your browser to load new patterns / groups.');
