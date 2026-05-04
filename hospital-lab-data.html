@@ -358,7 +358,7 @@ body {
 //   3. cd hospital-lab-reporter && node sync-patterns.js
 //   4. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-04T05:17:15.498Z
+// Synced at: 2026-05-04T05:47:10.076Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -961,6 +961,46 @@ if (typeof window !== 'undefined') {
 'use strict';
 
 /**
+ * normalizers.js — Named numeric-value transforms used by catalog entries.
+ *
+ * Why named: catalog entries reference normalizers by string name (e.g.
+ * `normalize: 'wbcCount'`) so the catalog can be JSON-serialised for
+ * runtime fetch. Functions can't go in JSON; string names can.
+ *
+ * To add a new normalizer:
+ *   1. Add a named function below
+ *   2. Reference it from a catalog entry: `normalize: 'yourName'`
+ *   3. validate.js will confirm the name resolves
+ *
+ * NOTE: adding a new normalizer requires extension redistribution
+ * (the bundled `normalizers.js` snapshot must be updated on each OPD
+ * computer). Existing normalizers are stable and cover both current
+ * use-cases below.
+ */
+
+const NORMALIZERS = {
+  // WBC: API may report /µL (e.g. 6700) or ×10³/µL (6.7).
+  // Normalize to ×10³/µL — divide by 1000 if value > 100.
+  wbcCount: function (v) {
+    return v > 100 ? +(v / 1000).toFixed(1) : v;
+  },
+
+  // Platelet: API may report /µL (e.g. 250000) or ×10³/µL (250).
+  // Normalize to ×10³/µL — divide by 1000 if value > 1000.
+  plateletCount: function (v) {
+    return v > 1000 ? +(v / 1000).toFixed(0) : v;
+  },
+};
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = NORMALIZERS;
+}
+if (typeof window !== 'undefined') {
+  window.HOSPITAL_LAB_PATTERNS_NORMALIZERS = NORMALIZERS;
+}
+'use strict';
+
+/**
  * reporter.js — Manifest for the dialysis-room app (hospital-lab-reporter).
  *
  * Each manifest entry references a catalog id (see catalog.js) and adds
@@ -1138,7 +1178,7 @@ var COMPUTED_TESTS = REPORTER_COMPUTED;
 //   2. node sync-patterns.js
 //   3. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-04T05:17:15.507Z
+// Synced at: 2026-05-04T05:47:10.085Z
 // Files:    dialysis.js
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -1784,7 +1824,16 @@ function extractLabValues(orders) {
       if (!test.qualitative) {
         value = parseFloat(value);
         if (isNaN(value)) continue;
-        if (test.normalize) value = test.normalize(value);
+        if (test.normalize) {
+          // catalog references normalizers by string name (so it stays
+          // JSON-serialisable); look up the function from the bundled
+          // NORMALIZERS table. Tolerate function references too for
+          // forward/backward compat.
+          const fn = typeof test.normalize === 'function'
+            ? test.normalize
+            : (typeof NORMALIZERS !== 'undefined' && NORMALIZERS[test.normalize]);
+          if (typeof fn === 'function') value = fn(value);
+        }
       }
 
       // Avoid duplicate date+value entries
