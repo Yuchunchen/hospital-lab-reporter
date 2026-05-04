@@ -87,10 +87,13 @@ const resolverAndAliases = [
   '',
 ].join('\n');
 
-const catalogSrc  = read('catalog.js');
-const manifestSrc = read('reporter.js');
+const catalogSrc      = read('catalog.js');
+const manifestSrc     = read('reporter.js');
+const normalizersSrc  = fs.existsSync(path.join(PATTERNS_DIR, 'normalizers.js'))
+  ? read('normalizers.js')
+  : '';
 
-const blockBody = banner + catalogSrc + manifestSrc + resolverAndAliases;
+const blockBody = banner + catalogSrc + normalizersSrc + manifestSrc + resolverAndAliases;
 const replacementBlock = BEGIN + '\n' + blockBody + END;
 
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }

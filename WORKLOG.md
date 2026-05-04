@@ -1,5 +1,38 @@
 # WORKLOG
 
+## 2026-05-04 — 修復 normalizer 字串名稱解析（WBC / Platelet TypeError）
+
+- 作者：claude（與 YC 共同）
+- 範圍：sync-script、shell
+- 變更：修改
+- 檔案：
+  - 修改 `sync-patterns.js`：把 `patterns/normalizers.js` 一併打包進
+    `__HOSPITAL_LAB_PATTERNS__` 區塊（接在 catalog.js 之後、reporter.js
+    之前）。原本未打包，所以 HTML 內沒有 `NORMALIZERS` 表。
+  - 修改 `hospital-lab-data.html`（位於 `__PATTERNS__` 標記區塊外）：
+    `extractLabValues()` 對 `test.normalize` 改為「先看是否為函式 → 否則
+    當字串名稱在 `NORMALIZERS` 表查詢」。函式型寫法仍接受，向後相容。
+- 原因：
+  - patterns repo 將 normalize 從 inline 函式改成具名查表（`normalize:
+    'wbcCount'` / `'plateletCount'`），讓 catalog 可被 JSON 序列化。
+  - 但 sync-patterns.js 沒同步打包 normalizers.js，且 extractLabValues
+    仍然把 test.normalize 當函式直接呼叫，導致任何 reportText 含 WBC 或
+    Platelet 的醫囑，更新時都會丟出
+    `TypeError: test.normalize is not a function`，整個病患更新失敗。
+  - 此 bug 在今天 Step 1 v3 sync 時被觸發（先前的 sync 結果還是函式型
+    catalog；今天重新 sync 後變成字串型）。
+- 測試：
+  - `node sync-patterns.js` 乾淨；NORMALIZERS / wbcCount / plateletCount
+    都出現在 HTML 內。
+  - `new Function(inlineScript)` 解析通過。
+  - Node 直接呼叫 `wbcCount(6700)=6.7`、`wbcCount(6.7)=6.7`、
+    `plateletCount(250000)=250`、`plateletCount(250)=250` 行為正確。
+  - **尚待 YC 在實機瀏覽器手動驗證：** 重新整理 → 更新全部資料 → 確認
+    DevTools console 不再出現 `test.normalize is not a function`。
+- 相依：
+  - 無資料遷移；不影響其他 disease group。
+  - 阻擋 Step 2 baseline 匯出 — 修完才能開始 Step 2 驗證流程。
+
 ## 2026-05-04 — 透析 group 模組與紙本對齊；新增 form-aware CSV 匯出（Step 1 v3）
 
 - 作者：claude（與 YC 共同）
