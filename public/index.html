@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>洗腎室檢驗資料管理</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Segoe UI', Arial, sans-serif;
+  background: #f0f4f8; color: #2c3e50; line-height: 1.5; font-size: 14px;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────────── */
+.app-header {
+  background: linear-gradient(135deg, #1a5276, #2980b9);
+  color: #fff; padding: 12px 24px; display: flex; align-items: center;
+  justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.app-header h1 { font-size: 20px; font-weight: 600; letter-spacing: 1px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer;
+  font-size: 13px; font-family: inherit; transition: all .15s;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn-primary   { background: #2980b9; color: #fff; }
+.btn-success   { background: #27ae60; color: #fff; }
+.btn-warning   { background: #e67e22; color: #fff; }
+.btn-danger    { background: #c0392b; color: #fff; }
+.btn-secondary { background: #95a5a6; color: #fff; }
+.btn-outline   { background: transparent; border: 1px solid #bdc3c7; color: #2c3e50; }
+.btn-outline:hover { background: #ecf0f1; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 6px 8px; font-size: 16px; background: transparent; color: #fff; border: none; cursor: pointer; }
+.btn-icon:hover { background: rgba(255,255,255,.15); border-radius: 4px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── Layout ──────────────────────────────────────────────────────────────── */
+.container { max-width: 1400px; margin: 0 auto; padding: 16px 24px; }
+.card {
+  background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  margin-bottom: 16px; overflow: hidden;
+}
+.card-header {
+  background: #f8f9fa; padding: 10px 16px; border-bottom: 1px solid #e9ecef;
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; font-size: 15px; flex-wrap: wrap; gap: 8px;
+}
+.card-body { padding: 16px; }
+
+/* ─── Tabs ────────────────────────────────────────────────────────────────── */
+.tabs { display: flex; border-bottom: 2px solid #e9ecef; margin-bottom: 16px; }
+.tab-btn {
+  padding: 8px 20px; border: none; background: transparent; cursor: pointer;
+  font-size: 14px; font-family: inherit; color: #7f8c8d;
+  border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .2s;
+}
+.tab-btn.active { color: #1a5276; border-bottom-color: #1a5276; font-weight: 600; }
+.tab-btn:hover:not(.active) { color: #2c3e50; background: #f8f9fa; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ─── Patient Table ───────────────────────────────────────────────────────── */
+.patient-table { width: 100%; border-collapse: collapse; }
+.patient-table th {
+  background: #1a5276; color: #fff; padding: 8px 12px; text-align: left;
+  font-weight: 500; font-size: 13px; white-space: nowrap;
+}
+.patient-table td { padding: 8px 12px; border-bottom: 1px solid #e9ecef; font-size: 13px; }
+.patient-table tr:hover td { background: #eaf2f8; }
+.patient-table .actions { white-space: nowrap; }
+
+/* ─── Lab Data Table ──────────────────────────────────────────────────────── */
+.lab-wrapper { overflow-x: auto; }
+.lab-table { border-collapse: collapse; min-width: 100%; font-size: 12px; }
+.lab-table th, .lab-table td { padding: 4px 8px; border: 1px solid #ddd; white-space: nowrap; }
+.lab-table thead th {
+  background: #1a5276; color: #fff; position: sticky; top: 0; z-index: 2; font-weight: 500;
+}
+.lab-table .row-category { background: #2c3e50; color: #fff; font-weight: 600; text-align: left; }
+.lab-table .row-item td:first-child {
+  background: #f8f9fa; font-weight: 500; position: sticky; left: 0; z-index: 1;
+  min-width: 120px; border-right: 2px solid #bdc3c7;
+}
+.lab-table .row-item td:nth-child(2) {
+  background: #f8f9fa; position: sticky; left: 120px; z-index: 1;
+  min-width: 90px; border-right: 2px solid #bdc3c7; color: #7f8c8d; font-size: 11px;
+}
+.val-hi { color: #c0392b; font-weight: 700; }
+.val-lo { color: #2471a3; font-weight: 700; }
+.val-q-pos { color: #c0392b; font-weight: 700; }
+.val-q-neg { color: #27ae60; }
+.latest-col { background: rgba(255,235,59,.1); }
+
+/* ─── Modal ───────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex;
+  align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: #fff; border-radius: 8px; width: 420px; max-width: 95vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-header {
+  padding: 14px 20px; border-bottom: 1px solid #e9ecef;
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 600; font-size: 16px;
+}
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #7f8c8d; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid #e9ecef; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ─── Form ────────────────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #34495e; }
+.form-group input, .form-group select {
+  width: 100%; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 4px;
+  font-size: 13px; font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #2980b9; box-shadow: 0 0 0 2px rgba(41,128,185,.2); }
+
+/* ─── Status bar ──────────────────────────────────────────────────────────── */
+.status-bar { padding: 8px 16px; font-size: 12px; color: #7f8c8d; border-top: 1px solid #e9ecef; background: #f8f9fa; }
+.status-bar .spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid #bdc3c7; border-top-color: #2980b9; border-radius: 50%;
+  animation: spin .6s linear infinite; margin-right: 6px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.settings-panel { max-width: 500px; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge-am { background: #fdebd0; color: #e67e22; }
+.badge-pm { background: #d5f5e3; color: #27ae60; }
+.badge-135 { background: #d6eaf8; color: #2980b9; }
+.badge-246 { background: #fadbd8; color: #c0392b; }
+.badge-cache { background: #e8f8f5; color: #1abc9c; font-size: 10px; }
+.text-muted { color: #95a5a6; }
+.text-center { text-align: center; }
+.flex { display: flex; }
+.gap-8 { gap: 8px; }
+.items-center { align-items: center; }
+
+.patient-detail-header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+  padding-bottom: 12px; border-bottom: 2px solid #e9ecef;
+}
+.patient-detail-header h2 { font-size: 18px; }
+.patient-detail-header .meta { font-size: 13px; color: #7f8c8d; }
+
+.toast-container { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 10px 16px; border-radius: 6px; color: #fff; font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15); animation: toastIn .3s ease; max-width: 360px;
+}
+.toast-success { background: #27ae60; }
+.toast-error { background: #c0392b; }
+.toast-info { background: #2980b9; }
+.toast-warning { background: #e67e22; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+
+/* ─── Image Report ────────────────────────────────────────────────────────── */
+.image-report-card {
+  background: #fff; border: 1px solid #e9ecef; border-radius: 6px;
+  padding: 12px 16px; margin-bottom: 8px;
+}
+.image-report-card .report-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.image-report-card .report-date { font-size: 11px; color: #7f8c8d; margin-bottom: 6px; }
+.image-report-card .report-text { font-size: 12px; white-space: pre-wrap; color: #34495e; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+  <h1>洗腎室檢驗資料管理</h1>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="switchTab('patients')" title="病患清單">&#128100;</button>
+    <button class="btn-icon" onclick="switchTab('settings')" title="設定">&#9881;</button>
+  </div>
+</header>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="container">
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="patients" onclick="switchTab('patients')">病患清單</button>
+    <button class="tab-btn" data-tab="labview" onclick="switchTab('labview')">檢驗資料</button>
+    <button class="tab-btn" data-tab="csv" onclick="switchTab('csv')">月報匯出</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">設定</button>
+  </div>
+
+  <!-- Tab: Patient List -->
+  <div class="tab-panel active" id="tab-patients">
+    <div class="card">
+      <div class="card-header">
+        <span>病患清單</span>
+        <div class="flex gap-8" style="flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="showAddPatient()">+ 新增病患</button>
+          <button class="btn btn-success btn-sm" onclick="updateAllPatients()" id="btnUpdateAll">更新全部資料</button>
+          <button class="btn btn-outline btn-sm" onclick="exportData()">匯出 JSON</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">匯入 JSON</button>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importPatients(event)">
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table class="patient-table">
+          <thead>
+            <tr>
+              <th>病歷號</th><th>姓名</th><th>性別</th><th>年齡</th>
+              <th>洗腎頻率</th><th>時段</th><th>快取狀態</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="patientBody"></tbody>
+        </table>
+      </div>
+      <div class="status-bar" id="statusBar">就緒</div>
+    </div>
+  </div>
+
+  <!-- Tab: Lab View -->
+  <div class="tab-panel" id="tab-labview">
+    <div class="card">
+      <div class="card-header">
+        <div style="display:flex;align-items:center;gap:16px">
+          <h2 id="labPatientName" style="font-size:18px">請選擇病患</h2>
+          <span class="text-muted" id="labPatientMeta" style="font-size:13px"></span>
+        </div>
+        <div class="flex gap-8">
+          <select id="labReportType" style="padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px">
+            <option value="all">全部</option>
+            <option value="lab">僅檢驗</option>
+            <option value="image">僅影像</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="switchTab('patients')">返回清單</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="lab-wrapper" id="labTableWrapper">
+          <p class="text-center text-muted">請從病患清單點選病患以查看檢驗資料</p>
+        </div>
+        <div id="imageReportWrapper" style="margin-top:16px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: CSV Monthly Report -->
+  <div class="tab-panel" id="tab-csv">
+    <div class="card">
+      <div class="card-header">
+        <span>月報 CSV 匯出</span>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
+          <div class="form-group" style="margin-bottom:0">
+            <label>年份</label>
+            <input type="number" id="csvYear" style="width:100px" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>月份</label>
+            <select id="csvMonth" style="width:80px">
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+              <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+              <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+              <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+            </select>
+          </div>
+          <button class="btn btn-success" id="btnCompile" onclick="compileCSV(false)">編譯月報</button>
+          <button class="btn btn-warning" onclick="compileCSV(true)">重新擷取並編譯</button>
+        </div>
+        <div id="csvStatus" class="text-muted" style="margin-bottom:16px"></div>
+        <div id="csvFileList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Settings -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card settings-panel">
+      <div class="card-header"><span>系統設定</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>API Base URL</label>
+          <input type="text" id="settingBaseUrl" placeholder="http://ernode.vghb12.vhtt.gov.tw:8000">
+        </div>
+        <div class="form-group">
+          <label>操作人員代號 (OPSID)</label>
+          <input type="text" id="settingOpsid" placeholder="A123456789">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettingsUI()">儲存設定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Patient Modal -->
+<div class="modal-overlay hidden" id="patientModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modalTitle">新增病患</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>病歷號 (Chart No.)</label>
+        <input type="text" id="modalChartno" placeholder="810385G 或 000810385G">
+      </div>
+      <div class="form-group">
+        <label>姓名</label>
+        <input type="text" id="modalName" placeholder="王小明">
+      </div>
+      <div class="form-group">
+        <label>洗腎頻率</label>
+        <select id="modalSchedule"><option value="一三五">一三五</option><option value="二四六">二四六</option></select>
+      </div>
+      <div class="form-group">
+        <label>時段</label>
+        <select id="modalShift"><option value="上午">上午</option><option value="下午">下午</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="savePatientModal()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal" style="width:340px">
+    <div class="modal-header">
+      <span>確認刪除</span>
+      <button class="modal-close" onclick="closeConfirm()">&times;</button>
+    </div>
+    <div class="modal-body"><p id="confirmMsg">確定要刪除此病患嗎？</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger btn-sm" id="confirmOkBtn">確定刪除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const API = ''; // same origin
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function showToast(msg, type = 'info', duration = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+function setStatus(msg, loading = false) {
+  const bar = document.getElementById('statusBar');
+  bar.innerHTML = (loading ? '<span class="spinner"></span>' : '') + escHtml(msg);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+  if (name === 'csv') loadCSVFiles();
+}
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATIENT LIST
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function renderPatientList() {
+  const tbody = document.getElementById('patientBody');
+  try {
+    const patients = await apiFetch('/api/patients');
+
+    if (patients.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">尚未新增病患，請點選「+ 新增病患」開始</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = patients.map(p => {
+      const schedBadge = p.schedule === '一三五'
+        ? '<span class="badge badge-135">一三五</span>'
+        : '<span class="badge badge-246">二四六</span>';
+      const shiftBadge = p.shift === '上午'
+        ? '<span class="badge badge-am">上午</span>'
+        : '<span class="badge badge-pm">下午</span>';
+
+      return `<tr>
+        <td><a href="#" onclick="viewPatientLab('${p.chartno}'); return false;" style="color:#2980b9;font-weight:600">${p.chartno}</a></td>
+        <td>${escHtml(p.name)}</td>
+        <td>${p.gender || ''}</td>
+        <td>${p.age || ''}</td>
+        <td>${schedBadge}</td>
+        <td>${shiftBadge}</td>
+        <td id="cache-${p.chartno}"><span class="text-muted">—</span></td>
+        <td class="actions">
+          <button class="btn btn-primary btn-sm" onclick="updatePatientData('${p.chartno}')">更新</button>
+          <button class="btn btn-outline btn-sm" onclick="showEditPatient('${p.chartno}')">編輯</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeletePatient('${p.chartno}', '${escHtml(p.name)}')">刪除</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    // Load cache status for each patient asynchronously
+    for (const p of patients) {
+      loadCacheStatus(p.chartno);
+    }
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding:24px;color:#c0392b">載入失敗: ${escHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function loadCacheStatus(chartno) {
+  try {
+    const status = await apiFetch(`/api/reports/cache-status?chartno=${chartno}`);
+    const el = document.getElementById(`cache-${chartno}`);
+    if (!el) return;
+
+    if (status.status === 'hit') {
+      el.innerHTML = `<span class="badge badge-cache">已快取 ${status.age_hours}h (${status.order_count}筆)</span>`;
+    } else {
+      el.innerHTML = '<span class="text-muted">未快取</span>';
+    }
+  } catch (_) {}
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATIENT CRUD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let _editChartno = null;
+
+function showAddPatient() {
+  _editChartno = null;
+  document.getElementById('modalTitle').textContent = '新增病患';
+  document.getElementById('modalChartno').value = '';
+  document.getElementById('modalChartno').disabled = false;
+  document.getElementById('modalName').value = '';
+  document.getElementById('modalSchedule').value = '一三五';
+  document.getElementById('modalShift').value = '上午';
+  document.getElementById('patientModal').classList.remove('hidden');
+}
+
+async function showEditPatient(chartno) {
+  try {
+    const p = await apiFetch(`/api/patients/${chartno}`);
+    _editChartno = chartno;
+    document.getElementById('modalTitle').textContent = '編輯病患';
+    document.getElementById('modalChartno').value = p.chartno;
+    document.getElementById('modalChartno').disabled = true;
+    document.getElementById('modalName').value = p.name;
+    document.getElementById('modalSchedule').value = p.schedule || '一三五';
+    document.getElementById('modalShift').value = p.shift || '上午';
+    document.getElementById('patientModal').classList.remove('hidden');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function closeModal() { document.getElementById('patientModal').classList.add('hidden'); }
+function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); }
+
+async function savePatientModal() {
+  const chartno = document.getElementById('modalChartno').value;
+  const name = document.getElementById('modalName').value.trim();
+  const schedule = document.getElementById('modalSchedule').value;
+  const shift = document.getElementById('modalShift').value;
+
+  if (!name) { showToast('請輸入姓名', 'error'); return; }
+
+  try {
+    if (_editChartno) {
+      await apiFetch(`/api/patients/${_editChartno}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, schedule, shift }),
+      });
+      showToast('已更新病患資料', 'success');
+    } else {
+      await apiFetch('/api/patients', {
+        method: 'POST',
+        body: JSON.stringify({ chartno, name, schedule, shift }),
+      });
+      showToast('已新增病患', 'success');
+    }
+    closeModal();
+    renderPatientList();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function confirmDeletePatient(chartno, name) {
+  document.getElementById('confirmMsg').textContent = `確定要刪除 ${name} (${chartno}) 嗎？`;
+  document.getElementById('confirmOkBtn').onclick = async () => {
+    try {
+      await apiFetch(`/api/patients/${chartno}`, { method: 'DELETE' });
+      closeConfirm();
+      renderPatientList();
+      showToast('已刪除病患', 'info');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FETCH & VIEW LAB DATA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function updatePatientData(chartno) {
+  setStatus(`正在擷取 ${chartno} 的資料...`, true);
+  try {
+    const data = await apiFetch(`/api/reports?chartno=${chartno}&type=all&refresh=true`);
+    setStatus(`${chartno}: 更新完成 (${data.total_orders} 筆醫囑, ${data.from_cache ? '快取' : '新抓取'})`);
+    showToast(`${chartno} 資料更新完成`, 'success');
+    renderPatientList();
+  } catch (err) {
+    setStatus(`${chartno}: 擷取失敗 - ${err.message}`);
+    showToast(`${chartno} 擷取失敗: ${err.message}`, 'error');
+  }
+}
+
+async function updateAllPatients() {
+  const btn = document.getElementById('btnUpdateAll');
+  btn.disabled = true;
+  setStatus('正在更新全部病患資料...', true);
+
+  try {
+    const result = await apiFetch('/api/patients/update-all', { method: 'POST' });
+    setStatus(`全部更新完成: ${result.success} 成功, ${result.fail} 失敗`);
+    showToast(`更新完成: ${result.success} 成功${result.fail ? `, ${result.fail} 失敗` : ''}`,
+      result.fail ? 'warning' : 'success');
+    renderPatientList();
+  } catch (err) {
+    setStatus(`更新失敗: ${err.message}`);
+    showToast(`更新失敗: ${err.message}`, 'error');
+  }
+
+  btn.disabled = false;
+}
+
+async function viewPatientLab(chartno) {
+  const reportType = document.getElementById('labReportType').value;
+  setStatus(`正在載入 ${chartno} 的資料...`, true);
+
+  try {
+    const data = await apiFetch(`/api/reports?chartno=${chartno}&type=${reportType}`);
+
+    // Update header
+    const pi = data.patient_info;
+    document.getElementById('labPatientName').textContent = pi
+      ? `${pi.name} (${chartno})` : chartno;
+    document.getElementById('labPatientMeta').textContent = pi
+      ? `${pi.gender || ''} ${pi.age ? pi.age + '歲' : ''}`
+      : '';
+
+    const labWrapper = document.getElementById('labTableWrapper');
+    const imgWrapper = document.getElementById('imageReportWrapper');
+
+    // Render lab data table
+    if (data.lab_data) {
+      renderLabTable(data.lab_data, labWrapper);
+    } else {
+      labWrapper.innerHTML = '';
+    }
+
+    // Render image reports
+    if (data.image_reports && data.image_reports.length > 0) {
+      renderImageReports(data.image_reports, imgWrapper);
+    } else {
+      imgWrapper.innerHTML = '';
+    }
+
+    const cacheNote = data.from_cache ? ` (快取: ${new Date(data.fetched_at).toLocaleString('zh-TW')})` : '';
+    setStatus(`${chartno}: ${data.total_orders} 筆醫囑${cacheNote}`);
+    switchTab('labview');
+  } catch (err) {
+    setStatus(`${chartno}: 載入失敗 - ${err.message}`);
+    showToast(err.message, 'error');
+  }
+}
+
+// Re-fetch when report type changes
+document.getElementById('labReportType').addEventListener('change', () => {
+  const nameEl = document.getElementById('labPatientName');
+  const match = nameEl.textContent.match(/\((\w+)\)/);
+  if (match) viewPatientLab(match[1]);
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAB TABLE RENDERING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Category definitions for grouping
+const LAB_CATEGORIES = [
+  { id: 'CBC', label: '血液常規', tests: ['WBC','Hb','Platelet','RBC','HCT','MCV'] },
+  { id: 'PROTEIN', label: '蛋白質', tests: ['TP','Albumin'] },
+  { id: 'LIVER', label: '肝功能', tests: ['GOT','GPT','ALP','ALKP','TBIL','RGT'] },
+  { id: 'LIPID', label: '血脂', tests: ['CHOL','LDL','TG','HDLC'] },
+  { id: 'SUGAR', label: '血糖', tests: ['Glucose','GluAC','HbA1C','HbA1c'] },
+  { id: 'RENAL', label: '腎功能', tests: ['BUN','BUN_pre','BUN_post','CREAT','UA','eGFR','UACR','UPCR'] },
+  { id: 'LYTE', label: '電解質', tests: ['NA','Na','K','Cl','Ca','FreeCa','P','MG'] },
+  { id: 'IRON', label: '鐵代謝', tests: ['Fe','FE','TIBC','TSAT','Ferritin'] },
+  { id: 'PTH', label: '副甲狀腺', tests: ['iPTH'] },
+  { id: 'HEPAT', label: '肝炎 / 感染', tests: ['HBsAg','AntiHBs','AntiHCV','AFP','HIV','RPR','HCV'] },
+  { id: 'THYROID', label: '甲狀腺', tests: ['TSH','FreeT4'] },
+  { id: 'CANCER', label: '癌症指數', tests: ['CEA','CA199','PSA','CA125'] },
+  { id: 'NUTRITION', label: '營養', tests: ['VitB12','FolicAcid'] },
+  { id: 'COMPUTED', label: '計算值', tests: ['URR','CaxP'] },
+];
+
+function renderLabTable(labData, wrapper) {
+  // Collect all unique dates
+  const dateSet = new Set();
+  for (const testId in labData) {
+    if (testId.startsWith('_')) continue;
+    const entries = labData[testId];
+    if (!Array.isArray(entries)) continue;
+    for (const e of entries) dateSet.add(e.date);
+  }
+
+  const dates = Array.from(dateSet).sort((a, b) => b.localeCompare(a));
+
+  if (dates.length === 0) {
+    wrapper.innerHTML = '<p class="text-center text-muted" style="padding:24px">未找到任何檢驗數據</p>';
+    return;
+  }
+
+  // Date headers in Taiwan calendar format
+  const dateHeaders = dates.map(d => {
+    const parts = d.split('-');
+    return `${+parts[0] - 1911}/${parts[1]}/${parts[2]}`;
+  });
+
+  let html = '<table class="lab-table"><thead><tr>';
+  html += '<th style="min-width:120px;position:sticky;left:0;z-index:3;background:#1a5276">檢驗項目</th>';
+  html += '<th style="min-width:90px;position:sticky;left:120px;z-index:3;background:#1a5276">參考值</th>';
+  dates.forEach((d, i) => {
+    html += `<th${i === 0 ? ' class="latest-col"' : ''}>${dateHeaders[i]}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  for (const cat of LAB_CATEGORIES) {
+    // Find tests in this category that have data
+    const testsWithData = cat.tests.filter(tid => {
+      const entries = labData[tid];
+      return entries && Array.isArray(entries) && entries.length > 0;
+    });
+    if (testsWithData.length === 0) continue;
+
+    html += `<tr class="row-category"><td colspan="${dates.length + 2}">${cat.label}</td></tr>`;
+
+    for (const tid of testsWithData) {
+      const entries = labData[tid];
+      const dateMap = {};
+      for (const e of entries) {
+        if (!dateMap[e.date]) dateMap[e.date] = e.value;
+      }
+
+      html += '<tr class="row-item">';
+      html += `<td>${escHtml(tid)}</td>`;
+      html += `<td></td>`;
+
+      dates.forEach((d, i) => {
+        const val = dateMap[d];
+        const cls = i === 0 ? ' latest-col' : '';
+        if (val == null) { html += `<td class="${cls}"></td>`; return; }
+
+        // Color coding
+        let valCls = '';
+        const numVal = typeof val === 'number' ? val : parseFloat(val);
+        // Simple high/low — the server doesn't send thresholds in the response,
+        // but the value is already numeric. We just display it as-is for now.
+        html += `<td class="${valCls}${cls}">${val}</td>`;
+      });
+
+      html += '</tr>';
+    }
+  }
+
+  // Also show any testIds not covered by categories
+  const categorized = new Set(LAB_CATEGORIES.flatMap(c => c.tests));
+  const uncategorized = Object.keys(labData).filter(tid =>
+    !tid.startsWith('_') && !categorized.has(tid) &&
+    Array.isArray(labData[tid]) && labData[tid].length > 0
+  );
+
+  if (uncategorized.length > 0) {
+    html += `<tr class="row-category"><td colspan="${dates.length + 2}">其他</td></tr>`;
+    for (const tid of uncategorized) {
+      const entries = labData[tid];
+      const dateMap = {};
+      for (const e of entries) { if (!dateMap[e.date]) dateMap[e.date] = e.value; }
+
+      html += '<tr class="row-item">';
+      html += `<td>${escHtml(tid)}</td><td></td>`;
+      dates.forEach((d, i) => {
+        const val = dateMap[d];
+        html += `<td${i === 0 ? ' class="latest-col"' : ''}>${val != null ? val : ''}</td>`;
+      });
+      html += '</tr>';
+    }
+  }
+
+  html += '</tbody></table>';
+  wrapper.innerHTML = html;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMAGE REPORT RENDERING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function renderImageReports(reports, wrapper) {
+  if (!reports || reports.length === 0) {
+    wrapper.innerHTML = '';
+    return;
+  }
+
+  let html = '<h3 style="font-size:15px;font-weight:600;margin-bottom:8px;color:#1a5276">影像報告</h3>';
+  for (const r of reports) {
+    html += `<div class="image-report-card">
+      <div class="report-title">${escHtml(r.orderName)}</div>
+      <div class="report-date">${escHtml(r.orderDate)} | ${escHtml(r.date)}</div>
+      <div class="report-text">${escHtml(r.reportText || '(無報告內容)')}</div>
+    </div>`;
+  }
+  wrapper.innerHTML = html;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMPORT / EXPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function exportData() {
+  try {
+    const patients = await apiFetch('/api/patients');
+    const blob = new Blob([JSON.stringify(patients, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `洗腎室病患清單_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('匯出完成', 'success');
+  } catch (err) {
+    showToast('匯出失敗: ' + err.message, 'error');
+  }
+}
+
+async function importPatients(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('格式不正確');
+
+      let added = 0, updated = 0;
+      for (const p of imported) {
+        if (!p.chartno || !p.name) continue;
+        try {
+          await apiFetch('/api/patients', {
+            method: 'POST',
+            body: JSON.stringify(p),
+          });
+          added++;
+        } catch (_) {
+          // Already exists — try update
+          try {
+            await apiFetch(`/api/patients/${p.chartno}`, {
+              method: 'PUT',
+              body: JSON.stringify(p),
+            });
+            updated++;
+          } catch (__) {}
+        }
+      }
+
+      renderPatientList();
+      showToast(`匯入完成: ${added} 新增, ${updated} 更新`, 'success');
+    } catch (err) {
+      showToast(`匯入失敗: ${err.message}`, 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function loadSettingsUI() {
+  try {
+    const s = await apiFetch('/api/settings');
+    document.getElementById('settingBaseUrl').value = s.baseUrl || '';
+    document.getElementById('settingOpsid').value = s.opsid || '';
+  } catch (_) {}
+}
+
+async function saveSettingsUI() {
+  const baseUrl = document.getElementById('settingBaseUrl').value.trim().replace(/\/+$/, '');
+  const opsid = document.getElementById('settingOpsid').value.trim();
+  try {
+    await apiFetch('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify({
+        baseUrl: baseUrl || 'http://ernode.vghb12.vhtt.gov.tw:8000',
+        opsid,
+      }),
+    });
+    showToast('設定已儲存', 'success');
+  } catch (err) {
+    showToast('儲存失敗: ' + err.message, 'error');
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CSV MONTHLY REPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function compileCSV(forceRefresh) {
+  const year = parseInt(document.getElementById('csvYear').value, 10);
+  const month = parseInt(document.getElementById('csvMonth').value, 10);
+  if (!year || !month) {
+    showToast('請選擇年份與月份', 'error');
+    return;
+  }
+
+  const statusEl = document.getElementById('csvStatus');
+  const btn = document.getElementById('btnCompile');
+  btn.disabled = true;
+  statusEl.innerHTML = '<span style="color:#2980b9">編譯中，請稍候...</span>';
+
+  try {
+    const result = await apiFetch('/api/csv/compile', {
+      method: 'POST',
+      body: JSON.stringify({ year, month, forceRefresh }),
+    });
+
+    let msg = `編譯完成: ${result.patientCount} 位病患, ${result.rowCount} 筆資料`;
+    if (result.errors && result.errors.length > 0) {
+      msg += ` (${result.errors.length} 筆錯誤)`;
+    }
+    statusEl.innerHTML = `<span style="color:#27ae60">${escHtml(msg)}</span>`;
+    showToast(msg, 'success');
+    loadCSVFiles();
+  } catch (err) {
+    statusEl.innerHTML = `<span style="color:#c0392b">編譯失敗: ${escHtml(err.message)}</span>`;
+    showToast('編譯失敗: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadCSVFiles() {
+  const container = document.getElementById('csvFileList');
+  try {
+    const files = await apiFetch('/api/csv/list');
+    if (!files.length) {
+      container.innerHTML = '<p class="text-muted">尚無已編譯的 CSV 檔案</p>';
+      return;
+    }
+
+    let html = '<table class="data-table" style="width:100%"><thead><tr>'
+      + '<th>檔案名稱</th><th>大小</th><th>修改時間</th><th>操作</th>'
+      + '</tr></thead><tbody>';
+    for (const f of files) {
+      const sizeKB = (f.size / 1024).toFixed(1);
+      const modified = new Date(f.modified).toLocaleString('zh-TW');
+      const dlYear = f.filename.match(/(\d{4})/)?.[1] || '';
+      const dlMonth = f.filename.match(/_(\d{2})\.csv/)?.[1] || '';
+      html += `<tr>
+        <td>${escHtml(f.filename)}</td>
+        <td>${sizeKB} KB</td>
+        <td>${escHtml(modified)}</td>
+        <td><a href="/api/csv/download?year=${dlYear}&month=${parseInt(dlMonth,10)}" class="btn btn-sm btn-primary" download>下載</a></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#c0392b">載入檔案列表失敗: ${escHtml(err.message)}</p>`;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettingsUI();
+  renderPatientList();
+
+  // Set CSV tab defaults to current year/month
+  const now = new Date();
+  document.getElementById('csvYear').value = now.getFullYear();
+  document.getElementById('csvMonth').value = now.getMonth() + 1;
+  loadCSVFiles();
+});
+</script>
+</body>
+</html>

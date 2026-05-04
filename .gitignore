@@ -1,0 +1,25 @@
+# Build / temp artefacts
+*.tmp.*
+*.zip
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (the cache.js / patients.js Express attempt — keep node_modules out)
+node_modules/
+package-lock.json
+
+# Local data (anything saved to the user's localStorage that's been exported)
+data/
+
+# Hand-off briefs from Cowork to Claude Code (per-task, not for sharing)
+TASK_BRIEF*.md
+
+# Step-validation scratch (real patient CSVs land here during diff testing)
+tmp/

@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>洗腎室檢驗資料管理</title>
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Segoe UI', Arial, sans-serif;
+  background: #f0f4f8; color: #2c3e50; line-height: 1.5; font-size: 14px;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────────────── */
+.app-header {
+  background: linear-gradient(135deg, #1a5276, #2980b9);
+  color: #fff; padding: 12px 24px; display: flex; align-items: center;
+  justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.app-header h1 { font-size: 20px; font-weight: 600; letter-spacing: 1px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ─── Buttons ──────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer;
+  font-size: 13px; font-family: inherit; transition: all .15s;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn-primary   { background: #2980b9; color: #fff; }
+.btn-success   { background: #27ae60; color: #fff; }
+.btn-warning   { background: #e67e22; color: #fff; }
+.btn-danger    { background: #c0392b; color: #fff; }
+.btn-secondary { background: #95a5a6; color: #fff; }
+.btn-outline   { background: transparent; border: 1px solid #bdc3c7; color: #2c3e50; }
+.btn-outline:hover { background: #ecf0f1; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 6px 8px; font-size: 16px; background: transparent; color: #fff; border: none; cursor: pointer; }
+.btn-icon:hover { background: rgba(255,255,255,.15); border-radius: 4px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── Layout ───────────────────────────────────────────────────────────────── */
+.container { max-width: 1400px; margin: 0 auto; padding: 16px 24px; }
+.card {
+  background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  margin-bottom: 16px; overflow: hidden;
+}
+.card-header {
+  background: #f8f9fa; padding: 10px 16px; border-bottom: 1px solid #e9ecef;
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; font-size: 15px;
+}
+.card-body { padding: 16px; }
+
+/* ─── Tabs ─────────────────────────────────────────────────────────────────── */
+.tabs { display: flex; border-bottom: 2px solid #e9ecef; margin-bottom: 16px; }
+.tab-btn {
+  padding: 8px 20px; border: none; background: transparent; cursor: pointer;
+  font-size: 14px; font-family: inherit; color: #7f8c8d;
+  border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .2s;
+}
+.tab-btn.active { color: #1a5276; border-bottom-color: #1a5276; font-weight: 600; }
+.tab-btn:hover:not(.active) { color: #2c3e50; background: #f8f9fa; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ─── Patient Table ────────────────────────────────────────────────────────── */
+.patient-table { width: 100%; border-collapse: collapse; }
+.patient-table th {
+  background: #1a5276; color: #fff; padding: 8px 12px; text-align: left;
+  font-weight: 500; font-size: 13px; white-space: nowrap;
+}
+.patient-table td {
+  padding: 8px 12px; border-bottom: 1px solid #e9ecef; font-size: 13px;
+}
+.patient-table tr:hover td { background: #eaf2f8; }
+.patient-table .actions { white-space: nowrap; }
+
+/* ─── Lab Data Table ───────────────────────────────────────────────────────── */
+.lab-wrapper { overflow-x: auto; }
+.lab-table { border-collapse: collapse; min-width: 100%; font-size: 12px; }
+.lab-table th, .lab-table td {
+  padding: 4px 8px; border: 1px solid #ddd; white-space: nowrap;
+}
+.lab-table thead th {
+  background: #1a5276; color: #fff; position: sticky; top: 0; z-index: 2;
+  font-weight: 500;
+}
+.lab-table .row-category {
+  background: #2c3e50; color: #fff; font-weight: 600; text-align: left;
+}
+.lab-table .row-item td:first-child {
+  background: #f8f9fa; font-weight: 500; position: sticky; left: 0; z-index: 1;
+  min-width: 120px; border-right: 2px solid #bdc3c7;
+}
+.lab-table .row-item td:nth-child(2) {
+  background: #f8f9fa; position: sticky; left: 120px; z-index: 1;
+  min-width: 90px; border-right: 2px solid #bdc3c7; color: #7f8c8d; font-size: 11px;
+}
+.val-hi { color: #c0392b; font-weight: 700; }
+.val-lo { color: #2471a3; font-weight: 700; }
+.val-q-pos { color: #c0392b; font-weight: 700; }
+.val-q-neg { color: #27ae60; }
+.latest-col { background: rgba(255,235,59,.1); }
+
+/* ─── Modal ────────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex;
+  align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: #fff; border-radius: 8px; width: 420px; max-width: 95vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-header {
+  padding: 14px 20px; border-bottom: 1px solid #e9ecef;
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 600; font-size: 16px;
+}
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #7f8c8d; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid #e9ecef; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ─── Form ─────────────────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #34495e; }
+.form-group input, .form-group select {
+  width: 100%; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 4px;
+  font-size: 13px; font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #2980b9; box-shadow: 0 0 0 2px rgba(41,128,185,.2); }
+
+/* ─── Status bar ───────────────────────────────────────────────────────────── */
+.status-bar {
+  padding: 8px 16px; font-size: 12px; color: #7f8c8d;
+  border-top: 1px solid #e9ecef; background: #f8f9fa;
+}
+.status-bar .spinner { display: inline-block; width: 12px; height: 12px;
+  border: 2px solid #bdc3c7; border-top-color: #2980b9; border-radius: 50%;
+  animation: spin .6s linear infinite; margin-right: 6px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Settings panel ──────────────────────────────────────────────────────── */
+.settings-panel { max-width: 500px; }
+
+/* ─── Misc ─────────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-am { background: #fdebd0; color: #e67e22; }
+.badge-pm { background: #d5f5e3; color: #27ae60; }
+.badge-135 { background: #d6eaf8; color: #2980b9; }
+.badge-246 { background: #fadbd8; color: #c0392b; }
+.text-muted { color: #95a5a6; }
+.text-center { text-align: center; }
+.mt-8 { margin-top: 8px; }
+.mb-8 { margin-bottom: 8px; }
+.gap-8 { gap: 8px; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+
+/* ─── Patient detail header ────────────────────────────────────────────────── */
+.patient-detail-header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+  padding-bottom: 12px; border-bottom: 2px solid #e9ecef;
+}
+.patient-detail-header h2 { font-size: 18px; }
+.patient-detail-header .meta { font-size: 13px; color: #7f8c8d; }
+
+/* ─── KtV / URR computed row ───────────────────────────────────────────────── */
+.computed-row { background: #fffde7; }
+
+/* ─── Toast ────────────────────────────────────────────────────────────────── */
+.toast-container { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 10px 16px; border-radius: 6px; color: #fff; font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15); animation: toastIn .3s ease;
+  max-width: 360px;
+}
+.toast-success { background: #27ae60; }
+.toast-error { background: #c0392b; }
+.toast-info { background: #2980b9; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<!-- ═══ Header ════════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <h1>洗腎室檢驗資料管理</h1>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="switchTab('patients')" title="病患清單">&#128100;</button>
+    <button class="btn-icon" onclick="switchTab('settings')" title="設定">&#9881;</button>
+  </div>
+</header>
+
+<!-- ═══ Toast Container ══════════════════════════════════════════════════════ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══ Main Container ════════════════════════════════════════════════════════ -->
+<div class="container">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="patients" onclick="switchTab('patients')">病患清單</button>
+    <button class="tab-btn" data-tab="labview" onclick="switchTab('labview')">檢驗資料</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">設定</button>
+  </div>
+
+  <!-- ═══ Tab: Patient List ════════════════════════════════════════════════── -->
+  <div class="tab-panel active" id="tab-patients">
+    <div class="card">
+      <div class="card-header">
+        <span>病患清單</span>
+        <div class="flex gap-8">
+          <button class="btn btn-primary btn-sm" onclick="showAddPatient()">+ 新增病患</button>
+          <button class="btn btn-success btn-sm" onclick="updateAllPatients()" id="btnUpdateAll">更新全部資料</button>
+          <button class="btn btn-outline btn-sm" onclick="exportPatients()">匯出 JSON</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">匯入 JSON</button>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importPatients(event)">
+          <button class="btn btn-outline btn-sm" onclick="exportAllLabData()">匯出檢驗資料</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table class="patient-table">
+          <thead>
+            <tr>
+              <th>病歷號</th>
+              <th>姓名</th>
+              <th>性別</th>
+              <th>年齡</th>
+              <th>洗腎頻率</th>
+              <th>時段</th>
+              <th>最後更新</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="patientBody"></tbody>
+        </table>
+      </div>
+      <div class="status-bar" id="statusBar">就緒</div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab: Lab View ════════════════════════════════════════════════════── -->
+  <div class="tab-panel" id="tab-labview">
+    <div class="card">
+      <div class="card-header">
+        <div class="patient-detail-header" id="labPatientHeader" style="border:none;margin:0;padding:0">
+          <h2 id="labPatientName">請選擇病患</h2>
+          <span class="meta" id="labPatientMeta"></span>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="switchTab('patients')">返回清單</button>
+      </div>
+      <div class="card-body">
+        <div class="lab-wrapper" id="labTableWrapper">
+          <p class="text-center text-muted">請從病患清單點選病患以查看檢驗資料</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab: Settings ════════════════════════════════════════════════════── -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card settings-panel">
+      <div class="card-header"><span>系統設定</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>API Base URL</label>
+          <input type="text" id="settingBaseUrl" placeholder="http://ernode.vghb12.vhtt.gov.tw:8000">
+        </div>
+        <div class="form-group">
+          <label>操作人員代號 (OPSID)</label>
+          <input type="text" id="settingOpsid" placeholder="A123456789">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">儲存設定</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ Patient Modal ═════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="patientModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modalTitle">新增病患</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>病歷號 (Chart No.)</label>
+        <input type="text" id="modalChartno" placeholder="810385G 或 000810385G">
+      </div>
+      <div class="form-group">
+        <label>姓名</label>
+        <input type="text" id="modalName" placeholder="王小明">
+      </div>
+      <div class="form-group">
+        <label>洗腎頻率</label>
+        <select id="modalSchedule">
+          <option value="一三五">一三五</option>
+          <option value="二四六">二四六</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>時段</label>
+        <select id="modalShift">
+          <option value="上午">上午</option>
+          <option value="下午">下午</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="modalSaveBtn" onclick="savePatient()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Confirm Modal ═════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal" style="width:340px">
+    <div class="modal-header">
+      <span>確認刪除</span>
+      <button class="modal-close" onclick="closeConfirm()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg">確定要刪除此病患嗎？</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger btn-sm" id="confirmOkBtn">確定刪除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// __HOSPITAL_LAB_PATTERNS_BEGIN__
+// ════════════════════════════════════════════════════════════════════════════
+// AUTO-GENERATED BLOCK — DO NOT EDIT BETWEEN THE __PATTERNS__ MARKERS
+//
+// Source of truth: hospital-lab-patterns repo (catalog.js + reporter.js)
+//   https://github.com/Yuchunchen/hospital-lab-patterns
+//
+// To update:
+//   1. Edit ../hospital-lab-patterns/patterns/{catalog,reporter}.js
+//   2. git commit + git push
+//   3. cd hospital-lab-reporter && node sync-patterns.js
+//   4. Reload hospital-lab-data.html in your browser
+//
+// Synced at: 2026-05-04T02:09:22.420Z
+// ════════════════════════════════════════════════════════════════════════════
+'use strict';
+
+/**
+ * catalog.js — Master human-readable catalog of every lab/imaging entry
+ * we know how to detect from the ernode API.
+ *
+ * Goals:
+ *   1. Single source of truth: every test pattern lives here ONCE.
+ *   2. Human-readable: organised by clinical category with comments.
+ *   3. Universal fields only — NO app-specific layout (page/col/section/cat).
+ *      Each consuming app (viewer / reporter) has its own manifest that
+ *      picks ids from this catalog and adds layout / overrides.
+ *
+ * "Track-only" patterns (detect but don't render anywhere) just live here
+ * and aren't referenced by any manifest.
+ *
+ * See ../docs/pattern-spec.md for field definitions, ../docs/learning-workflow.md
+ * for the Claude-driven recipe to add new entries.
+ */
+
+const CATALOG = [
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HEMATOLOGY (CBC)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'WBC',
+    pattern: /WBC:\s*([\d.]+)(?!\s*[-–]\s*\d)/,
+    displayName:'白血球 (WBC)', shortLabel:'WBC',
+    unit:'×10³/µL', category:'血液',
+    ref:'4.0–11.0 ×10³/µL',
+    refLo:4.0, refHi:11.0, hi:11, lo:4,
+    normalize: 'wbcCount',
+    notes:'Negative lookahead in pattern rejects urine routine "WBC: 0-5". Normalize handles /µL (e.g. 6700) → ×10³/µL (6.7).' },
+
+  { id:'RBC',
+    pattern: /\bRBC:\s*([\d.]+)/,
+    displayName:'紅血球 (RBC)', shortLabel:'RBC',
+    unit:'×10⁶/µL', category:'血液',
+    ref:'男 4.2–6.2，女 3.7–5.5 ×10⁶/µL',
+    refLo:3.7, refHi:6.2, hi:6.2, lo:4.2 },
+
+  { id:'Hb',
+    pattern: /(?:Hb|HGB):\s*([\d.]+)/,
+    displayName:'血色素 (Hemoglobin)', shortLabel:'Hb',
+    unit:'g/dL', category:'血液',
+    ref:'男 14–18，女 12–16 g/dL',
+    refLo:12, refHi:18, hi:18, lo:14,
+    notes:'Pattern matches both "Hb:" and "HGB:" labels.' },
+
+  { id:'HCT',
+    pattern: /HCT:\s*([\d.]+)/,
+    displayName:'血比容 (HCT)', shortLabel:'HCT',
+    unit:'%', category:'血液',
+    ref:'男 39–53，女 33–47 %',
+    refLo:33, refHi:53, hi:53, lo:39 },
+
+  { id:'MCV',
+    pattern: /MCV:\s*([\d.]+)/,
+    displayName:'平均紅血球容積 (MCV)', shortLabel:'MCV',
+    unit:'fL', category:'血液',
+    ref:'79–99 fL',
+    refLo:79, refHi:99, hi:99, lo:79 },
+
+  { id:'Platelet',
+    pattern: /Platelet:\s*([\d.]+)/,
+    displayName:'血小板 (Platelet)', shortLabel:'PLT',
+    unit:'×10³/µL', category:'血液',
+    ref:'150–400 ×10³/µL',
+    refLo:150, refHi:400, hi:400, lo:150,
+    normalize: 'plateletCount',
+    notes:'Normalize handles /µL (e.g. 250000) → ×10³/µL (250).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PROTEINS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'TP',
+    pattern: /Total protein\(serum\):\s*([\d.]+)/i,
+    displayName:'總蛋白 (Total Protein)', shortLabel:'TP',
+    unit:'g/dL', category:'蛋白質',
+    ref:'6.0–8.3 g/dL',
+    refLo:6.0, refHi:8.3, hi:8.3, lo:6.0 },
+
+  { id:'Albumin',
+    pattern: /(?:^|[\s;])Albumin(?:\([^)]*\))?:\s*([\d.]+)/i,
+    displayName:'白蛋白 (Albumin)', shortLabel:'Alb',
+    unit:'g/dL', category:'蛋白質',
+    ref:'3.5–5.0 g/dL',
+    refLo:3.5, refHi:5.0, hi:5.0, lo:3.5,
+    meaning:'營養狀態指標',
+    notes:'Boundary requirement (^ or whitespace/semicolon) prevents matching "U-Albumin:" or "Microalbumin:".' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIVER FUNCTION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'GOT',
+    pattern: /GOT:\s*([\d.]+)/,
+    displayName:'天門冬胺酸轉氨酶 (GOT / AST)', shortLabel:'GOT/AST',
+    unit:'U/L', category:'肝功能',
+    ref:'5–34 U/L',
+    refLo:5, refHi:34, hi:34, lo:null },
+
+  { id:'GPT',
+    pattern: /GPT:\s*([\d.]+)/,
+    displayName:'丙胺酸轉氨酶 (GPT / ALT)', shortLabel:'GPT/ALT',
+    unit:'U/L', category:'肝功能',
+    ref:'男<45，女<34 U/L',
+    refLo:7, refHi:45, hi:45, lo:null },
+
+  { id:'RGT',
+    pattern: /(?:r-?GT|R-?GT|γ-?GT|GGT|RGT):\s*([\d.]+)/i,
+    displayName:'γ-麩胺醯轉移酶 (r-GT / GGT)', shortLabel:'r-GT',
+    unit:'U/L', category:'肝功能',
+    ref:'男 < 55，女 < 38 U/L',
+    refLo:0, refHi:55, hi:55, lo:null,
+    notes:'Pattern matches r-GT, R-GT, γ-GT, GGT, RGT — hospitals use various labels.' },
+
+  { id:'ALP',
+    pattern: /(?:Alk[\s.\-]*P|ALP|Alkaline\s*Phosphatase):\s*([\d.]+)/i,
+    displayName:'鹼性磷酸酶 (Alk-P / ALP)', shortLabel:'Alk-P',
+    unit:'U/L', category:'肝功能',
+    ref:'40–130 U/L',
+    refLo:34, refHi:130, hi:130, lo:34 },
+
+  { id:'TBIL',
+    pattern: /T-BIL:\s*([\d.]+)/,
+    displayName:'總膽紅素 (T-BIL)', shortLabel:'T-BIL',
+    unit:'mg/dL', category:'肝功能',
+    ref:'0.3–1.0 mg/dL',
+    refLo:0.3, refHi:1.0, hi:1.0, lo:null },
+
+  { id:'DBIL',
+    pattern: /D-BIL:\s*([\d.]+)/,
+    displayName:'直接膽紅素 (D-BIL)', shortLabel:'D-BIL',
+    unit:'mg/dL', category:'肝功能',
+    ref:'0.03–0.18 mg/dL',
+    refLo:0.03, refHi:0.18, hi:0.18, lo:null },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIPIDS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'CHOL',
+    pattern: /CHOL:\s*([\d.]+)/,
+    displayName:'總膽固醇 (Cholesterol)', shortLabel:'CHOL',
+    unit:'mg/dL', category:'血脂',
+    ref:'< 200 mg/dL',
+    refLo:null, refHi:200, hi:200, lo:null },
+
+  { id:'HDLC',
+    pattern: /HDLC:\s*([\d.]+)/,
+    displayName:'高密度膽固醇 (HDL)', shortLabel:'HDL',
+    unit:'mg/dL', category:'血脂',
+    ref:'男 >40 mg/dL',
+    refLo:40, refHi:null, hi:null, lo:40,
+    meaning:'俗稱「好膽固醇」' },
+
+  { id:'LDL',
+    pattern: /LDL-C:\s*([\d.]+)/,
+    displayName:'低密度膽固醇 (LDL)', shortLabel:'LDL-C',
+    unit:'mg/dL', category:'血脂',
+    ref:'< 130 mg/dL',
+    refLo:null, refHi:130, hi:130, lo:null,
+    meaning:'俗稱「壞膽固醇」' },
+
+  { id:'TG',
+    pattern: /Triglyceride:\s*([\d.]+)/,
+    displayName:'三酸甘油脂 (Triglyceride)', shortLabel:'TG',
+    unit:'mg/dL', category:'血脂',
+    ref:'< 150 mg/dL',
+    refLo:null, refHi:150, hi:150, lo:null },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // GLUCOSE
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'GluAC',
+    pattern: /(?:Glucose(?:\([^)]*\))?|GLU[\s-]*(?:AC)?|Sugar(?:\([^)]*\))?|AC[\s-]*Sugar|飯前血糖):\s*([\d.]+)/i,
+    displayName:'空腹血糖 (AC Sugar)', shortLabel:'空腹血糖',
+    unit:'mg/dL', category:'血糖',
+    ref:'74–100 mg/dL',
+    refLo:74, refHi:100, hi:100, lo:74,
+    notes:'Matches Glucose(...), GLU, GLU-AC, Sugar(...), AC Sugar, 飯前血糖 — many hospital label variants.' },
+
+  { id:'HbA1c',
+    pattern: /HBA[I1]C%?:\s*([\d.]+)/i,
+    displayName:'糖化血色素 (HbA1c)', shortLabel:'HbA1c',
+    unit:'%', category:'血糖',
+    ref:'4–6 %',
+    refLo:4, refHi:6, hi:6, lo:null,
+    notes:'Pattern allows HBA1C and HBAIC (some systems print I instead of 1).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RENAL FUNCTION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'BUN',
+    pattern: /BUN:\s*([\d.]+)/,
+    displayName:'血尿素氮 (BUN)', shortLabel:'BUN',
+    unit:'mg/dL', category:'腎功能',
+    ref:'男 8.9–20.6，女 7.0–18.7 mg/dL',
+    refLo:7, refHi:25, hi:25.7, lo:null },
+
+  // BUN_pre / BUN_post — dialysis-specific. Only the reporter uses these.
+  // The orderNameFilter discriminates pre-dialysis (composite panel
+  // containing comma in orderName) from post-dialysis (standalone "BUN" order).
+  { id:'BUN_pre',
+    pattern: /BUN:\s*([\d.]+)/,
+    orderNameFilter: /,/,
+    displayName:'BUN（洗前）', shortLabel:'BUN(洗前)',
+    unit:'mg/dL', category:'腎功能',
+    ref:'7–25 mg/dL',
+    refLo:7, refHi:25, hi:25, lo:7,
+    meaning:'透析前 BUN — 與 BUN_post 配對計算 URR',
+    notes:'Filter selects orders whose orderName contains a comma (composite dialysis panel).' },
+
+  { id:'BUN_post',
+    pattern: /BUN:\s*([\d.]+)/,
+    orderNameFilter: /^BUN$/i,
+    displayName:'BUN（洗後）', shortLabel:'BUN(洗後)',
+    unit:'mg/dL', category:'腎功能',
+    ref:'',
+    refLo:null, refHi:null, hi:null, lo:null,
+    meaning:'透析後 BUN — 通常 6–7，與 BUN_pre 配對計算 URR',
+    notes:'Filter selects orders where orderName is exactly "BUN" (standalone post-dialysis draw).' },
+
+  { id:'CREAT',
+    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([\d.]+)/i,
+    displayName:'肌酸酐 (Creatinine, Cr)', shortLabel:'Cr',
+    unit:'mg/dL', category:'腎功能',
+    ref:'男 0.6–1.2，女 0.5–1.0 mg/dL',
+    refLo:0.5, refHi:1.3, hi:1.2, lo:null,
+    notes:'Pattern matches "Creatinine(serum):" and "CREAT:" but NOT "Creatinine(24hrs Urine):".' },
+
+  { id:'UA',
+    pattern: /(?:UA|Uric\s*acid):\s*([\d.]+)/i,
+    displayName:'尿酸 (Uric acid, UA)', shortLabel:'UA',
+    unit:'mg/dL', category:'腎功能',
+    ref:'男 3.3–7.7，女 2.5–6.2 mg/dL',
+    refLo:2.5, refHi:7.7, hi:7.7, lo:null },
+
+  { id:'eGFR',
+    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([\d.]+)/i,
+    computed:'eGFR',
+    displayName:'腎絲球過濾率 (eGFR)', shortLabel:'eGFR',
+    unit:'mL/min/1.73m²', category:'腎功能',
+    ref:'> 60 mL/min/1.73m²',
+    refLo:60, refHi:null, hi:null, lo:60,
+    meaning:'腎功能指標',
+    notes:'Computed from Creatinine via CKD-EPI 2021 (race-free). Pattern shares Creatinine capture so the same regex works.' },
+
+  { id:'UACR',
+    pattern: /(?:U-?ACR|UACR|Alb(?:umin)?\/Cr(?:eatinine)?|Urine\s*Alb\/Cr):\s*([\d.]+)/i,
+    displayName:'尿白蛋白／肌酸酐比 (UACR)', shortLabel:'UACR',
+    unit:'mg/g', category:'腎功能',
+    ref:'< 30 mg/g',
+    refLo:null, refHi:30, hi:30, lo:null,
+    meaning:'腎臟早期傷害指標',
+    notes:'Viewer fetches sub-pages from opdweb (1-year window) when UACR not in main reportText.' },
+
+  { id:'UPCR',
+    pattern: /(?:U-?PCR|UPCR|RATTC|TP\/Cr|Pr(?:otein)?\/Cr(?:eatinine)?|Urine\s*TP\/Cr):\s*([\d.]+)/i,
+    displayName:'尿蛋白／肌酸酐比 (UPCR)', shortLabel:'UPCR',
+    unit:'mg/g', category:'腎功能',
+    ref:'< 150 mg/g',
+    refLo:null, refHi:150, hi:150, lo:null,
+    notes:'RATTC label is also used at some sites for total-protein/creatinine ratio.' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // KIDNEY DISEASE STAGING (computed)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'GFRStage',  computed:'GFRStage',  pattern:null,
+    displayName:'GFR 分級 (正常, CKD2-5)', category:'腎臟病分期' },
+
+  { id:'UACRStage', computed:'UACRStage', pattern:null,
+    displayName:'微蛋白尿(UACR)分級 (正常, A2-3)', category:'腎臟病分期' },
+
+  { id:'UPCRStage', computed:'UPCRStage', pattern:null,
+    displayName:'蛋白尿(UPCR)分級 (正常/輕度/顯著/腎病)', category:'腎臟病分期' },
+
+  { id:'KDIGORisk', computed:'KDIGORisk', pattern:null,
+    displayName:'腎臟病風險 (KDIGO, 低/中/高/極高)', category:'腎臟病分期' },
+
+  { id:'TaiwanCKD', computed:'TaiwanCKD', pattern:null,
+    displayName:'慢性腎臟病分期 (正常, 第1~5期)', category:'腎臟病分期' },
+
+  { id:'EarlyCKD',  computed:'EarlyCKD',  pattern:null,
+    displayName:'健保 CKD 分群 (P1早期/P2中晚期)', category:'腎臟病分期' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ELECTROLYTES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'Na',
+    pattern: /NA\(Serum\):\s*([\d.]+)/,
+    displayName:'鈉 (Na)', shortLabel:'Na',
+    unit:'mmol/L', category:'電解質',
+    ref:'136–145 mmol/L',
+    refLo:136, refHi:145, hi:145, lo:136 },
+
+  { id:'K',
+    pattern: /K \(Serum\):\s*([\d.]+)/,
+    displayName:'鉀 (K)', shortLabel:'K',
+    unit:'mmol/L', category:'電解質',
+    ref:'3.5–5.1 mmol/L',
+    refLo:3.5, refHi:5.1, hi:5.1, lo:3.5 },
+
+  { id:'Cl',
+    pattern: /Cl\(Serum\):\s*([\d.]+)/,
+    displayName:'氯 (Cl)', shortLabel:'Cl',
+    unit:'mmol/L', category:'電解質',
+    ref:'98–107 mmol/L',
+    refLo:98, refHi:107, hi:107, lo:98 },
+
+  { id:'Ca',
+    pattern: /Calcium\(Serum\):\s*([\d.]+)/,
+    displayName:'鈣 (Ca)', shortLabel:'Ca',
+    unit:'mg/dL', category:'電解質',
+    ref:'8.6–10.3 mg/dL',
+    refLo:8.6, refHi:10.3, hi:10.3, lo:8.6 },
+
+  { id:'FreeCa',
+    pattern: /Free Ca\+\+:\s*([\d.]+)/,
+    displayName:'游離鈣 (Free Ca)', shortLabel:'Free Ca',
+    unit:'mmol/L', category:'電解質',
+    ref:'1.15–1.32 mmol/L',
+    refLo:1.15, refHi:1.32, hi:1.32, lo:1.15 },
+
+  { id:'P',
+    pattern: /Phosphorus:\s*([\d.]+)/,
+    displayName:'磷 (P)', shortLabel:'P',
+    unit:'mg/dL', category:'電解質',
+    ref:'2.5–5.0 mg/dL',
+    refLo:2.5, refHi:5.0, hi:5.0, lo:2.5 },
+
+  { id:'Mg',
+    pattern: /MG:\s*([\d.]+)/,
+    displayName:'鎂 (Magnesium, Mg)', shortLabel:'Mg',
+    unit:'mg/dL', category:'電解質',
+    ref:'1.6–2.6 mg/dL',
+    refLo:1.6, refHi:2.6, hi:2.6, lo:1.6 },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // IRON METABOLISM
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'Fe',
+    pattern: /FE:\s*([\d.]+)/,
+    displayName:'血清鐵 (Fe)', shortLabel:'Fe',
+    unit:'µg/dL', category:'鐵代謝',
+    ref:'男 65–175，女 50–170 µg/dL',
+    refLo:50, refHi:175, hi:175, lo:65 },
+
+  { id:'TIBC',
+    pattern: /TIBC:\s*([\d.]+)/,
+    displayName:'總鐵結合力 (TIBC)', shortLabel:'TIBC',
+    unit:'µg/dL', category:'鐵代謝',
+    ref:'男 134–415，女 120–480 µg/dL',
+    refLo:120, refHi:480, hi:415, lo:134 },
+
+  { id:'TSAT',
+    pattern: /SAT:\s*([\d.]+)/,
+    displayName:'鐵飽和度 (TSAT)', shortLabel:'TSAT',
+    unit:'%', category:'鐵代謝',
+    ref:'20–45 %',
+    refLo:20, refHi:45, hi:45, lo:20 },
+
+  { id:'Ferritin',
+    pattern: /(?:Ferritin|FERRITIN):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'鐵蛋白 (Ferritin)', shortLabel:'Ferritin',
+    unit:'ng/mL', category:'鐵代謝',
+    ref:'男 21.81–274.66，女 4.63–204.00 ng/mL',
+    refLo:4.63, refHi:274.66, hi:274.66, lo:21.81,
+    notes:'Capture allows leading <> operator (handles "<5.0", ">2000" results).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PARATHYROID + VITAMINS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'iPTH',
+    pattern: /i-PTH:\s*([\d.]+)/,
+    displayName:'副甲狀腺素 (iPTH)', shortLabel:'i-PTH',
+    unit:'pg/mL', category:'副甲狀腺',
+    ref:'15–68.3 pg/mL',
+    refLo:15, refHi:68.3, hi:68.3, lo:15 },
+
+  { id:'VitB12',
+    pattern: /(?:Vit(?:amin)?\.?\s*B12|VIT\.?\s*B12|B12):\s*([\d.]+)/i,
+    displayName:'維生素 B12 (Vit. B12)', shortLabel:'Vit B12',
+    unit:'pg/mL', category:'維生素',
+    ref:'187–883 pg/mL',
+    refLo:187, refHi:883, hi:883, lo:187,
+    notes:'Matches "Vit. B12:", "Vitamin B12:", "VIT.B12:", "B12:".' },
+
+  { id:'FolicAcid',
+    pattern: /(?:Folic\s+acid|Folate):\s*([\d.]+)/i,
+    displayName:'葉酸 (Folic Acid)', shortLabel:'Folate',
+    unit:'ng/mL', category:'維生素',
+    ref:'3.1–20.5 ng/mL',
+    refLo:3.1, refHi:20.5, hi:20.5, lo:3.1,
+    notes:'Allows variable internal whitespace (some hospitals print "Folic  acid:" with double space).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // TUMOR MARKERS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'AFP',
+    pattern: /AFP:\s*([<>]?[\d.]+)/,
+    displayName:'甲胎蛋白 (AFP)', shortLabel:'AFP',
+    unit:'ng/mL', category:'癌症指數',
+    ref:'< 20 ng/mL（肝臟）',
+    refLo:null, refHi:20, hi:20, lo:null },
+
+  { id:'CEA',
+    pattern: /CEA:\s*([<>]?[\d.]+)/,
+    displayName:'癌胚抗原 (CEA)', shortLabel:'CEA',
+    unit:'ng/mL', category:'癌症指數',
+    ref:'< 5 ng/mL（大腸直腸）',
+    refLo:null, refHi:5, hi:5, lo:null },
+
+  { id:'CA199',
+    pattern: /CA.?19.?9:\s*([<>]?[\d.]+)/i,
+    displayName:'CA-199', shortLabel:'CA-199',
+    unit:'U/mL', category:'癌症指數',
+    ref:'< 37 U/mL（胰臟、膽道）',
+    refLo:null, refHi:37, hi:37, lo:null },
+
+  { id:'PSA',
+    pattern: /\bPSA:\s*([\d.]+)/,
+    displayName:'攝護腺特異抗原 (PSA)', shortLabel:'PSA',
+    unit:'ng/mL', category:'癌症指數',
+    ref:'< 4 ng/mL（男性／攝護腺）',
+    refLo:null, refHi:4, hi:4, lo:null,
+    gender:'M' },
+
+  { id:'FreePSA',
+    pattern: /(?:Free PSA|RATIO):\s*([\d.]+)/,
+    displayName:'游離 PSA (Free PSA)', shortLabel:'Free PSA',
+    unit:'ng/mL', category:'癌症指數',
+    gender:'M' },
+
+  { id:'PSARatio', computed:'PSARatio', pattern:null,
+    displayName:'Free/Total PSA 比值', shortLabel:'F/T PSA',
+    unit:'%', category:'癌症指數',
+    ref:'>25% 正常，10-25% 注意，<10% 警示',
+    meaning:'PSA>4 時參考此比值',
+    gender:'M' },
+
+  { id:'CA125',
+    pattern: /CA[-\s.]?125:\s*([<>]?[\d.]+)/i,
+    displayName:'CA-125', shortLabel:'CA-125',
+    unit:'U/mL', category:'癌症指數',
+    ref:'< 35 U/mL（女性／卵巢）',
+    refLo:null, refHi:35, hi:35, lo:null,
+    gender:'F' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // THYROID
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'TSH',
+    pattern: /TSH:\s*([\d.]+)/,
+    displayName:'促甲狀腺刺激素 (TSH)', shortLabel:'TSH',
+    unit:'µIU/mL', category:'甲狀腺',
+    ref:'0.35–4.94 µIU/mL',
+    refLo:0.35, refHi:4.94, hi:4.94, lo:0.35 },
+
+  { id:'FreeT4',
+    pattern: /Free T4:\s*([\d.]+)/,
+    displayName:'游離甲狀腺素 (Free T4)', shortLabel:'fT4',
+    unit:'ng/dL', category:'甲狀腺',
+    ref:'0.7–1.48 ng/dL',
+    refLo:0.7, refHi:1.48, hi:1.48, lo:0.7 },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HEPATITIS / INFECTION (qualitative — values are text, not numbers)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Raw qualitative pattern — used by reporter for direct table display.
+  // Viewer overrides these in its manifest with `computed: '<id>'` to render
+  // a patient-friendly verdict (帶原 / 正常) via report.js helpers.
+
+  { id:'HBsAg',
+    pattern: /HBsAg(?:\(TT\))?:\s*(\S+)/,
+    displayName:'B型肝炎表面抗原 (HBsAg)', shortLabel:'HBsAg',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    notes:'(TT) suffix used at vhtt; alternation handles both hospitals.' },
+
+  { id:'AntiHBs',
+    pattern: /Anti-HBs(?:\(TT\))?:\s*(\S+)/,
+    displayName:'B型肝炎表面抗體 (Anti-HBs)', shortLabel:'Anti-HBs',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    meaning:'疫苗免疫指標' },
+
+  { id:'AntiHCV',
+    pattern: /(?:HCV Ab\(TT\)|Anti-HCV):\s*(\S+)/,
+    displayName:'C型肝炎抗體 (Anti-HCV)', shortLabel:'Anti-HCV',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    notes:'vhtt uses "HCV Ab(TT):", vhyl uses "Anti-HCV:".' },
+
+  // Viewer's computed wrapper — same concept as AntiHCV, but produces
+  // 帶原/正常 + numeric titer for the patient handout. Kept as a separate
+  // catalog entry so report.js's special-case code can reference id "HCV".
+  { id:'HCV', computed:'HCV', pattern:null,
+    displayName:'C型肝炎', shortLabel:'HCV',
+    category:'肝炎 / 感染',
+    qualitative:true, singleValue:true,
+    notes:'Computed display wrapper around AntiHCV raw data.' },
+
+  { id:'HIV',
+    pattern: /HIV[^:]*:\s*(\S+)/i,
+    displayName:'HIV', shortLabel:'HIV',
+    category:'肝炎 / 感染',
+    qualitative:true },
+
+  { id:'RPR',
+    pattern: /REACT:\s*(\S+)/,
+    displayName:'RPR 梅毒篩檢', shortLabel:'RPR',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    notes:'Reporter uses raw REACT pattern; viewer overrides with computed wrapper for titer + verdict.' },
+
+  { id:'TPHA',
+    pattern: /TPHA(?:\(TT\))?:\s*(\S+)/,
+    displayName:'TPHA 梅毒血球凝集試驗', shortLabel:'TPHA',
+    category:'肝炎 / 感染',
+    qualitative:true },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HIV MONITORING (only rendered when HIV checkbox is on in viewer)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'HIVLoad',
+    pattern: /HIV virus load:\s*([\d,.]+)/,
+    displayName:'HIV 病毒量 (Viral Load)', shortLabel:'HIV VL',
+    category:'HIV',
+    notes:'Capture allows commas (thousands separator).' },
+
+  { id:'CD4',
+    pattern: /LEU3AN:\s*([\d.]+)/,
+    displayName:'CD4 淋巴球 (LEU3AN)', shortLabel:'CD4',
+    category:'HIV' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // IMAGING / TEXT-BLOCK ENTRIES (page 2 of viewer — fillable text forms)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'BoneDensity',
+    kind:'text',
+    orderNameMatch: /骨(?:質|密|鬆)|DEXA|BMD|Bone\s*Density|T[-\s]?score/i,
+    rows: [
+      { label:'AI分析',
+        fields:[{ name:'T分數', pattern:/AI[^0-9\-]{0,15}(-?\d+\.?\d*)/i }],
+        options:['疏鬆','缺損','正常'] },
+      { label:'腰椎',
+        fields:[{ name:'T分數', pattern:/(?:腰椎|Lumbar|L[\s-]?spine|L1-?L4)[^0-9\-]{0,15}(-?\d+\.?\d*)/i }],
+        options:['疏鬆','缺損','正常'] },
+      { label:'髖關節',
+        fields:[{ name:'T分數', pattern:/(?:髖(?:關節)?|Hip|Femoral|Femur)[^0-9\-]{0,15}(-?\d+\.?\d*)/i }],
+        options:['疏鬆','缺損','正常'] },
+    ],
+    displayName:'骨密度', category:'影像 / 文字報告' },
+
+  { id:'Endoscopy',
+    kind:'text',
+    orderNameMatch: /胃鏡|內視鏡|UGI|Endoscop|Gastroscop|EGD|Panendoscop/i,
+    rows: [
+      { label:'上消化道', options:['胃食道逆流','胃潰瘍','十二指腸潰瘍'], trailing:'胃藥治療' },
+      { label:'細菌',     options:['胃幽門桿菌'],                            trailing:'三合一治療' },
+    ],
+    displayName:'上消化道內視鏡', category:'影像 / 文字報告' },
+
+  { id:'AbdSono',
+    kind:'text',
+    orderNameMatch: /超音波|Sonograph|Ultrasound|Abd.*Echo|Abdominal\s*US|腹部.*US/i,
+    rows: [
+      { label:'肝臟', options:['正常','脂肪肝','水泡','血管瘤'] },
+      { label:'膽',   options:['正常','膽結石','膽息肉'] },
+      { label:'右腎', options:['正常','水泡','萎縮','結石'] },
+      { label:'左腎', options:['正常','水泡','萎縮','結石'] },
+    ],
+    displayName:'腹部超音波', category:'影像 / 文字報告' },
+
+];
+
+// ─── Exports (CommonJS + browser global) ─────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = CATALOG;
+}
+if (typeof window !== 'undefined') {
+  window.HOSPITAL_LAB_PATTERNS_CATALOG = CATALOG;
+}
+'use strict';
+
+/**
+ * reporter.js — Manifest for the dialysis-room app (hospital-lab-reporter).
+ *
+ * Each manifest entry references a catalog id (see catalog.js) and adds
+ * reporter-specific fields (cat, label, filter) plus any per-app overrides.
+ *
+ * To add a test to the dialysis table:
+ *   1. Make sure it exists in catalog.js (add it there if not).
+ *   2. Append a manifest entry below in the appropriate category.
+ *   3. Run `node sync-patterns.js` from hospital-lab-reporter/.
+ *
+ * Two equivalent forms accepted:
+ *   - String: just the id        e.g. 'WBC'
+ *   - Object: id + overrides     e.g. { id:'WBC', cat:'CBC', label:'白血球 WBC' }
+ *
+ * Resolution: index.js merges each manifest entry on top of its catalog
+ * entry. Manifest fields override catalog defaults.
+ */
+
+// ─── Categories (groups in the table view) ───────────────────────────────
+const CATEGORIES = [
+  { id:'CBC',      label:'血液' },
+  { id:'PROTEIN',  label:'蛋白質' },
+  { id:'LIVER',    label:'肝功能' },
+  { id:'LIPID',    label:'血脂' },
+  { id:'SUGAR',    label:'血糖' },
+  { id:'RENAL',    label:'腎功能' },
+  { id:'LYTE',     label:'電解質' },
+  { id:'IRON',     label:'鐵代謝' },
+  { id:'PTH',      label:'副甲狀腺' },
+  { id:'HEPAT',    label:'肝炎 / 感染' },
+  { id:'COMPUTED', label:'計算值' },
+];
+
+// ─── Manifest (37 entries — dialysis-room outpatient list) ──────────────
+const REPORTER_MANIFEST = [
+  // ── 血液常規 ──
+  { id:'WBC',      cat:'CBC',     label:'白血球 WBC' },
+  { id:'RBC',      cat:'CBC',     label:'紅血球 RBC',
+    hi:null, lo:null },                                   // catalog has alarms; reporter shows raw values
+  { id:'Hb',       cat:'CBC',     label:'血色素 Hb',
+    hi:null, lo:null },
+  { id:'HCT',      cat:'CBC',     label:'血比容 HCT',
+    hi:null, lo:null },
+  { id:'MCV',      cat:'CBC',     label:'MCV' },
+  { id:'Platelet', cat:'CBC',     label:'血小板 PLT',
+    ref:'120-320', hi:320, lo:120 },                      // dialysis-specific tighter range
+
+  // ── 蛋白質 ──
+  { id:'TP',       cat:'PROTEIN', label:'總蛋白 TP' },
+  { id:'Albumin',  cat:'PROTEIN', label:'白蛋白 Alb' },
+
+  // ── 肝功能 ──
+  { id:'GOT',      cat:'LIVER',   label:'GOT/AST',
+    ref:'13-39', hi:39 },                                 // reporter uses 13-39 range
+  { id:'GPT',      cat:'LIVER',   label:'GPT/ALT',
+    ref:'7-52', hi:52 },                                  // reporter uses 7-52 range
+  { id:'ALP',      cat:'LIVER',   label:'Alk-P',
+    ref:'34-104', hi:104, lo:34 },                        // reporter uses 34-104
+  { id:'TBIL',     cat:'LIVER',   label:'總膽紅素 T-BIL',
+    lo:0.3 },                                             // reporter flags low T-BIL
+
+  // ── 血脂 ──
+  { id:'CHOL',     cat:'LIPID',   label:'總膽固醇' },
+  { id:'LDL',      cat:'LIPID',   label:'LDL-C',
+    ref:'<140', hi:140 },                                 // reporter uses 140 cutoff (catalog: 130)
+  { id:'TG',       cat:'LIPID',   label:'三酸甘油脂' },
+
+  // ── 血糖 ──
+  { id:'GluAC',    cat:'SUGAR',   label:'飯前血糖',
+    ref:'74-106', hi:106 },                               // reporter uses 106 upper (catalog: 100)
+  { id:'HbA1c',    cat:'SUGAR',   label:'HbA1c' },
+
+  // ── 腎功能 ──
+  { id:'BUN_pre',  cat:'RENAL',   label:'BUN(洗前)' },
+  { id:'BUN_post', cat:'RENAL',   label:'BUN(洗後)' },
+  { id:'CREAT',    cat:'RENAL',   label:'肌酸酐 Cr',
+    ref:'M:0.7-1.3 F:0.6-1.2', hi:null, lo:null },        // reporter shows raw, no alarms
+  { id:'UA',       cat:'RENAL',   label:'尿酸 UA',
+    ref:'M:4.4-7.6 F:2.3-6.6', hi:null, lo:null },
+
+  // ── 電解質 ──
+  { id:'Na',       cat:'LYTE',    label:'鈉 Na' },
+  { id:'K',        cat:'LYTE',    label:'鉀 K' },
+  { id:'Cl',       cat:'LYTE',    label:'氯 Cl' },
+  { id:'Ca',       cat:'LYTE',    label:'鈣 Ca' },
+  { id:'P',        cat:'LYTE',    label:'磷 P' },
+
+  // ── 鐵代謝 ──
+  { id:'Fe',       cat:'IRON',    label:'血清鐵 Fe',
+    ref:'M:65-175 F:50-170', hi:null, lo:null },
+  { id:'TIBC',     cat:'IRON',    label:'TIBC',
+    ref:'M:134-415 F:120-480', hi:null, lo:null },
+  { id:'TSAT',     cat:'IRON',    label:'TSAT' },
+  { id:'Ferritin', cat:'IRON',    label:'鐵蛋白',
+    ref:'M:21.8-274.7 F:4.6-204.0', hi:null, lo:null },
+
+  // ── 副甲狀腺 ──
+  { id:'iPTH',     cat:'PTH',     label:'i-PTH' },
+
+  // ── 肝炎 / 感染 (qualitative) ──
+  { id:'HBsAg',    cat:'HEPAT',   label:'HBsAg' },
+  { id:'AntiHBs',  cat:'HEPAT',   label:'Anti-HBs' },
+  { id:'AntiHCV',  cat:'HEPAT',   label:'Anti-HCV' },
+  { id:'AFP',      cat:'HEPAT',   label:'AFP' },
+  { id:'HIV',      cat:'HEPAT',   label:'HIV' },
+  { id:'RPR',      cat:'HEPAT',   label:'RPR' },
+];
+
+// ─── Computed tests (URR, Ca×P) — reporter-specific derivations ─────────
+// These coexist with patterns/computed.js; reporter's HTML loads them
+// as COMPUTED_TESTS via a backwards-compat alias.
+const REPORTER_COMPUTED = [
+  { id:'URR',  cat:'COMPUTED', label:'URR',  unit:'%', ref:'>65%', hi:null, lo:65,
+    needs:['BUN_pre', 'BUN_post'],
+    compute: (pre, post) => {
+      if (pre == null || post == null || pre === 0) return null;
+      return +((1 - post / pre) * 100).toFixed(1);
+    } },
+  { id:'CaxP', cat:'COMPUTED', label:'Ca×P', unit:'',  ref:'<55',  hi:55,   lo:null,
+    needs:['Ca', 'P'],
+    compute: (ca, p) => {
+      if (ca == null || p == null) return null;
+      return +(ca * p).toFixed(1);
+    } },
+];
+
+// ─── Exports (CommonJS + browser global) ─────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    CATEGORIES,
+    REPORTER_MANIFEST,
+    REPORTER_COMPUTED,
+  };
+}
+if (typeof window !== 'undefined') {
+  window.HOSPITAL_LAB_PATTERNS_REPORTER_PKG = {
+    CATEGORIES,
+    REPORTER_MANIFEST,
+    REPORTER_COMPUTED,
+  };
+}
+
+// ─── Resolver: merge each manifest entry on top of its catalog entry ──
+function _resolveManifest(manifest, cat) {
+  var byId = new Map(cat.map(function (e) { return [e.id, e]; }));
+  var out = [];
+  manifest.forEach(function (m) {
+    var id = typeof m === "string" ? m : m.id;
+    var base = byId.get(id);
+    if (!base) {
+      console.warn("[hospital-lab-data] manifest references unknown id: " + id);
+      return;
+    }
+    out.push(typeof m === "string"
+      ? Object.assign({}, base)
+      : Object.assign({}, base, m));
+  });
+  return out;
+}
+
+// ─── Backwards-compat aliases — names the rest of this HTML expects ──
+var LAB_CATEGORIES = CATEGORIES;
+var LAB_TESTS      = _resolveManifest(REPORTER_MANIFEST, CATALOG);
+var COMPUTED_TESTS = REPORTER_COMPUTED;
+// __HOSPITAL_LAB_PATTERNS_END__
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const STORAGE_KEYS = {
+  patients: 'hd_patients',
+  settings: 'hd_settings',
+  labData:  'hd_labData',
+};
+
+/** Load patients from localStorage. Returns array of patient objects. */
+function loadPatients() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.patients)) || []; }
+  catch { return []; }
+}
+function savePatients(list) {
+  localStorage.setItem(STORAGE_KEYS.patients, JSON.stringify(list));
+}
+
+/** Load lab data from localStorage. Returns { chartno: { testId: [{date,value},...] } } */
+function loadLabData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.labData)) || {}; }
+  catch { return {}; }
+}
+function saveLabData(data) {
+  localStorage.setItem(STORAGE_KEYS.labData, JSON.stringify(data));
+}
+
+/** Load settings */
+function loadSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.settings)) || {
+      baseUrl: 'http://ernode.vghb12.vhtt.gov.tw:8000',
+      opsid: '',
+    };
+  } catch {
+    return { baseUrl: 'http://ernode.vghb12.vhtt.gov.tw:8000', opsid: '' };
+  }
+}
+function saveSettingsData(s) {
+  localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(s));
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHART NUMBER FORMATTING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Normalize chart number to 9-digit + 1-letter format (e.g. "810385G" -> "000810385G").
+ */
+function formatChartNo(raw) {
+  const s = raw.trim();
+  if (!s) throw new Error('請輸入病歷號');
+  const last = s[s.length - 1];
+  if (!/[a-zA-Z]/.test(last)) throw new Error('病歷號須以英文字母結尾 (如 810385G)');
+  const letter = last.toUpperCase();
+  const digitStr = s.slice(0, -1).replace(/\D/g, '');
+  if (!digitStr) throw new Error('病歷號中未找到數字');
+  if (digitStr.length > 9) throw new Error('數字部分最多 9 碼');
+  return digitStr.padStart(9, '0') + letter;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATE UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Parse RESDTTM: "20260414203800" -> Date */
+function parseDateResdttm(str) {
+  if (!str || str.length < 8) return null;
+  const y = +str.slice(0, 4), m = +str.slice(4, 6) - 1, d = +str.slice(6, 8);
+  return new Date(y, m, d);
+}
+
+/** Parse Taiwan calendar date: "115/04/14 19:36" -> Date */
+function parseDateTaiwan(str) {
+  if (!str) return null;
+  const match = str.match(/^(\d+)\/(\d+)\/(\d+)/);
+  if (!match) return null;
+  return new Date(+match[1] + 1911, +match[2] - 1, +match[3]);
+}
+
+/** Format Date to Taiwan calendar string: "115/04/14" */
+function toTaiwanDate(d) {
+  if (!d) return '';
+  const y = d.getFullYear() - 1911;
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
+
+/** Format Date to short display: "04/14" */
+function toShortDate(d) {
+  if (!d) return '';
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/** Format Date as YYYY-MM-DD for sorting */
+function toSortableDate(d) {
+  if (!d) return '';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// API FETCHING & HTML PARSING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Parse patient info from the ernode HTML header.
+ * Header text example: "全部醫囑 000123456A 王小明 M 51 歲"
+ */
+function parsePatientInfo(doc, chartno) {
+  const headerText = doc.querySelector('table.Header')?.textContent || '';
+  const rest = chartno ? headerText.split(chartno)[1] || '' : headerText;
+  const m = rest.match(/\s+(.+?)\s+([MF])\s+(\d+)\s*歲/);
+  if (!m) return null;
+  return {
+    chartno,
+    name:   m[1].trim(),
+    gender: m[2] === 'M' ? '男' : '女',
+    genderCode: m[2],
+    age:    m[3],
+  };
+}
+
+/**
+ * Parse a single page of order results from the ernode API HTML.
+ * Returns { orders[], nextUrl, total, patientInfo }.
+ */
+function parseOrdersPage(html, chartno, baseUrl) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const grid = doc.querySelector('table.Grid');
+  if (!grid) return { orders: [], nextUrl: null, total: 0, patientInfo: null };
+
+  const patientInfo = parsePatientInfo(doc, chartno);
+  const orders = [];
+
+  grid.querySelectorAll('tr.Row').forEach(row => {
+    if (row.cells.length < 6) return;
+    const h = name => row.querySelector(`input[name="${name}"]`)?.value?.trim() || '';
+    orders.push({
+      ordseq:     h('ORDSEQ'),
+      comKey:     h('COM_KEY'),
+      ordapno:    h('ORDAPNO'),
+      resdttm:    h('RESDTTM'),
+      pfcode:     h('PFCODE'),
+      ordType:    h('ORDTYPE'),
+      orderName:  row.cells[0]?.textContent.trim() || '',
+      status:     row.cells[1]?.textContent.trim() || '',
+      reportText: row.cells[2]?.textContent.trim() || '',
+      dept:       row.cells[3]?.textContent.trim() || '',
+      orderDate:  row.cells[4]?.textContent.trim() || '',
+      receiveDate: row.cells[5]?.textContent.trim() || '',
+    });
+  });
+
+  // Pagination: find ">>" link
+  let nextUrl = null;
+  doc.querySelectorAll('a').forEach(a => {
+    if (a.textContent.trim() === '>>' && !nextUrl) {
+      const href = a.getAttribute('href');
+      nextUrl = href ? baseUrl + href : null;
+    }
+  });
+
+  const footerText = doc.querySelector('tr.Footer')?.textContent || '';
+  const totalMatch = footerText.match(/總筆數：(\d+)/);
+  const total = totalMatch ? +totalMatch[1] : 0;
+
+  return { orders, nextUrl, total, patientInfo };
+}
+
+/**
+ * Fetch all pages of lab orders for a given chart number.
+ * @param {string} chartno - Formatted chart number (e.g. "000810385G")
+ * @param {Function} onProgress - Callback(fetched, total)
+ * @returns {Promise<{orders: Array, patientInfo: Object}>}
+ */
+async function fetchAllOrders(chartno, onProgress) {
+  const settings = loadSettings();
+  const baseUrl = settings.baseUrl;
+  let url = `${baseUrl}/order/get_lab_orders?chartno=${chartno}&opsid=${settings.opsid}`;
+  const all = [];
+  let page = 0, total = 0, patientInfo = null;
+
+  while (url) {
+    page++;
+    if (page > 50) break; // safety limit
+
+    const resp = await fetch(url, { credentials: 'omit' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const html = await resp.text();
+
+    const result = parseOrdersPage(html, chartno, baseUrl);
+    if (page === 1) {
+      if (result.total) total = result.total;
+      if (result.patientInfo) patientInfo = result.patientInfo;
+    }
+    all.push(...result.orders);
+
+    if (onProgress) onProgress(all.length, total || '?');
+    if (!result.nextUrl || (total && all.length >= total)) break;
+    url = result.nextUrl;
+  }
+
+  return { orders: all, patientInfo };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAB VALUE EXTRACTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Extract lab values from fetched orders.
+ * Returns { testId: [{date: "YYYY-MM-DD", value: number|string, dateObj: Date}, ...], ... }
+ *
+ * BUN pre/post distinction:
+ *   - composite orderName (contains comma): pre-dialysis
+ *   - standalone "BUN" orderName: post-dialysis
+ */
+function extractLabValues(orders) {
+  const results = {};
+  LAB_TESTS.forEach(t => { results[t.id] = []; });
+
+  // Filter to LAB orders within last 12 months (except hepatitis/HIV/RPR: all-time)
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 12);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const ALL_TIME_IDS = new Set(['HBsAg', 'AntiHBs', 'AntiHCV', 'HIV', 'RPR']);
+
+  for (const order of orders) {
+    if (order.ordType && order.ordType !== 'LAB') continue;
+    if (!order.reportText) continue;
+
+    const dateObj = parseDateResdttm(order.resdttm) || parseDateTaiwan(order.orderDate);
+    if (!dateObj) continue;
+
+    const text = order.reportText;
+    const dateStr = toSortableDate(dateObj);
+    const isComposite = order.orderName.includes(',');
+    const isStandaloneBun = order.orderName.trim() === 'BUN';
+
+    for (const test of LAB_TESTS) {
+      // Date filter: all-time for hepatitis/HIV/RPR, 12 months for everything else
+      if (!ALL_TIME_IDS.has(test.id) && dateObj < cutoff) continue;
+
+      // BUN filter logic
+      if (test.filter === 'composite' && !isComposite) continue;
+      if (test.filter === 'standalone_bun' && !isStandaloneBun) continue;
+
+      const match = text.match(test.pattern);
+      if (!match) continue;
+
+      let value = match[1];
+      if (!test.qualitative) {
+        value = parseFloat(value);
+        if (isNaN(value)) continue;
+        if (test.normalize) value = test.normalize(value);
+      }
+
+      // Avoid duplicate date+value entries
+      const existing = results[test.id];
+      const dup = existing.find(e => e.date === dateStr && e.value === value);
+      if (!dup) {
+        existing.push({ date: dateStr, value, dateObj });
+      }
+    }
+  }
+
+  // Sort each test's results by date (newest first)
+  for (const id in results) {
+    results[id].sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  return results;
+}
+
+/**
+ * Compute derived values (URR, Ca*P) from extracted lab data.
+ * Adds entries to the results object under computed test IDs.
+ */
+function computeDerivedValues(results) {
+  for (const ct of COMPUTED_TESTS) {
+    results[ct.id] = [];
+
+    if (ct.id === 'URR') {
+      // Pair BUN_pre and BUN_post by same date
+      const preMap = {};
+      for (const e of (results['BUN_pre'] || [])) {
+        if (!preMap[e.date]) preMap[e.date] = e.value;
+      }
+      for (const e of (results['BUN_post'] || [])) {
+        const pre = preMap[e.date];
+        if (pre != null) {
+          const v = ct.compute(pre, e.value);
+          if (v != null) {
+            results[ct.id].push({ date: e.date, value: v, dateObj: e.dateObj });
+          }
+        }
+      }
+    } else if (ct.id === 'CaxP') {
+      // Pair Ca and P by same date
+      const caMap = {};
+      for (const e of (results['Ca'] || [])) {
+        if (!caMap[e.date]) caMap[e.date] = e.value;
+      }
+      for (const e of (results['P'] || [])) {
+        const ca = caMap[e.date];
+        if (ca != null) {
+          const v = ct.compute(ca, e.value);
+          if (v != null) {
+            results[ct.id].push({ date: e.date, value: v, dateObj: e.dateObj });
+          }
+        }
+      }
+    }
+
+    results[ct.id].sort((a, b) => b.date.localeCompare(a.date));
+  }
+  return results;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - TABS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function showToast(msg, type = 'info', duration = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - PATIENT LIST
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function renderPatientList() {
+  const patients = loadPatients();
+  const labData = loadLabData();
+  const tbody = document.getElementById('patientBody');
+
+  if (patients.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">尚未新增病患，請點選「+ 新增病患」開始</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = patients.map((p, i) => {
+    const schedBadge = p.schedule === '一三五'
+      ? '<span class="badge badge-135">一三五</span>'
+      : '<span class="badge badge-246">二四六</span>';
+    const shiftBadge = p.shift === '上午'
+      ? '<span class="badge badge-am">上午</span>'
+      : '<span class="badge badge-pm">下午</span>';
+    const lastUpdate = labData[p.chartno]?._lastUpdate
+      ? new Date(labData[p.chartno]._lastUpdate).toLocaleString('zh-TW')
+      : '<span class="text-muted">未更新</span>';
+    const gender = p.gender || '';
+    const age = p.age || '';
+
+    return `<tr>
+      <td><a href="#" onclick="viewPatientLab('${p.chartno}'); return false;" style="color:#2980b9;font-weight:600">${p.chartno}</a></td>
+      <td>${escHtml(p.name)}</td>
+      <td>${gender}</td>
+      <td>${age}</td>
+      <td>${schedBadge}</td>
+      <td>${shiftBadge}</td>
+      <td style="font-size:11px">${lastUpdate}</td>
+      <td class="actions">
+        <button class="btn btn-primary btn-sm" onclick="updatePatient('${p.chartno}')">更新</button>
+        <button class="btn btn-outline btn-sm" onclick="showEditPatient(${i})">編輯</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeletePatient(${i})">刪除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - PATIENT MODAL (Add / Edit)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let _editIndex = -1; // -1 = adding new
+
+function showAddPatient() {
+  _editIndex = -1;
+  document.getElementById('modalTitle').textContent = '新增病患';
+  document.getElementById('modalChartno').value = '';
+  document.getElementById('modalChartno').disabled = false;
+  document.getElementById('modalName').value = '';
+  document.getElementById('modalSchedule').value = '一三五';
+  document.getElementById('modalShift').value = '上午';
+  document.getElementById('patientModal').classList.remove('hidden');
+}
+
+function showEditPatient(idx) {
+  _editIndex = idx;
+  const p = loadPatients()[idx];
+  if (!p) return;
+  document.getElementById('modalTitle').textContent = '編輯病患';
+  document.getElementById('modalChartno').value = p.chartno;
+  document.getElementById('modalChartno').disabled = true;
+  document.getElementById('modalName').value = p.name;
+  document.getElementById('modalSchedule').value = p.schedule || '一三五';
+  document.getElementById('modalShift').value = p.shift || '上午';
+  document.getElementById('patientModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('patientModal').classList.add('hidden');
+}
+
+function savePatient() {
+  const patients = loadPatients();
+  const rawChartno = document.getElementById('modalChartno').value;
+  const name = document.getElementById('modalName').value.trim();
+  const schedule = document.getElementById('modalSchedule').value;
+  const shift = document.getElementById('modalShift').value;
+
+  if (!name) { showToast('請輸入姓名', 'error'); return; }
+
+  let chartno;
+  try { chartno = formatChartNo(rawChartno); }
+  catch (e) { showToast(e.message, 'error'); return; }
+
+  if (_editIndex === -1) {
+    // Adding new
+    if (patients.find(p => p.chartno === chartno)) {
+      showToast('此病歷號已存在', 'error');
+      return;
+    }
+    patients.push({ chartno, name, schedule, shift });
+  } else {
+    // Editing
+    patients[_editIndex] = { ...patients[_editIndex], name, schedule, shift };
+  }
+
+  savePatients(patients);
+  closeModal();
+  renderPatientList();
+  showToast(_editIndex === -1 ? '已新增病患' : '已更新病患資料', 'success');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - DELETE CONFIRMATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function confirmDeletePatient(idx) {
+  const p = loadPatients()[idx];
+  if (!p) return;
+  document.getElementById('confirmMsg').textContent = `確定要刪除 ${p.name} (${p.chartno}) 嗎？`;
+  document.getElementById('confirmOkBtn').onclick = () => {
+    const patients = loadPatients();
+    const chartno = patients[idx].chartno;
+    patients.splice(idx, 1);
+    savePatients(patients);
+    // Also remove lab data
+    const labData = loadLabData();
+    delete labData[chartno];
+    saveLabData(labData);
+    closeConfirm();
+    renderPatientList();
+    showToast('已刪除病患', 'info');
+  };
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.add('hidden');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA FETCHING - SINGLE PATIENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function setStatus(msg, loading = false) {
+  const bar = document.getElementById('statusBar');
+  bar.innerHTML = (loading ? '<span class="spinner"></span>' : '') + escHtml(msg);
+}
+
+async function updatePatient(chartno) {
+  const settings = loadSettings();
+  if (!settings.opsid) {
+    showToast('請先到「設定」填寫操作人員代號 (OPSID)', 'error');
+    switchTab('settings');
+    return;
+  }
+
+  setStatus(`正在擷取 ${chartno} 的資料...`, true);
+  try {
+    const { orders, patientInfo } = await fetchAllOrders(chartno, (n, t) => {
+      setStatus(`${chartno}: 已擷取 ${n} / ${t} 筆`, true);
+    });
+
+    // Extract lab values
+    let labValues = extractLabValues(orders);
+    labValues = computeDerivedValues(labValues);
+
+    // Save to localStorage
+    const allLabData = loadLabData();
+    allLabData[chartno] = { ...labValues, _lastUpdate: Date.now() };
+    saveLabData(allLabData);
+
+    // Update patient info (name, gender, age) if available from API
+    if (patientInfo) {
+      const patients = loadPatients();
+      const idx = patients.findIndex(p => p.chartno === chartno);
+      if (idx >= 0) {
+        if (patientInfo.name) patients[idx].name = patientInfo.name;
+        if (patientInfo.gender) patients[idx].gender = patientInfo.gender;
+        if (patientInfo.genderCode) patients[idx].genderCode = patientInfo.genderCode;
+        if (patientInfo.age) patients[idx].age = patientInfo.age;
+        savePatients(patients);
+      }
+    }
+
+    renderPatientList();
+    setStatus(`${chartno}: 更新完成 (${orders.length} 筆醫囑)`);
+    showToast(`${chartno} 資料更新完成`, 'success');
+  } catch (err) {
+    setStatus(`${chartno}: 擷取失敗 - ${err.message}`);
+    showToast(`${chartno} 擷取失敗: ${err.message}`, 'error');
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA FETCHING - ALL PATIENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function updateAllPatients() {
+  const patients = loadPatients();
+  if (patients.length === 0) { showToast('沒有病患可更新', 'error'); return; }
+
+  const settings = loadSettings();
+  if (!settings.opsid) {
+    showToast('請先到「設定」填寫操作人員代號 (OPSID)', 'error');
+    switchTab('settings');
+    return;
+  }
+
+  const btn = document.getElementById('btnUpdateAll');
+  btn.disabled = true;
+  let success = 0, fail = 0;
+
+  for (let i = 0; i < patients.length; i++) {
+    const p = patients[i];
+    setStatus(`更新中 (${i+1}/${patients.length}): ${p.chartno} ${p.name}...`, true);
+    try {
+      const { orders, patientInfo } = await fetchAllOrders(p.chartno, (n, t) => {
+        setStatus(`${p.chartno} ${p.name}: ${n}/${t} 筆`, true);
+      });
+
+      let labValues = extractLabValues(orders);
+      labValues = computeDerivedValues(labValues);
+
+      const allLabData = loadLabData();
+      allLabData[p.chartno] = { ...labValues, _lastUpdate: Date.now() };
+      saveLabData(allLabData);
+
+      if (patientInfo) {
+        if (patientInfo.name) patients[i].name = patientInfo.name;
+        if (patientInfo.gender) patients[i].gender = patientInfo.gender;
+        if (patientInfo.genderCode) patients[i].genderCode = patientInfo.genderCode;
+        if (patientInfo.age) patients[i].age = patientInfo.age;
+      }
+      success++;
+    } catch (err) {
+      fail++;
+      console.warn(`Failed to fetch ${p.chartno}:`, err);
+    }
+  }
+
+  savePatients(patients);
+  renderPatientList();
+  btn.disabled = false;
+  setStatus(`全部更新完成: ${success} 成功, ${fail} 失敗`);
+  showToast(`更新完成: ${success} 成功${fail ? `, ${fail} 失敗` : ''}`, fail ? 'warning' : 'success');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAB DATA TABLE RENDERING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * View lab data for a specific patient.
+ * Switches to the labview tab and renders the full history table.
+ */
+function viewPatientLab(chartno) {
+  const patients = loadPatients();
+  const patient = patients.find(p => p.chartno === chartno);
+  const labData = loadLabData()[chartno];
+
+  // Update header
+  document.getElementById('labPatientName').textContent = patient
+    ? `${patient.name} (${chartno})`
+    : chartno;
+  document.getElementById('labPatientMeta').textContent = patient
+    ? `${patient.gender || ''} ${patient.age ? patient.age + '歲' : ''} | ${patient.schedule || ''} ${patient.shift || ''}`
+    : '';
+
+  const wrapper = document.getElementById('labTableWrapper');
+
+  if (!labData) {
+    wrapper.innerHTML = '<p class="text-center text-muted" style="padding:24px">尚無檢驗資料，請先點選「更新」按鈕擷取資料</p>';
+    switchTab('labview');
+    return;
+  }
+
+  // Collect all unique dates across all tests
+  const allTests = [...LAB_TESTS, ...COMPUTED_TESTS];
+  const dateSet = new Set();
+  for (const test of allTests) {
+    const entries = labData[test.id];
+    if (!entries) continue;
+    for (const e of entries) {
+      dateSet.add(e.date);
+    }
+  }
+
+  const dates = Array.from(dateSet).sort((a, b) => b.localeCompare(a)); // newest first
+
+  if (dates.length === 0) {
+    wrapper.innerHTML = '<p class="text-center text-muted" style="padding:24px">未找到任何檢驗數據</p>';
+    switchTab('labview');
+    return;
+  }
+
+  // Convert dates to Taiwan calendar for header display
+  const dateHeaders = dates.map(d => {
+    const parts = d.split('-');
+    const twYear = +parts[0] - 1911;
+    return `${twYear}/${parts[1]}/${parts[2]}`;
+  });
+
+  // Build table HTML
+  let html = '<table class="lab-table">';
+
+  // Header row with dates
+  html += '<thead><tr>';
+  html += '<th style="min-width:120px;position:sticky;left:0;z-index:3;background:#1a5276">檢驗項目</th>';
+  html += '<th style="min-width:90px;position:sticky;left:120px;z-index:3;background:#1a5276">參考值</th>';
+  dates.forEach((d, i) => {
+    const cls = i === 0 ? ' class="latest-col"' : '';
+    html += `<th${cls}>${dateHeaders[i]}</th>`;
+  });
+  html += '</tr></thead>';
+
+  html += '<tbody>';
+
+  // Group tests by category
+  for (const cat of LAB_CATEGORIES) {
+    const testsInCat = allTests.filter(t => t.cat === cat.id);
+    // Check if category has any data
+    const hasData = testsInCat.some(t => labData[t.id] && labData[t.id].length > 0);
+    if (!hasData) continue;
+
+    // Category header row
+    html += `<tr class="row-category"><td colspan="${dates.length + 2}">${cat.label}</td></tr>`;
+
+    for (const test of testsInCat) {
+      const entries = labData[test.id] || [];
+      if (entries.length === 0) continue;
+
+      // Build a date -> value map
+      const dateMap = {};
+      for (const e of entries) {
+        if (!dateMap[e.date]) dateMap[e.date] = e.value; // take first (most recent if duplicates)
+      }
+
+      html += '<tr class="row-item">';
+      html += `<td>${test.label}</td>`;
+      html += `<td>${test.ref || ''} ${test.unit ? '(' + test.unit + ')' : ''}</td>`;
+
+      dates.forEach((d, i) => {
+        const val = dateMap[d];
+        const cls = i === 0 ? ' latest-col' : '';
+
+        if (val == null) {
+          html += `<td class="${cls}"></td>`;
+          return;
+        }
+
+        // Determine color class
+        let valCls = '';
+        if (test.qualitative) {
+          // Qualitative: Reactive/positive = red, Non-Reactive/negative = green
+          const lower = String(val).toLowerCase();
+          if (lower.includes('reactive') && !lower.includes('non')) {
+            valCls = 'val-q-pos';
+          } else if (lower.includes('non-reactive') || lower.includes('negative') || lower.includes('nonreactive')) {
+            valCls = 'val-q-neg';
+          }
+        } else {
+          const numVal = typeof val === 'number' ? val : parseFloat(val);
+          if (!isNaN(numVal)) {
+            if (test.hi != null && numVal > test.hi) valCls = 'val-hi';
+            else if (test.lo != null && numVal < test.lo) valCls = 'val-lo';
+          }
+        }
+
+        html += `<td class="${valCls}${cls}">${val}</td>`;
+      });
+
+      html += '</tr>';
+    }
+  }
+
+  html += '</tbody></table>';
+  wrapper.innerHTML = html;
+  switchTab('labview');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMPORT / EXPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Export patient list as JSON file */
+function exportPatients() {
+  const patients = loadPatients();
+  const blob = new Blob([JSON.stringify(patients, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, `洗腎室病患清單_${todayStr()}.json`);
+  showToast('病患清單已匯出', 'success');
+}
+
+/** Import patient list from JSON file */
+function importPatients(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('格式不正確');
+
+      const existing = loadPatients();
+      let added = 0, updated = 0;
+
+      for (const p of imported) {
+        if (!p.chartno || !p.name) continue;
+        const idx = existing.findIndex(e => e.chartno === p.chartno);
+        if (idx >= 0) {
+          // Update existing
+          existing[idx] = { ...existing[idx], ...p };
+          updated++;
+        } else {
+          existing.push(p);
+          added++;
+        }
+      }
+
+      savePatients(existing);
+      renderPatientList();
+      showToast(`匯入完成: ${added} 新增, ${updated} 更新`, 'success');
+    } catch (err) {
+      showToast(`匯入失敗: ${err.message}`, 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // reset input
+}
+
+/** Export all lab data as structured JSON */
+function exportAllLabData() {
+  const patients = loadPatients();
+  const labData = loadLabData();
+  const exportObj = { patients, labData };
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, `洗腎室檢驗資料_${todayStr()}.json`);
+  showToast('檢驗資料已匯出', 'success');
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function loadSettingsUI() {
+  const s = loadSettings();
+  document.getElementById('settingBaseUrl').value = s.baseUrl || '';
+  document.getElementById('settingOpsid').value = s.opsid || '';
+}
+
+function saveSettings() {
+  const baseUrl = document.getElementById('settingBaseUrl').value.trim().replace(/\/+$/, '');
+  const opsid = document.getElementById('settingOpsid').value.trim();
+  saveSettingsData({ baseUrl: baseUrl || 'http://ernode.vghb12.vhtt.gov.tw:8000', opsid });
+  showToast('設定已儲存', 'success');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettingsUI();
+  renderPatientList();
+});
+</script>
+</body>
+</html>
