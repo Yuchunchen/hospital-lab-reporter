@@ -1,5 +1,89 @@
 # WORKLOG
 
+## 2026-05-04 — BUN 前/後判定切換為報告時間制（Step 2，驗證待補）
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis、shell
+- 變更：修改
+- 檔案：
+  - 修改 `hospital-lab-data.html`（`__PATTERNS__` 標記區塊外）：
+    - `parseDateResdttm()` / `parseDateTaiwan()` 改為保留 HH:MM(:SS)。
+      原本只取年月日 → 同日抽血的前 / 後 BUN 永遠 reportDateTime 相同，
+      新規則會退化為 tie-break。修完之後同日 BUN 可比較時間先後。
+    - `extractLabValues()`：移除 BUN-specific filter（`composite` /
+      `standalone_bun` 字串路徑），因為（a）catalog 已改用
+      `orderNameFilter` 正則，那條路徑早就失效，（b）Step 2 的策略是
+      在 parser 層不做 pre/post 分類，留給 dialysis group 依
+      reportDateTime 重新判定。
+    - `extractLabValues()`：每筆 entry 額外保存 `reportDateTime`
+      （ISO 字串）與 `orderName`，供 resolveBUN 使用。
+    - `extractLabValues()`：去重 key 改為 `(reportDateTime + value)`，
+      讓同日不同時間的兩筆 BUN 都保留。
+    - `viewPatientLab()` 新增 BUN_pre / BUN_post / URR 三列的 cell
+      override：呼叫 `GROUP.resolveBunClustersFromStored(labData)`，
+      把每個叢集的 pre / post / URR 結果分配到對應日期欄。所有 BUN
+      叢集起始日 / pre 日 / post 日都加入欄位集合，避免純 BUN 抽血日
+      被漏掉。`hasAny()` 也納入 override map 判斷。
+  - 修改 `groups/dialysis.js`：
+    - 新增 `DIALYSIS_FLAGS = { useReportTimeBUN: true }` 旗標（code-only，
+      留作緊急回滾用）。亦掛在 `DIALYSIS_GROUP.flags` 上。
+    - `resolveBUN()` 由 TODO 狀態改為實作完整版：
+      - 先以 `(reportDateTime + value)` 去重
+      - 0 / 1 筆按舊規則處理
+      - 2+ 筆依 reportDateTime 排序：早 = pre、晚 = post
+      - 同 reportDateTime 但值不同 → 較大者 = pre、較小者 = post
+        （post 通常 6–25 mg/dL，遠低於 pre 60–90）
+      - 3+ 筆 → console.warn，仍取 min/max
+      - 部分缺 reportDateTime → console.warn，缺 time 的視為 0 排到最前
+      - 全部缺 reportDateTime 或 flag=false → fallback 到 legacy
+        `resolveBUNByLegacyOrderName()`：orderName 含逗號 = pre、
+        orderName == "BUN" = post
+    - 新增 `resolveBunClustersFromStored(labDataForPatient)`：給 shell
+      呼叫的高階介面。把 `BUN_pre` + `BUN_post` + `BUN` 三個 testId 的
+      stored entries 合併、依 `clusterDayWindow` 叢集，每叢套用
+      `resolveBUN()`，回傳 `{ startDate: { pre, post, urr, preDate,
+      postDate } }`。lab table 與 CSV exporter 共用同一個來源，避免雙
+      頭真相。
+    - `exporter.buildDraws()` 改為呼叫 `resolveBunClustersFromStored`
+      取代原本 inline 的 URR 計算。同時略過 `BUN_pre` / `BUN_post` /
+      `BUN` 三個 testId 的 dateToLabs 收集（避免 stored 重複條目誤
+      變成 cell value）；改由 resolver 結果回填 `c.labs.BUN_pre` /
+      `c.labs.BUN_post`。BUN cluster 起始日不在其他測試日期集合中時
+      也會補上一筆 draw。
+- 原因：
+  - 原 filter-based 方案（orderName 含逗號 = pre、orderName="BUN" = post）
+    依賴特定醫囑命名習慣。跨醫師、跨醫院、或同一病人有非月檢 composite
+    醫囑時都會出錯。
+  - 改為依報告時間判定 — 早抽 = 洗腎前、晚抽 = 洗腎後 — 直接對應臨床
+    現實，與醫囑命名脫鉤。
+  - Step 1 v3 baseline 的數據顯示 filter 路徑事實上失效（每筆 BUN(BD) =
+    BUN(AD)、URR = 0），所以這個切換同時也是 bug 修復。
+- 測試：
+  - `node sync-patterns.js` 乾淨。
+  - `node tmp/smoke-step2.js` 25/25 全綠（含去重、tie-break、3+ 筆、
+    缺時間、flag=false、`resolveBunClustersFromStored` 端到端、
+    `exporter.buildDraws()` 端到端）。
+  - `new Function(inlineScript)` 解析通過。
+  - **Side-by-side 驗證 (TASK_BRIEF 接收條件 #3) 尚未完成。** YC 已
+    同意先 commit 實作版本作 checkpoint，待後續再做 baseline / after
+    diff。預期：對於 Step 1 v3 baseline 中所有 BD = AD 的 row，新版會
+    產生不同的 BD / AD 與真正的 URR%；其他非 BUN 欄位應與 baseline
+    完全相同。
+  - **尚待 YC 在實機瀏覽器手動驗證：**
+    1. 重新整理 → 更新全部資料（讓新的 reportDateTime 寫進 storage）
+    2. 開 000105069H 檢驗資料表 → BUN(BD) 與 BUN(AD) 應為不同數字、
+       URR 不再永遠 0
+    3. DevTools console 除了預期的 `[dialysis.resolveBUN]` warning
+       （3+ 筆或缺 reportDateTime 的叢集）外應乾淨
+    4. 匯出 CSV → 比對 baseline，BUN / URR 欄與其他欄變化是否合理
+- 相依：
+  - 無 patterns repo 變更。
+  - 無資料遷移需求 — 舊 storage（無 reportDateTime）會走 legacy
+    fallback；重抓一次後即進入新路徑。
+  - `extractLabValues()` 的 `computeDerivedValues()` URR 計算保留為
+    無效的 dead code（lab table 與 CSV 都改走 resolver），日後 Step 3
+    再清。
+
 ## 2026-05-04 — 修復 normalizer 字串名稱解析（WBC / Platelet TypeError）
 
 - 作者：claude（與 YC 共同）

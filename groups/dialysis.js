@@ -25,9 +25,17 @@ function resolveManifestEntry(entry) {
   return Object.assign({ periodicity: 'monthly' }, entry);
 }
 
+// 功能旗標：BUN 前/後是否依報告時間判定。預設 true（Step 2 新行為）；
+// 切為 false 時退回 legacy 路徑（依 orderName 是否含逗號判斷 pre）。
+// 留作緊急回滾用，僅作為 code-only 旗標。
+const DIALYSIS_FLAGS = {
+  useReportTimeBUN: true,
+};
+
 const DIALYSIS_GROUP = {
   id: 'dialysis',
   label: '透析',
+  flags: DIALYSIS_FLAGS,
 
   storageKey: {
     patients: 'patients_dialysis',
@@ -107,29 +115,149 @@ const DIALYSIS_GROUP = {
     requireBUN: true,          // 必有 BUN 才算月檢
   },
 
-  // BUN 前/後判定（基於 reportDateTime）
-  //   ≥2 筆 → 依時間排序，最早 = 洗腎前，最晚 = 洗腎後
-  //   1 筆  → 預設為洗腎前
-  //   0 筆  → 兩者皆 null
+  // BUN 前/後判定（Step 2 - 已啟用為主要來源）
   //
-  // TODO: activate in Step 2 (BUN reportTime switchover)。
+  // 策略：
+  //   - 先依 (reportDateTime + value) 去重（extractLabValues 會把每筆 BUN
+  //     order 同時推到 BUN_pre 與 BUN_post 兩個 testId，這裡合併視同一筆）
+  //   - 0 筆 → 兩者皆 null
+  //   - 1 筆 → 預設為洗腎前（post = null）
+  //   - 2 筆且 reportDateTime 不同 → 早 = 前；晚 = 後
+  //   - 2 筆且 reportDateTime 相同（罕見，多半因為解析後同分鐘）：
+  //       tie-break：值較小的視為 post（洗腎後 BUN 通常 6–25，遠低於洗腎前
+  //       60–90）。若值也相同 → 取陣列原本順序（pre = 第一筆）。
+  //   - 3+ 筆 → min/max by reportDateTime，中間筆 console.warn（臨床罕見）
+  //   - 至少一筆缺 reportDateTime → console.warn；
+  //       若 useReportTimeBUN=false 或全部都缺，退回 legacy 規則：
+  //       orderName 含逗號 = pre；orderName == "BUN" = post。
   resolveBUN(bunEntries) {
     if (!bunEntries || bunEntries.length === 0) return { pre: null, post: null };
-    if (bunEntries.length === 1) return { pre: bunEntries[0], post: null };
-    const sorted = [...bunEntries].sort((a, b) => {
-      const ta = new Date(a.reportDateTime || a.reportDate).getTime();
-      const tb = new Date(b.reportDateTime || b.reportDate).getTime();
+
+    // 1. 去重 — 同一筆 BUN order 在 BUN_pre/BUN_post 兩個 testId 各出現一次
+    const dedup = [];
+    const seen  = new Set();
+    for (const e of bunEntries) {
+      const key = (e.reportDateTime || e.date || '') + '|' + (e.value != null ? e.value : '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      dedup.push(e);
+    }
+
+    if (dedup.length === 1) return { pre: dedup[0], post: null };
+
+    // 2. 偵測 reportDateTime 是否完整
+    const missingTime = dedup.filter(e => !e.reportDateTime).length;
+    const allMissing  = missingTime === dedup.length;
+
+    if (allMissing || !DIALYSIS_FLAGS.useReportTimeBUN) {
+      if (allMissing && DIALYSIS_FLAGS.useReportTimeBUN) {
+        try { console.warn('[dialysis.resolveBUN] all entries missing reportDateTime — falling back to legacy orderName rule'); } catch (_) {}
+      }
+      return resolveBUNByLegacyOrderName(dedup);
+    }
+
+    if (missingTime > 0) {
+      try { console.warn('[dialysis.resolveBUN] some entries missing reportDateTime — those default to "pre"', dedup); } catch (_) {}
+    }
+
+    // 3. 依 reportDateTime 排序（缺 time 的視為 0 → 排到最前 = pre）
+    const sorted = [...dedup].sort((a, b) => {
+      const ta = a.reportDateTime ? new Date(a.reportDateTime).getTime() : 0;
+      const tb = b.reportDateTime ? new Date(b.reportDateTime).getTime() : 0;
       return ta - tb;
     });
-    return { pre: sorted[0], post: sorted[sorted.length - 1] };
+
+    // 4. 3+ 筆：中間筆警告
+    if (sorted.length > 2) {
+      try { console.warn('[dialysis.resolveBUN] 3+ BUN entries on cluster — taking earliest as pre, latest as post', sorted); } catch (_) {}
+    }
+
+    let pre  = sorted[0];
+    let post = sorted[sorted.length - 1];
+
+    // 5. tie-break：第一與最後的 reportDateTime 相同 → 用值大小判斷
+    //    （post 通常比 pre 小很多）
+    if (pre.reportDateTime && post.reportDateTime &&
+        pre.reportDateTime === post.reportDateTime &&
+        pre !== post) {
+      const pv = Number(pre.value), sv = Number(post.value);
+      if (Number.isFinite(pv) && Number.isFinite(sv) && pv !== sv) {
+        if (sv > pv) {
+          // post 居然比較大 — 對調
+          const tmp = pre; pre = post; post = tmp;
+        }
+      }
+      // 值也相同 → 維持陣列順序
+    }
+
+    return { pre, post };
+  },
+
+  // 從 localStorage 的 stored 結構（{testId: [{date, value, reportDateTime, orderName, ...}, ...]}）
+  // 解析每個 BUN 叢集的 pre/post/URR。回傳：
+  //   { 'YYYY-MM-DD': { pre, post, urr, preDate, postDate } }
+  // key 為叢集起始日（startDate）；preDate/postDate 為 pre/post 各自的
+  // entry.date，因為 lab table 是依日期欄位渲染，pre/post 可能落在不同
+  // 日期欄。urr 只在 pre + post 都存在且 pre.value > 0 時計算。
+  resolveBunClustersFromStored(labDataForPatient) {
+    const out = {};
+    if (!labDataForPatient) return out;
+
+    const W = this.monthlyDetection.clusterDayWindow;
+    // 把 BUN_pre 與 BUN_post 兩個 testId 的條目合併（dedupe 在 resolveBUN 處理）
+    const all = []
+      .concat(labDataForPatient.BUN_pre  || [])
+      .concat(labDataForPatient.BUN_post || [])
+      .concat(labDataForPatient.BUN      || []);
+    if (all.length === 0) return out;
+
+    // 排序：reportDateTime 優先，否則用 date
+    all.sort((a, b) => {
+      const ta = a.reportDateTime ? new Date(a.reportDateTime).getTime()
+                                  : (a.date ? new Date(a.date).getTime() : 0);
+      const tb = b.reportDateTime ? new Date(b.reportDateTime).getTime()
+                                  : (b.date ? new Date(b.date).getTime() : 0);
+      return ta - tb;
+    });
+
+    // 依日期叢集
+    const clusters = [];
+    let cur = null;
+    for (const e of all) {
+      const d = e.date || (e.reportDateTime ? e.reportDateTime.slice(0, 10) : null);
+      if (!d) continue;
+      const dt = new Date(d);
+      if (!cur || (dt - new Date(cur.endDate)) / 86400000 > W) {
+        cur = { startDate: d, endDate: d, entries: [] };
+        clusters.push(cur);
+      } else {
+        if (d > cur.endDate) cur.endDate = d;
+      }
+      cur.entries.push(e);
+    }
+
+    for (const c of clusters) {
+      const { pre, post } = this.resolveBUN(c.entries);
+      const slot = {
+        pre,
+        post,
+        preDate:  pre  ? (pre.date  || (pre.reportDateTime  || '').slice(0, 10)) : null,
+        postDate: post ? (post.date || (post.reportDateTime || '').slice(0, 10)) : null,
+        urr: null,
+      };
+      const pv = pre  ? Number(pre.value)  : NaN;
+      const sv = post ? Number(post.value) : NaN;
+      if (Number.isFinite(pv) && Number.isFinite(sv) && pv > 0) {
+        slot.urr = +((1 - sv / pv) * 100).toFixed(1);
+      }
+      out[c.startDate] = slot;
+    }
+    return out;
   },
 
   // 月檢偵測（針對未來 raw lab rows 介面）
   // 輸入：該病人所有 raw lab rows（含 testId / orderDate / reportDateTime / value / unit）
   // 輸出：[{ drawDate: 'YYYY-MM-DD', labs: { TESTID: row } }, ...]
-  //
-  // TODO: activate in Step 2 — 目前 shell 仍從 localStorage 的
-  // {testId: [{date, value}, ...]} 結構讀取，由 exporter.buildDraws() 處理。
   detectMonthlyDraws(allLabs) {
     if (!allLabs || allLabs.length === 0) return [];
 
@@ -203,14 +331,15 @@ const DIALYSIS_GROUP = {
     filename: (patient) =>
       `dialysis_${patient.chartNo || patient.chartno || 'unknown'}.csv`,
 
-    // 把 localStorage 的 {testId: [{date, value}, ...]} 結構轉為 draws 陣列。
-    // 用 monthlyDetection.clusterDayWindow 把日期叢集，每叢一個 draw。
-    // 計算 URR（pre/post 同叢時）。
+    // 把 localStorage 的 {testId: [{date, value, reportDateTime, ...}, ...]} 結構
+    // 轉為 draws 陣列。日期叢集後，BUN_pre / BUN_post / URR 透過
+    // resolveBunClustersFromStored() 決定（與 lab table 同一個來源）。
     buildDraws(labDataForPatient) {
       if (!labDataForPatient) return [];
 
       const dateToLabs = new Map();
       for (const id in labDataForPatient) {
+        if (id === 'BUN_pre' || id === 'BUN_post' || id === 'BUN') continue;
         const entries = labDataForPatient[id];
         if (!Array.isArray(entries)) continue;
         for (const e of entries) {
@@ -235,17 +364,33 @@ const DIALYSIS_GROUP = {
         Object.assign(cur.labs, dateToLabs.get(d));
       }
 
-      // Computed pass — URR per draw (only if both BUN_pre and BUN_post present)
+      // BUN pre/post + URR — 走 Step 2 的 resolver。對齊到「叢集起始日」。
+      const bunByStart = DIALYSIS_GROUP.resolveBunClustersFromStored(labDataForPatient);
       for (const c of clusters) {
+        const slot = bunByStart[c.startDate];
         c.computed = {};
-        const pre  = c.labs.BUN_pre  ? c.labs.BUN_pre.value  : null;
-        const post = c.labs.BUN_post ? c.labs.BUN_post.value : null;
-        const preN  = typeof pre  === 'number' ? pre  : parseFloat(pre);
-        const postN = typeof post === 'number' ? post : parseFloat(post);
-        if (Number.isFinite(preN) && Number.isFinite(postN) && preN > 0) {
-          c.computed.URR = +((1 - postN / preN) * 100).toFixed(1);
+        if (slot) {
+          if (slot.pre)  c.labs.BUN_pre  = { value: slot.pre.value,  date: slot.preDate  };
+          if (slot.post) c.labs.BUN_post = { value: slot.post.value, date: slot.postDate };
+          if (slot.urr != null) c.computed.URR = slot.urr;
         }
       }
+
+      // 也要把 BUN cluster 起始日不在 dateToLabs 的補上（純 BUN cluster）
+      const seenStarts = new Set(clusters.map(c => c.startDate));
+      for (const startDate in bunByStart) {
+        if (seenStarts.has(startDate)) continue;
+        const slot = bunByStart[startDate];
+        const labs = {};
+        if (slot.pre)  labs.BUN_pre  = { value: slot.pre.value,  date: slot.preDate  };
+        if (slot.post) labs.BUN_post = { value: slot.post.value, date: slot.postDate };
+        const computed = {};
+        if (slot.urr != null) computed.URR = slot.urr;
+        clusters.push({ startDate, endDate: startDate, labs, computed });
+      }
+
+      // 重新排序（最後加入的純 BUN cluster 可能亂序）
+      clusters.sort((a, b) => a.startDate.localeCompare(b.startDate));
 
       return clusters.map(c => ({
         drawDate: c.startDate,
@@ -340,6 +485,20 @@ function daysBetween(d1, d2) {
 
 function isoDate(d) {
   return new Date(d).toISOString().slice(0, 10);
+}
+
+// Legacy fallback：依 orderName 是否含逗號判斷 pre/post。僅在
+// useReportTimeBUN=false 或所有條目均缺 reportDateTime 時使用。
+function resolveBUNByLegacyOrderName(entries) {
+  let pre = null, post = null;
+  for (const e of entries) {
+    const name = (e.orderName || '').trim();
+    if (!post && name === 'BUN') post = e;
+    else if (!pre && name.includes(',')) pre = e;
+  }
+  // 若還沒判斷出 pre：取剩下任一筆
+  if (!pre) pre = entries.find(e => e !== post) || null;
+  return { pre, post };
 }
 
 // ─── exports ─────────────────────────────────────────────────────────────────
