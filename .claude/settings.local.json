@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node *)",
+      "Bash(git -C \"D:\\\\self\\\\Dropbox\\\\1.Project.YuLi\\\\20251005.lab_report\\\\hospital-lab-reporter\" status)",
+      "Bash(git -C \"D:\\\\self\\\\Dropbox\\\\1.Project.YuLi\\\\20251005.lab_report\" status)",
+      "Bash(git config *)",
+      "Bash(echo \"name_exit=$?\")",
+      "Bash(echo \"email_exit=$?\")",
+      "Bash(git *)"
+    ]
+  }
+}
