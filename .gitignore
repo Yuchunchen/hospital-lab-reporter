@@ -20,7 +20,7 @@ data/
 
 # Hand-off briefs from Cowork to Claude Code (per-task, not for sharing)
 TASK_BRIEF*.md
-TASK_revision*_BRIEF.md
+TASK_revision*_BRIEF*.md
 
 # Step-validation scratch (real patient CSVs land here during diff testing)
 tmp/
