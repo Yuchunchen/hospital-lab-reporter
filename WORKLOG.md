@@ -1,5 +1,111 @@
 # WORKLOG
 
+## 2026-05-05 — Revision 1 hotfix：UI 微調 ＋ BUN(AD) 修復
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis、shell、ui
+- 變更：新增、修改
+- 檔案：
+  - 修改 `hospital-lab-data.html`（皆在 `__PATTERNS__` / `__GROUPS__`
+    標記區塊外）：
+    - 病人清單分頁 UI 重排：textarea 下方改為 flex 行 — 左側
+      `[新增清單]` `[更新資料]`，右側放大版 `匯出 CSV`（warning 橘、
+      `padding:12px 32px; font-size:1.15em; box-shadow`，視覺上明顯為主要
+      動作）。原 card-header 右上角的 CSV 按鈕移除。
+    - 既有按鈕 id `btnUpdate` → `btnAddToList`，文字 `更新` → `新增清單`。
+      `addAndUpdateFromInput()` 完成且全部成功後清空 textarea，狀態列字串
+      改為「新增清單中… N/M」「新增完成」。
+    - 新增按鈕 `btnRefreshList`（`更新資料`），handler
+      `refreshExistingPatients()`：忽略 textarea，逐筆對 `loadPatients()`
+      內現有病人重抓 labs + demographics（共用 `fetchAndStore()` pipeline），
+      狀態列顯示「更新中... N / M (chartno)」。執行期間兩個按鈕 disable。
+    - 修正空清單提示文字（「請按更新」→「請按新增清單」）以及 lab view
+      無資料提示（「請點選更新」→「請點選新增清單或更新資料」）。
+    - **BUN(AD) 修復** — `extractLabValues()` 結尾新增
+      `classifyBUNPrePost()` post-processing pass。原本兩個 BUN regex
+      (`BUN_pre` / `BUN_post`) 都比對到同一段 `BUN:\s*(\d+)`，每筆 BUN
+      被同時推進兩個 array → `BUN_post[]` 與 `BUN_pre[]` 完全相同，
+      `BUN(AD)` 永遠空白。新 pass 步驟：
+        1. 合併兩 array → 以 `(value, signOffTime/dateObj/reportDateTime,
+           orderName)` 為 key 去重。
+        2. 依 `e.date` (YYYY-MM-DD) 分組。
+        3. **Method A（預設、跨醫院安全）**：同日 entries 依
+           `signOffTime → dateObj → reportDateTime` 升冪排序，
+           最早 = pre、最晚 = post。3+ 筆 console.warn 並取頭尾。
+        4. **Method B（fallback）**：當 A 模糊（缺 timestamp 或 tie）時，
+           依 `orderName` 字串：含 `洗後` → post、含 `洗前` → pre、
+           無標記預設 pre。每次 fallback 都 console.warn。
+        5. 重建 `results.BUN_pre` / `results.BUN_post`，每日各最多一筆。
+       fix 為 idempotent：使用者下次按「更新資料」即會被清乾淨，無須清
+       localStorage。
+  - 修改 `groups/dialysis.js`（隨後 `node sync-patterns.js` 重新內嵌）：
+    - 新增 `_indexBunByDate(labDataForPatient)` helper：把已清理過的
+      `BUN_pre[]` / `BUN_post[]` 轉成 `{date → entry}` 的兩張查表。
+    - **重寫 `detectMonthlyDrawsFromStored()`** 的 BUN 配對：原來只在
+      effectiveTime cluster 內 `resolveBUN(bunEntries)` 來決定 pre/post，
+      但實際資料中 `BUN洗前(YL),...` 與 `BUN洗後分開印(YL)` 是兩張不同的
+      醫囑 → 不同的 `生效時間` → 落在不同 cluster，cluster-內配對永遠拿
+      不到 post。新邏輯：找到月檢 cluster 後，post 改用
+      `bunIdx.post[drawDateIso]` 跨 cluster 以 date 查表。pre 仍偏好
+      cluster 內的 `BUN_pre[0]`（fallback 用查表）。
+    - **重寫 `resolveBunClustersFromStored()`** 為 date-based：直接從
+      `_indexBunByDate()` 結果產出 `{date → {pre, post, urr,
+      preDate, postDate, effectiveTime}}`，與 lab-table override map 形狀
+      相容。
+    - `resolveBUN()` / `resolveBUNByLegacyOrderName()` 保留但已成 dead
+      code（沒有 caller），用作將來備援。
+- 原因：
+  - 使用者測試 patient `000105069H` 後發現 `BUN(AD)` 仍空白；DevTools
+    探查顯示 `localStorage.labs_dialysis['000105069H'].BUN_pre` 與
+    `.BUN_post` 內容**完全相同**（每筆 BUN 同時出現在兩個 bucket）。
+  - 根因：revision 1 把 catalog 層的 `composite` / `standalone_bun`
+    filter 移除了（兩個 testId 共用同一個 regex），但**沒有補上後製
+    分流邏輯**。同時，`BUN洗前` 與 `BUN洗後` 是兩張不同醫囑，`生效時間`
+    不同，所以原本依 cluster 內 `resolveBUN()` 配對的策略也失效。
+  - UI 上「新增清單」與「更新資料」拆成兩顆按鈕，是為了避免每次 batch
+    update 都得手動清空 textarea；同時讓「重抓既有清單」這個高頻動作
+    一鍵可達。CSV 按鈕放大置右是因為它是流程最後輸出（貼清單 → 更新
+    → 匯 CSV → 上傳「下一個系統」），需要視覺上明確的主要動作。
+- 測試：
+  - `node sync-patterns.js` 乾淨（patterns + groups blocks 皆更新）。
+  - `new Function(inlineScript)` parse 通過。
+  - Headless smoke：以模擬資料（同日 BUN_pre cluster effA 03:30 +
+    BUN_post cluster effB 08:00 + 完整月檢面板）跑
+    `DIALYSIS_GROUP.detectMonthlyDrawsFromStored(labData)` →
+    `draws=1, BUN_pre=62, BUN_post=19, URR=69.4`。
+    `resolveBunClustersFromStored(labData)` → `2026-04-08: pre=62
+    post=19 urr=69.4`。確認跨 cluster 配對成立。
+  - Headless smoke (`classifyBUNPrePost`)：
+    1. 兩 array 完全重複（stale state） → 1 pre + 1 post，值正確。
+    2. 缺 signOffTime + orderName 含 `洗前/洗後` → Method B 正確分流。
+    3. 單筆 entry → 預設 pre，post=null。
+    4. 三個月份各一對 → 三 pre + 三 post，date 排序正確。
+  - **尚待 YC 在實機瀏覽器手動驗證：**
+    1. 重新整理 `hospital-lab-data.html` → 病人清單頁應看到三個按鈕
+       （`新增清單` 綠、`更新資料` 藍、`匯出 CSV` 大顆橘）。
+    2. 點 `更新資料` 一次（清單已有 `000105069H`）→ 狀態列顯示
+       「更新中... N / M」、按鈕 disable。
+    3. 完成後點 `000105069H` 進入 lab view → `BUN (BD)` 與 `BUN (AD)`
+       兩列在 2026-04-08 應分別顯示 62 / 19，URR 應 ≈ 69.4。
+    4. DevTools console：
+       `JSON.parse(localStorage.labs_dialysis)['000105069H'].BUN_pre.length`
+       應與 `BUN_post.length` 接近（≈18-20），且
+       `pre.filter(r=>r.date==='2026-04-08')[0].value === 62`，
+       `post.filter(r=>r.date==='2026-04-08')[0].value === 19`。
+    5. 按 `匯出 CSV` → 開檔確認 `000105069H, 202604` 那 row 的
+       `BUN (BD) value=62`、`BUN (AD) value=19`、`URR value≈69.4`。
+- 相依：
+  - 不需要 `hospital-lab-patterns` 先發版（patterns block 內容未變）。
+  - 不影響其他 disease group（目前只有 dialysis）。
+  - **idempotent 升級**：舊 stored data 仍是「兩 array 重複」狀態，
+    使用者按一次 `更新資料` 就會被新 `classifyBUNPrePost()` 清乾淨；
+    無須清 localStorage。
+- 已知/刻意保留：
+  - `resolveBUN()` / `resolveBUNByLegacyOrderName()` 變成 dead code，
+    暫不刪以保留未來「cluster 內配對」備援可能性。
+  - `computeDerivedValues()` 中的 URR 計算仍存在（lab table 與 CSV 都
+    走 dialysis group resolver），維持 dead-code 狀態。
+
 ## 2026-05-05 — Revision 1：UI 簡化 + 長格式合併 CSV 匯出
 
 - 作者：claude（與 YC 共同）
