@@ -1,5 +1,53 @@
 # WORKLOG
 
+## 2026-05-06 — Sync EarlyCKD 非 CKD 時回傳「正常」(Phase C)
+
+- 作者：claude（與 YC 共同）
+- 範圍：sync-script
+- 變更：修改（純 sync timestamp，不動 reporter 自身邏輯）
+- 檔案：
+  - 重跑 `node sync-patterns.js`，從 sibling repo `hospital-lab-patterns`
+    （commit `437683c` — `EarlyCKD` 非 CKD 時改回傳 `'正常'`）拉取最新
+    來源。
+  - `hospital-lab-data.html`：本輪只有兩處 timestamp 刷新
+    （`__HOSPITAL_LAB_PATTERNS_*__` 與 `__HOSPITAL_LAB_GROUPS_*__`），
+    inline 內容無 catalog/manifest 變動。新版
+    `Synced at: 2026-05-05T22:04:10.016Z`。
+- 原因：
+  - patterns repo 的 Phase A 改動只動到 `patterns/computed.js`
+    （`EarlyCKD()` 第二個 return 由 `null` 改成 `'正常'`），catalog 與
+    reporter manifest 都沒動。
+  - reporter 的 `sync-patterns.js` 只 inline `catalog.js` /
+    `normalizers.js` / `reporter.js`，**沒有 inline `computed.js`**，
+    所以 patterns 端的 `EarlyCKD()` 函式本來就不在 reporter HTML 內。
+  - 即使 inline，也無作用 — `REPORTER_MANIFEST`（line 1083–1155）並未
+    列入 `EarlyCKD` / `TaiwanCKD` / `UACR*` / `UPCR*` / `KDIGORisk` /
+    `GFRStage`，`_resolveManifest()` 解析後的 `LAB_TESTS` 不會包含這些
+    早期 CKD 分期 id；reporter UI 表格不會渲染這欄。
+  - reporter 自身的 `computeDerivedValues()`（line 2195–2234）也只處理
+    `URR` 與 `CaxP` 兩個透析專用 computed，沒有 client-side render
+    EarlyCKD 的迴圈 — 對應 task brief Phase C step 2 的「如無，純 sync
+    即可」分支。
+- 測試：
+  - `git diff hospital-lab-data.html`：2 inserts / 2 deletes，僅兩處
+    sync timestamp，inline catalog / manifest / groups 內容
+    byte-identical。
+  - 用 grep 確認 reporter HTML 內仍只有一處 `EarlyCKD` 出現（catalog
+    entry line 643），沒有任何 reporter manifest 或 client-side render
+    引用。
+  - 預期效果：reporter UI 行為與本輪 sync 前完全一致（不會渲染
+    EarlyCKD 欄；亦不受 patterns 端「非 CKD 時顯示正常」邏輯影響）。
+  - 瀏覽器手測：本輪 claude 端無法直接開瀏覽器，由使用者重整
+    `hospital-lab-data.html` 後快速確認既有透析病人列表與檢驗表格無
+    異常即可（不期待出現新欄位）。
+- 相依：
+  - 需要 `hospital-lab-patterns@437683c` 已 push（已確認 origin/main
+    在 437683c，本地 sync 已成功讀到）。
+  - Phase A（patterns computed.js）+ Phase B（viewer report.js +
+    patterns-computed.js sync）為前置；本 phase 為三 repo 連動最後
+    一棒，本次 reporter 端為 no-op sync 留底以保 timestamp 一致性。
+  - 不影響其他 disease group（CKD / DM / COPD）。
+
 ## 2026-05-06 — Sync 肝炎顯示集中化 (Item B Phase 3)
 
 - 作者：claude（與 YC 共同）
