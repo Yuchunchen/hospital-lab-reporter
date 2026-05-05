@@ -99,10 +99,28 @@ const DIALYSIS_GROUP = {
     requireBUN: true,
   },
 
-  // BUN testIds that need pre/post resolution (extractLabValues writes BUN
-  // matches to BUN_pre and BUN_post both, since both patterns match the same
-  // text; resolver dedupes).
+  // BUN testIds. Revision 1 hotfix (2026-05-05): extractLabValues now
+  // post-processes BUN_pre[] / BUN_post[] so each draw appears once in the
+  // correct bucket, classified by signOffTime (Method A) with orderName
+  // fallback (Method B). The two arrays are no longer mirror images.
+  // BUN (legacy single-bucket id) is kept for back-compat with stale records.
   _bunIds: ['BUN_pre', 'BUN_post', 'BUN'],
+
+  // Build a date → entry lookup over the cleaned BUN_pre[] / BUN_post[]
+  // arrays. After the hotfix these arrays hold one canonical entry per date,
+  // which lets us pair pre/post across separate effectiveTime clusters
+  // (洗前 panel and 洗後 single-BUN order have different 生效時間).
+  _indexBunByDate(labDataForPatient) {
+    const pre = {}, post = {};
+    if (!labDataForPatient) return { pre, post };
+    for (const e of (labDataForPatient.BUN_pre || [])) {
+      if (e && e.date && !pre[e.date]) pre[e.date] = e;
+    }
+    for (const e of (labDataForPatient.BUN_post || [])) {
+      if (e && e.date && !post[e.date]) post[e.date] = e;
+    }
+    return { pre, post };
+  },
 
   // Resolve BUN pre/post within a single cluster (i.e. entries that already
   // share the same 生效時間). Sort by 簽收時間 (signOffTime): earliest = pre,
@@ -195,12 +213,19 @@ const DIALYSIS_GROUP = {
   // Returns [{ effectiveTime, drawDate, yyyymm, labs: {testId: entry}, computed: {URR?} }].
   // Only clusters that pass the monthly-required overlap + BUN-presence gate
   // are returned. Sorted ascending by effectiveTime (then drawDate).
+  //
+  // Revision 1 hotfix: 洗前 (composite panel) and 洗後 (standalone BUN) have
+  // different 生效時間, so they live in separate effectiveTime clusters. The
+  // monthly cluster is the pre cluster (passes overlap thanks to the full
+  // panel); the matching BUN_post is looked up by date from the cleaned
+  // BUN_post[] array.
   detectMonthlyDrawsFromStored(labDataForPatient) {
     if (!labDataForPatient) return [];
     const monthlyReq = monthlyRequiredIds(this);
     const minRatio   = this.monthlyDetection.minMonthlyOverlapRatio;
     const reqBUN     = this.monthlyDetection.requireBUN;
     const buckets    = this._flattenEntriesByCluster(labDataForPatient);
+    const bunIdx     = this._indexBunByDate(labDataForPatient);
 
     const draws = [];
     for (const [, bucket] of buckets) {
@@ -215,12 +240,26 @@ const DIALYSIS_GROUP = {
       const hasBUN = this._bunIds.some(b => ids.has(b));
       if (reqBUN && !hasBUN) continue;
 
-      // Resolve BUN pre/post within the cluster.
-      const bunEntries = [];
-      for (const b of this._bunIds) {
-        if (bucket.byTestId[b]) bunEntries.push(...bucket.byTestId[b]);
+      // drawDate / yyyymm — prefer effectiveTime, fall back to any entry's date.
+      let drawDateIso = null;
+      if (bucket.effectiveTime) {
+        drawDateIso = bucket.effectiveTime.slice(0, 10);
+      } else {
+        for (const id in bucket.byTestId) {
+          const e0 = bucket.byTestId[id][0];
+          if (e0 && e0.date) { drawDateIso = e0.date; break; }
+        }
+        drawDateIso = drawDateIso || '';
       }
-      const { pre, post } = this.resolveBUN(bunEntries);
+
+      // BUN pre: prefer the cleaned date-indexed pre, fall back to whatever
+      // sat in this cluster's BUN_pre / BUN bucket (legacy data path).
+      const pre = bunIdx.pre[drawDateIso]
+        || (bucket.byTestId.BUN_pre && bucket.byTestId.BUN_pre[0])
+        || (bucket.byTestId.BUN     && bucket.byTestId.BUN[0])
+        || null;
+      // BUN post: cross-cluster lookup by date (post lives in its own cluster).
+      const post = bunIdx.post[drawDateIso] || null;
 
       // Collect non-BUN labs (one entry per testId — they share the cluster
       // key, so any duplicate is a parser-side dedupe miss).
@@ -240,15 +279,6 @@ const DIALYSIS_GROUP = {
         computed.URR = +((1 - sv / pv) * 100).toFixed(1);
       }
 
-      // drawDate / yyyymm — prefer effectiveTime, fall back to any entry's date.
-      let drawDateIso = null;
-      if (bucket.effectiveTime) {
-        drawDateIso = bucket.effectiveTime.slice(0, 10);
-      } else {
-        const anyKey = Object.keys(labs)[0];
-        const sample = anyKey ? labs[anyKey] : (pre || post);
-        drawDateIso = (sample && sample.date) || '';
-      }
       const yyyymm = drawDateIso ? drawDateIso.slice(0, 4) + drawDateIso.slice(5, 7) : '';
 
       draws.push({
@@ -282,48 +312,31 @@ const DIALYSIS_GROUP = {
     return out;
   },
 
-  // Lab-table BUN cluster map for the labview tab. Same source of truth as
-  // the exporter — keyed by drawDate (YYYY-MM-DD of the cluster).
+  // Lab-table BUN cluster map for the labview tab.
+  // Revision 1 hotfix: built directly from the cleaned BUN_pre[] / BUN_post[]
+  // arrays (one canonical entry per date) so pre/post pair correctly even
+  // when 洗前 and 洗後 sit in separate effectiveTime clusters.
   resolveBunClustersFromStored(labDataForPatient) {
     const out = {};
     if (!labDataForPatient) return out;
-    const buckets = this._flattenEntriesByCluster(labDataForPatient);
-    for (const [, bucket] of buckets) {
-      const ids = new Set(Object.keys(bucket.byTestId));
-      const hasBUN = this._bunIds.some(b => ids.has(b));
-      if (!hasBUN) continue;
-      const bunEntries = [];
-      for (const b of this._bunIds) {
-        if (bucket.byTestId[b]) bunEntries.push(...bucket.byTestId[b]);
-      }
-      const { pre, post } = this.resolveBUN(bunEntries);
-      const drawDate = bucket.effectiveTime
-        ? bucket.effectiveTime.slice(0, 10)
-        : ((pre && pre.date) || (post && post.date) || null);
-      if (!drawDate) continue;
-
+    const { pre: preIdx, post: postIdx } = this._indexBunByDate(labDataForPatient);
+    const allDates = new Set([...Object.keys(preIdx), ...Object.keys(postIdx)]);
+    for (const date of allDates) {
+      const pre  = preIdx[date]  || null;
+      const post = postIdx[date] || null;
       const slot = {
         pre, post,
-        preDate:  pre  ? (pre.date  || (pre.signOffTime  ? pre.signOffTime.slice(0, 10)  : null)) : null,
-        postDate: post ? (post.date || (post.signOffTime ? post.signOffTime.slice(0, 10) : null)) : null,
+        preDate:  pre  ? pre.date  : null,
+        postDate: post ? post.date : null,
         urr: null,
-        effectiveTime: bucket.effectiveTime || null,
+        effectiveTime: (pre && pre.effectiveTime) || (post && post.effectiveTime) || null,
       };
       const pv = pre  ? Number(pre.value)  : NaN;
       const sv = post ? Number(post.value) : NaN;
       if (Number.isFinite(pv) && Number.isFinite(sv) && pv > 0) {
         slot.urr = +((1 - sv / pv) * 100).toFixed(1);
       }
-
-      // If two clusters land on the same date (rare), keep the earlier
-      // effectiveTime (matches "earliest per month" semantics).
-      if (out[drawDate]) {
-        const cur = out[drawDate];
-        const curKey = cur.effectiveTime || drawDate;
-        const newKey = slot.effectiveTime || drawDate;
-        if (newKey >= curKey) continue;
-      }
-      out[drawDate] = slot;
+      out[date] = slot;
     }
     return out;
   },
