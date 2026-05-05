@@ -76,6 +76,20 @@ body {
 }
 .patient-table tr:hover td { background: #eaf2f8; }
 .patient-table .actions { white-space: nowrap; }
+.patient-table th.sortable { cursor: pointer; user-select: none; }
+.patient-table th.sortable:hover { background: #154360; }
+.patient-table th .sort-ind { font-size: 11px; opacity: .85; margin-left: 4px; }
+.patient-table tr.filter-row th {
+  background: #ecf0f1; padding: 4px 6px; font-weight: 400;
+}
+.patient-table tr.filter-row input,
+.patient-table tr.filter-row select {
+  width: 100%; padding: 3px 6px; font-size: 12px; font-family: inherit;
+  border: 1px solid #bdc3c7; border-radius: 3px; background: #fff; color: #2c3e50;
+}
+.patient-table .row-actions { display: inline-flex; gap: 4px; }
+.patient-table .row-actions .btn { padding: 3px 8px; font-size: 12px; line-height: 1; }
+.patient-table .row-actions .btn:disabled { opacity: .5; cursor: wait; }
 
 /* ─── Lab Data Table ───────────────────────────────────────────────────────── */
 .lab-wrapper { overflow-x: auto; }
@@ -227,26 +241,17 @@ body {
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap">
           <div style="display:flex; gap:8px">
             <button class="btn btn-success btn-sm" id="btnAddToList" onclick="addAndUpdateFromInput()">新增清單</button>
-            <button class="btn btn-primary btn-sm" id="btnRefreshList" onclick="refreshExistingPatients()">更新資料</button>
           </div>
-          <button class="btn btn-warning" id="btnExportCSV" onclick="exportCombinedCSV()"
-            style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出 CSV</button>
+          <div style="display:flex; gap:8px; align-items:center">
+            <button class="btn btn-primary btn-sm" id="btnRefreshList" onclick="refreshExistingPatients()">更新資料</button>
+            <button class="btn btn-warning" id="btnExportCSV" onclick="exportCombinedCSV()"
+              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出 CSV</button>
+          </div>
         </div>
       </div>
       <div class="card-body" style="padding:0;border-top:1px solid #e9ecef">
         <table class="patient-table">
-          <thead>
-            <tr>
-              <th>病歷號</th>
-              <th>姓名</th>
-              <th>性別</th>
-              <th>年齡</th>
-              <th>洗腎日期</th>
-              <th>班別</th>
-              <th>最後更新</th>
-              <th>操作</th>
-            </tr>
-          </thead>
+          <thead id="patientHead"></thead>
           <tbody id="patientBody"></tbody>
         </table>
       </div>
@@ -1654,6 +1659,9 @@ const STORAGE_KEYS = {
   patients: GROUP.storageKey.patients,   // 'patients_dialysis'
   settings: 'hd_settings',                // shell-global
   labData:  GROUP.storageKey.labs,        // 'labs_dialysis'
+  // Hotfix v2 (2026-05-05): per-group sort + filter UI state.
+  patientSort:    GROUP.storageKey.patients + '_sort',    // {column, dir}
+  patientFilters: GROUP.storageKey.patients + '_filters', // {col: value, ...}
 };
 
 // One-time migration from legacy hd_* keys (one-release fallback per the
@@ -2179,47 +2187,254 @@ function showToast(msg, type = 'info', duration = 3000) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// UI - PATIENT LIST
+// UI - PATIENT LIST  (hotfix v2: sortable + filterable, per-row actions)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function renderPatientList() {
-  const patients = loadPatients();
-  const labData = loadLabData();
-  const tbody = document.getElementById('patientBody');
-  const fields = (GROUP.patientFields || []);
+// Column config drives header rendering, sort, and filter widgets.
+// Built once per render so dynamic patientFields (dialysisDays/shift) stay
+// in sync with whatever the active group declares.
+function buildPatientColumns() {
+  const cols = [
+    { key: 'chartno',     label: '病歷號',   filter: 'text', sort: 'localeZh' },
+    { key: 'name',        label: '姓名',     filter: 'text', sort: 'localeZh' },
+    { key: 'sex',         label: '性別',     filter: 'enum', enumOptions: ['M', 'F'], sort: 'string' },
+    { key: 'age',         label: '年齡',     filter: 'text', sort: 'numeric' },
+  ];
+  for (const f of (GROUP.patientFields || [])) {
+    cols.push({
+      key: f.key, label: f.label,
+      filter: 'enum',
+      enumOptions: (f.options || []).slice(),
+      sort: 'enumUnsetLast',
+    });
+  }
+  cols.push({ key: '_lastUpdate', label: '最後更新', filter: null, sort: 'numeric' });
+  cols.push({ key: '_actions',    label: '動作',     filter: null, sort: null });
+  return cols;
+}
 
-  if (patients.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">尚未追蹤任何病患。請在上方輸入病歷號後按「新增清單」。</td></tr>';
+function loadSortState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.patientSort)) || null; }
+  catch { return null; }
+}
+function saveSortState(s) {
+  if (s) localStorage.setItem(STORAGE_KEYS.patientSort, JSON.stringify(s));
+  else   localStorage.removeItem(STORAGE_KEYS.patientSort);
+}
+function loadFilterState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.patientFilters)) || {}; }
+  catch { return {}; }
+}
+function saveFilterState(f) {
+  localStorage.setItem(STORAGE_KEYS.patientFilters, JSON.stringify(f || {}));
+}
+
+// Read the value used for sort/filter (handles synthetic _lastUpdate +
+// sex fallback for legacy genderCode-only records).
+function patientCellValue(p, key, labData) {
+  if (key === '_lastUpdate') return labData[p.chartno]?._lastUpdate || 0;
+  if (key === 'sex')         return p.sex || p.genderCode || '';
+  return p[key] != null ? p[key] : '';
+}
+
+function compareForColumn(va, vb, sortType, dir) {
+  const sign = dir === 'desc' ? -1 : 1;
+  if (sortType === 'numeric') {
+    const na = Number(va), nb = Number(vb);
+    const aNan = !Number.isFinite(na), bNan = !Number.isFinite(nb);
+    if (aNan && bNan) return 0;
+    if (aNan) return 1;          // missing values always last
+    if (bNan) return -1;
+    return (na - nb) * sign;
+  }
+  if (sortType === 'enumUnsetLast') {
+    const aUnset = !va || va === '未設定';
+    const bUnset = !vb || vb === '未設定';
+    if (aUnset && !bUnset) return 1;   // 未設定 always at the bottom
+    if (!aUnset && bUnset) return -1;
+    return String(va).localeCompare(String(vb), 'zh-TW') * sign;
+  }
+  if (sortType === 'localeZh') {
+    return String(va || '').localeCompare(String(vb || ''), 'zh-TW') * sign;
+  }
+  return String(va || '').localeCompare(String(vb || '')) * sign;
+}
+
+function applyPatientFilters(list, filters, labData, cols) {
+  const colByKey = new Map(cols.map(c => [c.key, c]));
+  const active = Object.entries(filters).filter(([, v]) => v != null && String(v).trim() !== '' && v !== '(全部)');
+  if (active.length === 0) return list;
+  return list.filter(p => active.every(([key, val]) => {
+    const col = colByKey.get(key);
+    if (!col) return true;
+    const cell = patientCellValue(p, key, labData);
+    if (col.filter === 'enum') return String(cell) === String(val);
+    return String(cell).toLowerCase().includes(String(val).toLowerCase());
+  }));
+}
+
+function applyPatientSort(list, sort, labData) {
+  if (!sort || !sort.column) return list;
+  const cols = buildPatientColumns();
+  const col = cols.find(c => c.key === sort.column);
+  if (!col || !col.sort) return list;
+  return [...list].sort((a, b) => compareForColumn(
+    patientCellValue(a, sort.column, labData),
+    patientCellValue(b, sort.column, labData),
+    col.sort, sort.dir
+  ));
+}
+
+function renderPatientHead(cols, sort, filters) {
+  const head = document.getElementById('patientHead');
+  if (!head) return;
+  const sortInd = (key) => {
+    if (!sort || sort.column !== key) return '';
+    return `<span class="sort-ind">${sort.dir === 'asc' ? '▲' : '▼'}</span>`;
+  };
+  const headerCells = cols.map(c => {
+    const sortable = !!c.sort;
+    const cls = sortable ? 'sortable' : '';
+    const onClick = sortable ? ` onclick="cyclePatientSort('${c.key}')"` : '';
+    return `<th class="${cls}"${onClick}>${escHtml(c.label)}${sortInd(c.key)}</th>`;
+  }).join('');
+  const filterCells = cols.map(c => {
+    if (!c.filter) return '<th></th>';
+    const cur = filters[c.key] != null ? filters[c.key] : '';
+    if (c.filter === 'enum') {
+      const opts = ['(全部)', ...(c.enumOptions || [])].map(o => {
+        const val = o === '(全部)' ? '' : o;
+        return `<option value="${escAttr(val)}"${String(cur) === String(val) ? ' selected' : ''}>${escHtml(o)}</option>`;
+      }).join('');
+      return `<th><select data-col="${escAttr(c.key)}" onchange="setPatientFilter('${c.key}', this.value)">${opts}</select></th>`;
+    }
+    return `<th><input type="text" data-col="${escAttr(c.key)}" value="${escAttr(cur)}" placeholder="篩選..." oninput="setPatientFilter('${c.key}', this.value)"></th>`;
+  }).join('');
+  head.innerHTML = `<tr>${headerCells}</tr><tr class="filter-row">${filterCells}</tr>`;
+}
+
+function renderPatientBody(visible, cols, labData, totalCount) {
+  const tbody = document.getElementById('patientBody');
+  if (!tbody) return;
+  const colspan = cols.length;
+  if (totalCount === 0) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted" style="padding:24px">尚未追蹤任何病患。請在上方輸入病歷號後按「新增清單」。</td></tr>`;
     return;
   }
+  if (visible.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted" style="padding:24px">沒有符合目前篩選條件的病患。</td></tr>`;
+    return;
+  }
+  const fields = (GROUP.patientFields || []);
+  const fieldKeys = new Set(fields.map(f => f.key));
 
-  tbody.innerHTML = patients.map(p => {
-    const lastUpdate = labData[p.chartno]?._lastUpdate
-      ? new Date(labData[p.chartno]._lastUpdate).toLocaleString('zh-TW')
-      : '<span class="text-muted">未更新</span>';
-    const sex = p.sex || p.genderCode || '';
-    const age = p.age != null ? String(p.age) : '';
-
-    const fieldCells = fields.map(f => {
-      const cur = p[f.key] != null && p[f.key] !== '' ? p[f.key] : (f.default || '');
-      const opts = (f.options || []).map(o =>
-        `<option value="${escAttr(o)}"${o === cur ? ' selected' : ''}>${escHtml(o)}</option>`
-      ).join('');
-      return `<td><select onchange="updatePatientField('${p.chartno}','${f.key}',this.value)" style="padding:4px 6px;font-size:12px">${opts}</select></td>`;
+  tbody.innerHTML = visible.map(p => {
+    const cells = cols.map(c => {
+      if (c.key === 'chartno') {
+        return `<td><a href="#" onclick="viewPatientLab('${p.chartno}'); return false;" style="color:#2980b9;font-weight:600">${escHtml(p.chartno)}</a></td>`;
+      }
+      if (c.key === 'name') return `<td>${escHtml(p.name || '')}</td>`;
+      if (c.key === 'sex')  return `<td>${escHtml(p.sex || p.genderCode || '')}</td>`;
+      if (c.key === 'age')  return `<td>${escHtml(p.age != null ? String(p.age) : '')}</td>`;
+      if (fieldKeys.has(c.key)) {
+        const f = fields.find(x => x.key === c.key);
+        const cur = p[c.key] != null && p[c.key] !== '' ? p[c.key] : (f.default || '');
+        const opts = (f.options || []).map(o =>
+          `<option value="${escAttr(o)}"${o === cur ? ' selected' : ''}>${escHtml(o)}</option>`
+        ).join('');
+        return `<td><select onchange="updatePatientField('${p.chartno}','${f.key}',this.value)" style="padding:4px 6px;font-size:12px">${opts}</select></td>`;
+      }
+      if (c.key === '_lastUpdate') {
+        const ts = labData[p.chartno]?._lastUpdate;
+        const text = ts ? new Date(ts).toLocaleString('zh-TW') : '<span class="text-muted">未更新</span>';
+        return `<td style="font-size:11px">${text}</td>`;
+      }
+      if (c.key === '_actions') {
+        return `<td class="actions"><span class="row-actions">
+          <button class="btn btn-primary" title="重新抓取此病患資料" data-row-refresh="${escAttr(p.chartno)}" onclick="refreshOnePatient('${p.chartno}', this)">↻</button>
+          <button class="btn btn-danger" title="移除此病患" onclick="confirmRemovePatient('${p.chartno}')">✕</button>
+        </span></td>`;
+      }
+      return '<td></td>';
     }).join('');
-
-    return `<tr>
-      <td><a href="#" onclick="viewPatientLab('${p.chartno}'); return false;" style="color:#2980b9;font-weight:600">${p.chartno}</a></td>
-      <td>${escHtml(p.name || '')}</td>
-      <td>${escHtml(sex)}</td>
-      <td>${escHtml(age)}</td>
-      ${fieldCells}
-      <td style="font-size:11px">${lastUpdate}</td>
-      <td class="actions">
-        <button class="btn btn-danger btn-sm" title="移除此病患" onclick="confirmRemovePatient('${p.chartno}')">✕</button>
-      </td>
-    </tr>`;
+    return `<tr>${cells}</tr>`;
   }).join('');
+}
+
+function renderPatientList() {
+  const cols     = buildPatientColumns();
+  const patients = loadPatients();
+  const labData  = loadLabData();
+  const sort     = loadSortState();
+  const filters  = loadFilterState();
+  const filtered = applyPatientFilters(patients, filters, labData, cols);
+  const sorted   = applyPatientSort(filtered, sort, labData);
+  renderPatientHead(cols, sort, filters);
+  renderPatientBody(sorted, cols, labData, patients.length);
+}
+
+// Header click handler — cycles unsorted → asc → desc → unsorted.
+function cyclePatientSort(column) {
+  const cur = loadSortState();
+  let next;
+  if (!cur || cur.column !== column)      next = { column, dir: 'asc' };
+  else if (cur.dir === 'asc')             next = { column, dir: 'desc' };
+  else                                    next = null;
+  saveSortState(next);
+  renderPatientList();
+}
+
+// Filter input handler — text inputs call this on every keystroke. With
+// ≤ ~50 patients the re-render cost is negligible, so no debounce needed.
+// Re-rendering the whole table would steal focus from the input being
+// typed into; we restore focus + caret position after the rebuild.
+function setPatientFilter(column, value) {
+  const filters = loadFilterState();
+  if (value == null || String(value).trim() === '') delete filters[column];
+  else                                              filters[column] = value;
+  saveFilterState(filters);
+
+  const active  = document.activeElement;
+  const wasInput = active && active.tagName === 'INPUT' && active.dataset.col === column;
+  const caret   = wasInput ? active.selectionStart : null;
+
+  renderPatientList();
+
+  if (wasInput) {
+    const next = document.querySelector(`#patientHead input[data-col="${CSS.escape(column)}"]`);
+    if (next) {
+      next.focus();
+      if (caret != null) try { next.setSelectionRange(caret, caret); } catch (_) {}
+    }
+  }
+}
+
+/**
+ * Per-row refresh handler (hotfix v2). Re-fetches labs + demographics for
+ * a single chartNo using the same pipeline as the top-level 更新資料.
+ * The clicked button is disabled with a spinner glyph during the fetch.
+ */
+async function refreshOnePatient(chartno, btn) {
+  const settings = loadSettings();
+  if (!settings.opsid) {
+    showToast('請先到「設定」填寫操作人員代號 (OPSID)', 'error');
+    switchTab('settings');
+    return;
+  }
+  const originalText = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⟳'; }
+  setStatus(`更新 ${chartno} 中...`, true);
+  try {
+    await fetchAndStore(chartno);
+    renderPatientList();
+    setStatus(`已更新: ${chartno}`);
+    showToast(`已更新 ${chartno}`, 'success');
+  } catch (err) {
+    console.warn(`Failed to refresh ${chartno}:`, err);
+    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+    setStatus(`更新失敗: ${chartno}`);
+    showToast(`更新 ${chartno} 失敗`, 'error');
+  }
 }
 
 function escHtml(s) {
