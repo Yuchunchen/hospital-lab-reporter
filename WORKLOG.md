@@ -1,5 +1,61 @@
 # WORKLOG
 
+## 2026-05-05 — reporter 對齊性別感知 threshold (Phase 3)
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（reporter 端 alarm 邏輯）+ sync-script
+- 變更：
+  - 重跑 `node sync-patterns.js`，把 `hospital-lab-patterns` 最新
+    catalog 的 6 條 gender-aware 欄位（`loM` / `hiM` / `loF` / `hiF`）
+    拉進 `hospital-lab-data.html` 的 inline pattern block。
+  - 修改 `viewPatientLab()` 內部表格渲染處（line ~2845 附近）的數值
+    alarm 計算：依 `patient.sex`（`'M'` / `'F'`）挑選對應的
+    `loM/hiM` 或 `loF/hiF`；性別未知時退回 `lo` / `hi`（在這 6 條
+    對應的是 manifest `hi:null lo:null`，等同維持原本不亮 alarm）。
+- 檔案：
+  - `hospital-lab-data.html`
+    - inline pattern block（`__HOSPITAL_LAB_PATTERNS_*__` 標記區）
+      重 sync；6 條 entry（RBC / Hb / HCT / Fe / TIBC / Ferritin）
+      resolved 後的形狀為 `lo:null hi:null`（manifest override）
+      + `loM/hiM/loF/hiF`（catalog 新欄位，manifest 沒這個 key 所以
+      `Object.assign({},catalog,manifest)` 不會覆蓋掉）。
+    - `viewPatientLab()`：alarm 計算分支加 gender pick + fallback
+      註解，邏輯與 TASK_BRIEF 第 7 節範例對齊。
+- 原因：
+  - vhyl 000151649A（女）Fe 58 被 viewer 誤判過低 → patterns repo
+    引入 `loM/hiM/loF/hiF` 後，viewer 已修；本 phase 把 reporter
+    也同步上去。
+  - 使用者選擇 (α) 方案：接受 reporter 透析表開始亮 RBC / Hb / HCT /
+    Fe / TIBC / Ferritin 6 條 gender-aware alarm，**不在 manifest
+    補 `loM/hiM/loF/hiF:null`** 蓋掉 catalog 新欄位。即:這 6 條
+    在 reporter 從「永遠不亮 alarm」→「依性別亮 alarm」是有意的
+    視覺變更，不是 regression。
+- 驗證：
+  - sync 後肉眼檢查 inline pattern block：6 條 catalog entry 都帶
+    `loM/hiM/loF/hiF`（line 372-398, 693-727），manifest 那邊保留
+    `hi:null lo:null` 不動（line 1032-1089），合併後 resolved
+    entry 同時有兩組（catalog 新欄位活的、manifest 把舊欄位 null）。
+  - 用 node 跑 standalone 模擬 resolver + 新 alarm 邏輯，跑完
+    TASK_BRIEF 第 8 節 11 個樣本 + 額外 6 個 RBC/HCT/TIBC 樣本
+    （共 17 個），全部 pass：
+    - 女 Fe 58 → normal（F lo:50）✓
+    - 男 Fe 58 → val-lo（M lo:65）✓
+    - 女 Hb 13 → normal、男 Hb 13 → val-lo ✓
+    - 女 Ferritin 250 → val-hi（F hi:204）✓
+    - unknown 性別 Fe 58 → normal（reporter 在這 6 條 fallback
+      到 `lo:null hi:null`，不亮 alarm；對「不誤判」目標仍成立）。
+  - 瀏覽器手測：本輪 claude 端無法直接開瀏覽器，由使用者重整
+    `hospital-lab-data.html` 後肉眼確認男女病人的鐵代謝列。
+- 相依：
+  - 需要 `hospital-lab-patterns` 已 push（catalog.js 包含
+    `loM/hiM/loF/hiF` 6 條欄位）。Phase 1 + Phase 2 已完成，
+    本 phase 為三 repo 連動的最後一棒。
+  - 其他 disease group（CKD / DM / COPD）尚未上線；本變更只動
+    dialysis 渲染路徑，groups block 內容無變動。
+  - Backlog（不在本輪）：GOT / GPT / RGT / BUN / CREAT / UA 6 個
+    test 的 `hi` 鎖男性、女性中段值漏 alarm，等使用者實際遇到再
+    開新 brief。
+
 ## 2026-05-05 — Sync vhyl 5 條 regex 放寬（HBsAg / AntiHCV / AFP / TSAT / Fe）
 
 - 作者：claude（與 YC 共同）
