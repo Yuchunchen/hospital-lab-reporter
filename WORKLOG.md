@@ -1,5 +1,58 @@
 # WORKLOG
 
+## 2026-05-06 — Sync 肝炎顯示集中化 (Item B Phase 3)
+
+- 作者：claude（與 YC 共同）
+- 範圍：sync-script
+- 變更：修改（純 sync，不動 reporter 自身邏輯）
+- 檔案：
+  - 重跑 `node sync-patterns.js`，從 sibling repo `hospital-lab-patterns`
+    拉取最新 catalog（含 Item B 肝炎顯示集中化）。
+  - `hospital-lab-data.html`：HTML inline pattern block
+    （`__HOSPITAL_LAB_PATTERNS_*__`）新增 5 條 catalog entry、修改
+    1 條既有 entry，並把既有 HCV computed wrapper 補上 `needs`：
+    - 新：`HBsAgTiter`（`HBsAg:\s*([\d.]+)`）— viewer computed 用的
+      raw 數值滴度。
+    - 新：`AntiHBsTiter`（`Anti-HBs:\s*([\d.]+)`）— 同上。
+    - 新：`AntiHCVTiter`（`(?:HCV Ab|Anti-HCV):\s*([\d.]+)`）— 同上。
+    - 新：`HBsAgDisplay`（`computed:'HBsAgDisplay'`,
+      `needs:['HBsAg','HBsAgTiter']`）— viewer 顯示用 wrapper。
+    - 新：`AntiHBsDisplay`（`computed:'AntiHBsDisplay'`,
+      `needs:['AntiHBs','AntiHBsTiter']`）— 反向 polarity wrapper
+      （Reactive=有抗體=normal）。
+    - 改：既有 `AntiHBs` raw 條目同步對齊 vhyl 樣式
+      `Anti-HBs\s*(?:\((?:TT|YL)\))?:\s*([^\s\d]\S*)`（Issue 2 順手
+      帶進來）。
+    - 改：既有 `HCV` computed 條目補上 `needs:['AntiHCV','AntiHCVTiter']`。
+  - Groups block（`__HOSPITAL_LAB_GROUPS_*__`）僅 timestamp 刷新，
+    內容無變動。
+- 原因：
+  - Item B Phase 1（patterns）、Phase 2（viewer）已完成；Phase 3
+    要求 reporter 只跑 `node sync-patterns.js`，不改 code。
+  - sync 腳本是 inline 整份 catalog（不只 reporter manifest 內條目），
+    所以 5 條新 entry 都會進 inline block。但 `_resolveManifest()`
+    只 resolve `REPORTER_MANIFEST` 列出的 id → reporter UI 仍只渲染
+    raw `HBsAg` / `AntiHBs` / `AntiHCV`，新加的 Titer / Display 條目
+    不會出現在表格。
+  - 跟 Phase 3 第 7 節「reporter 不變」的設計一致。
+- 測試：
+  - `git diff hospital-lab-data.html`：47 inserts / 4 deletes，全部
+    集中在 catalog block 內肝炎區段 + 兩處 sync timestamp。沒有任何
+    reporter 邏輯（`extractLabValues` / `viewPatientLab` /
+    `parseOrdersPage` 等）被動到。
+  - reporter manifest（patterns/reporter.js）沒列入 `HBsAgDisplay` /
+    `AntiHBsDisplay` / `*Titer`，所以 `_resolveManifest()` resolve 出
+    的 `LAB_TESTS` 仍只含舊有 raw 條目，UI 表格不會多欄。
+  - 瀏覽器手測（由 YC 執行）：fetch vhyl `000151649A`，確認 HBsAg /
+    Anti-HBs / Anti-HCV 表格欄位仍顯示 raw `Non-Reactive` /
+    `Reactive`，沒有被誤套成 viewer 的「正常 (HBsAg 0.21)」格式。
+- 相依：
+  - 需要 `hospital-lab-patterns` Phase 1 已 push（包含 5 條新
+    catalog entry + computed.js 三個顯示函式）— 本次 sync 已成功
+    讀到，視為已 push。
+  - 不影響其他 disease group（CKD / DM / COPD）。
+  - 不影響 reporter 的任何既有行為（pure sync）。
+
 ## 2026-05-06 — Sync GPT/RGT/BUN/CREAT/UA gender-aware hiM/hiF (Phase C)
 
 - 作者：claude（與 YC 共同）
