@@ -1,5 +1,53 @@
 # WORKLOG
 
+## 2026-05-06 — Sync GPT/RGT/BUN/CREAT/UA gender-aware hiM/hiF (Phase C)
+
+- 作者：claude（與 YC 共同）
+- 範圍：sync-script
+- 變更：修改（純 sync，不動 reporter 自身邏輯）
+- 檔案：
+  - 重跑 `node sync-patterns.js`，從 sibling repo `hospital-lab-patterns`
+    （commit `4a1a0b9`）拉取最新 catalog。
+  - `hospital-lab-data.html`：HTML inline pattern block
+    （`__HOSPITAL_LAB_PATTERNS_*__` 標記區）刷新，GPT / RGT / BUN /
+    CREAT / UA 共 5 個 entry 各加上 `hiM` / `hiF` 兩個欄位（BUN 另
+    多一行 `notes` 說明 fallback 25.7 的設計緊縮）。Groups block
+    （`__HOSPITAL_LAB_GROUPS_*__`）僅 timestamp 刷新。新版
+    `Synced at: 2026-05-05T20:59:51.004Z`。
+- 原因：
+  - patterns repo 於 2026-05-05 push commit `4a1a0b9` 把 Issue 1
+    backlog 第 1 條收尾 — 5 條原本 `hi` 鎖男性、女性中段值漏 alarm
+    的 catalog entry 補上 gender-aware threshold。
+  - 跨 repo 副作用清單第 3 步：reporter 是 inline pattern block，
+    沒有 runtime fetch 機制，必須靠 `sync-patterns.js` 重打包。
+  - 2026-05-05 Phase 3 已把 `viewPatientLab()` 的 alarm 計算改成
+    gender-aware（line ~2864–2869，依 `patient.sex` 挑 `hiM/hiF` 或
+    `loM/loF`，未知性別退回 `lo/hi`）。本輪 5 條新欄位會自動被
+    既有邏輯吃進，**不需改 reporter code**。
+- 測試：
+  - `git diff hospital-lab-data.html`：5 條 entry 全部正確帶入
+    `hiM/hiF`，兩處 timestamp 刷新，無其他變動（18 inserts / 7
+    deletes，全部集中在 catalog block + 兩個 sync timestamp）。
+  - 用 grep 確認 inline pattern block 已含 `hiM:45, hiF:34`（GPT,
+    line 453）、`hiM:55, hiF:38`（RGT, 462）、`hiM:20.6, hiF:18.7`
+    （BUN, 551）、`hiM:1.2, hiF:1.0`（CREAT, 584）、`hiM:7.7, hiF:6.2`
+    （UA, 594）。Phase 3 既有的 6 條 RBC/Hb/HCT/Fe/TIBC/Ferritin
+    `loM/hiM/loF/hiF` 仍在原處（line 378/387/397/710/719/736）。
+  - 預期效果：
+    - 女性病人 GPT 40 → 紅（女 hi 34）；男性 GPT 40 → 黑（男 hi 45）
+    - 女性 BUN 19 → 紅（女 hi 18.7）；男性 BUN 19 → 黑（男 hi 20.6）；
+      未知性別 BUN 19 → 黑（fallback hi 25.7）
+    - CREAT / UA / RGT 同模式
+  - 瀏覽器手測：本輪 claude 端無法直接開瀏覽器，由使用者重整
+    `hospital-lab-data.html` 後肉眼確認男女病人的肝腎功能列。
+- 相依：
+  - 需要 `hospital-lab-patterns@4a1a0b9` 已 push（已確認 origin/main
+    在 4a1a0b9）。
+  - Phase A（patterns）+ Phase B（viewer sync）為前置；本 phase
+    為三 repo 連動最後一棒。
+  - 只動 dialysis pattern 區塊；CKD / DM / COPD groups block 內容
+    無變動。
+
 ## 2026-05-05 — reporter 對齊性別感知 threshold (Phase 3)
 
 - 作者：claude（與 YC 共同）
