@@ -1,5 +1,38 @@
 # WORKLOG
 
+## 2026-05-05 — Sync vhyl 5 條 regex 放寬（HBsAg / AntiHCV / AFP / TSAT / Fe）
+
+- 作者：claude（與 YC 共同）
+- 範圍：sync-script
+- 變更：重 sync（不改 reporter 自身邏輯）
+- 檔案：
+  - 重跑 `node sync-patterns.js`，從 sibling repo
+    `hospital-lab-patterns`（commit `58eed17`）拉取最新 catalog。
+  - `hospital-lab-data.html`：HTML inline pattern block
+    （`__HOSPITAL_LAB_PATTERNS_*__` 標記區）刷新，HBsAg、AntiHCV、AFP、
+    TSAT、Fe 共 5 個 entry 的 `pattern` 已替換（每條上方帶
+    `// vhyl sample (2026-05-05): ...` 註解）。Groups block
+    （`__HOSPITAL_LAB_GROUPS_*__`）也刷新時間戳，內容無實質變動。
+    新版 `Synced at: 2026-05-05T15:09:27.196Z`。
+- 原因：
+  - 使用者回報 vhyl 病人 000151649A 的 HBsAg / Anti-HCV / AFP、
+    000051055E 的 Fe 在 reporter 漏顯示；連帶發現 TSAT 舊 regex
+    `/SAT:/` 對 vhyl 的 `TS:` label 不命中。
+  - patterns repo 已於 2026-05-05 push commit `58eed17`，依跨 repo
+    副作用清單，reporter 必須重 sync（reporter 是 inline pattern block，
+    沒有 runtime fetch 機制，所以只能靠 sync + 使用者拿新 HTML）。
+- 驗證：
+  - `git diff hospital-lab-data.html` 確認 5 條 pattern 全部正確替換、
+    `// vhyl sample (...)` 註解都已帶入。
+  - patterns repo 端的 `npm run release` + spot-check（18/18 pass）已
+    覆蓋 regex 行為驗證；reporter 端只是純粹 re-bundle，無新 logic。
+  - 預期：reporter 重 fetch 000151649A 後，HBsAg / Anti-HCV / AFP / TSAT
+    在表格與 CSV 都會出值（`Non-Reactive` / `Non-Reactive` / `< 2.00` /
+    `22`）；000051055E 的 Fe 若仍漏 → 表示該病人未抽 Fe，另案。
+- 相依：
+  - `hospital-lab-patterns@58eed17`、`hospital-lab-viewer` 已同步在
+    2026-05-05 sync + push。三個 repo 一起推完才完整覆蓋 vhyl 修正。
+
 ## 2026-05-05 — Milestone 收尾：revision 1 + hotfix v1 + hotfix v2 全數驗證合併
 
 - 作者：claude（與 YC 共同）
