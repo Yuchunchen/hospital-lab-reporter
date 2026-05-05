@@ -1,5 +1,94 @@
 # WORKLOG
 
+## 2026-05-05 — Revision 1 hotfix v2：按鈕重排 ＋ 列內動作 ＋ 可排序可篩選表頭
+
+- 作者：claude（與 YC 共同）
+- 範圍：ui
+- 變更：新增、修改
+- 檔案：
+  - 修改 `hospital-lab-data.html`（純 UI 層；不動 fetcher / parser /
+    exporter / storage shape）：
+    - **動作列重排**：`更新資料` 從左群組（`新增清單` 旁）移到右群組
+      `匯出 CSV` 左側。語意上把「對既有清單操作」的兩個動作收攏到右邊，
+      左邊只剩唯一的「丟新 ID 進清單」動作。`更新資料` 維持原本中等大小，
+      只有 `匯出 CSV` 仍是放大主要動作。
+    - **列內動作（per-row actions）**：每列新增 `↻`（單筆重抓）按鈕在
+      既有 `✕`（移除）按鈕旁。`↻` handler `refreshOnePatient(chartno, btn)`
+      共用 top-level `fetchAndStore()` pipeline；fetch 期間 button disable
+      並把字符換成 `⟳`，完成後重繪整列；失敗時還原按鈕並顯示 toast。
+    - **可排序 / 可篩選表頭**：`<thead>` 改為 JS 渲染（`#patientHead`），
+      由新 `buildPatientColumns()` 設定每欄的 sort/filter 屬性：
+        - `chartno` / `name`：text 篩選 + `localeCompare('zh-TW')` 排序
+        - `sex`：enum 篩選（全部 / M / F）+ string 排序
+        - `age`：text 篩選 + numeric 排序（NaN 永遠排在尾部）
+        - `dialysisDays` / `shift`（由 `GROUP.patientFields` 動態產生）：
+          enum 篩選（全部 / 各 option）+ `enumUnsetLast` 排序
+          （`未設定` 不論方向都在最底）
+        - `最後更新`：numeric 排序（無篩選）
+        - `動作`：無篩選、無排序
+      表頭兩列：第一列為可點擊欄名（含 `▲ / ▼ / 無` 指標），第二列為
+      篩選輸入框（text input 或 enum select，第一個選項固定 `(全部)`）。
+    - **狀態持久化**：新增 `STORAGE_KEYS.patientSort`（`patients_dialysis_sort`）
+      與 `STORAGE_KEYS.patientFilters`（`patients_dialysis_filters`），
+      用 `loadSortState` / `saveSortState` / `loadFilterState` /
+      `saveFilterState` 包裝。`cyclePatientSort(col)` 點擊欄頭循環
+      `unsorted → asc → desc → unsorted`；`setPatientFilter(col, val)`
+      在每次輸入時持久化＋重繪 tbody，並把 focus 與 caret 位置還原回
+      原本正在輸入的 input（避免重繪時 input 失去焦點 / 游標）。
+    - **`renderPatientList()` 重構**：原本一個函式同時處理 head + body，
+      拆成 `renderPatientHead(cols, sort, filters)`、
+      `renderPatientBody(visible, cols, labData, totalCount)` 與
+      orchestrator `renderPatientList()`。orchestrator 流程：
+      `loadPatients → applyPatientFilters → applyPatientSort →
+       renderPatientHead → renderPatientBody`。
+    - 新增 CSS：`th.sortable` hover、`.sort-ind`、`tr.filter-row` 樣式，
+      與 `.row-actions .btn` 緊湊化（3px 8px / font-size 12px）。
+- 原因：
+  - `更新資料` 與 `匯出 CSV` 在實際使用流程上是「先重抓清單再匯出」的
+    連續動作，放在一起符合視線移動方向；`新增清單` 在輸入新 ID 時才用，
+    與右側兩個動作觸發頻率不同。
+  - 一次只想更新某一位（例如剛新增、或剛改完那位的 dialysisDays）時，
+    跑全清單 batch 太重；列內 `↻` 給的是低成本的單筆重抓。
+  - 5–50 筆規模的清單，排序與篩選用 vanilla JS 即可；引入 table library
+    對這個 single-file HTML 是過度工程。
+  - 把 sort / filter 狀態存進 localStorage 是因為使用者通常會重複開同一
+    台機器，每次都重設一次篩選很煩。
+- 測試：
+  - `new Function(inlineScript)` parse 通過（沒有語法錯誤）。
+  - Headless smoke（把 pure helper 抽出來在 Node 跑）：
+    1. 排序 — `name` zh-TW asc/desc 正確；`age` numeric asc/desc 正確；
+       `dialysisDays` `enumUnsetLast` 兩個方向 `未設定` 都在尾部；
+       `shift` asc 顯示 `上午 | 下午 | 夜班 | 未設定`；`_lastUpdate`
+       desc 把 `_lastUpdate=0` 排到尾部。
+    2. 篩選 — enum `sex=M` 命中 2 筆；enum `dialysisDays=未設定` 命中 1
+       筆；text `name=林`、`chartno=105` 各命中 1 筆；text + enum 複合
+       `sex=F & shift=未設定` 命中 1 筆；空字串 / `(全部)` 視為無篩選。
+  - **尚待 YC 在實機瀏覽器手動驗證：**
+    1. 重新整理 → 動作列順序為
+       `[新增清單]                 [更新資料] [匯出 CSV]`。
+    2. 隨機點任一欄頭 → 出現 `▲`，再點變 `▼`，第三點消失（無排序）。
+       同時只能有一欄是 active sort。
+    3. 在 `姓名` 篩選輸入框打字 → 列表即時過濾，輸入框 focus 不會掉、
+       游標位置正確。`性別` select 切到 `M` → 只剩男性病人。
+    4. 重整頁面 → 上次的 sort + filter 狀態還在（檢查
+       `localStorage.patients_dialysis_sort` /
+       `localStorage.patients_dialysis_filters`）。
+    5. 列內 `↻` → 只重抓那筆病人，按鈕變 `⟳` + disable，完成後該列
+       `最後更新` 時間更新；其他列不動。失敗時 toast + 按鈕還原。
+    6. 列內 `✕` → 仍走原本 confirm modal，確定後該列消失。
+    7. 上方 `新增清單` / `更新資料` / `匯出 CSV` 既有流程仍正常。
+    8. DevTools console 乾淨（除 hotfix v1 已知的 `[BUN]` 警告）。
+- 相依：
+  - 不需要 `hospital-lab-patterns` 先發版（patterns block 內容未變）。
+  - 不影響 `groups/dialysis.js`（純 UI 層改動）。
+  - 不影響 storage shape：`patients_dialysis` / `labs_dialysis` 結構與
+    內容不變；新增的兩個 key（`_sort` / `_filters`）為純 UI 偏好。
+- 已知/刻意保留：
+  - `confirmRemovePatient` 仍走既有的 custom modal（brief 允許 `confirm()`
+    或 modal — 既有 modal 已驗證可用，不換）。
+  - `setPatientFilter` 不做 debounce — 5–50 筆規模重繪成本可忽略；
+    必要時未來再加（debounce 反而會讓打字延遲感變強）。
+
 ## 2026-05-05 — Revision 1 hotfix：UI 微調 ＋ BUN(AD) 修復
 
 - 作者：claude（與 YC 共同）
