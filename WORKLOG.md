@@ -1,5 +1,41 @@
 # WORKLOG
 
+## 2026-05-05 — Milestone 收尾：revision 1 + hotfix v1 + hotfix v2 全數驗證合併
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis、core、docs
+- 變更：修改（純文件補完 + sync timestamp 刷新；不動 logic）
+- 檔案：
+  - `CLAUDE.md`：補完截至 2026-05-04 為止的設計決策段落 — CSV 匯出
+    格式（long format, value/unit/lower/higher 4-tuple）、demographics
+    自動填入規則、action bar 三鈕配置、patient list sort/filter+per-row
+    actions、BUN 前/後分類（Method A dateObj + Method B orderName
+    fallback）、月檢識別新邏輯（叢集鍵=完全相同 `生效時間`、依 `簽收時間`
+    排前後、同月多次取最早）。
+  - `hospital-lab-data.html`：重新跑 `node sync-patterns.js`，刷新
+    `__HOSPITAL_LAB_PATTERNS_*__` 與 `__HOSPITAL_LAB_GROUPS_*__` 兩個
+    標記區塊的 `Synced at:` 時間戳。Patterns 與 groups 內容本身未變
+    （patterns repo 在這個 milestone 沒有新發版）。
+- 原因：
+  - 透析 reporter 從 revision 1（2026-05-04 落地）→ hotfix v1（同日
+    BUN(AD) 修復＋action bar 重排）→ hotfix v2（patient list sort/filter
+    + per-row ↻/✕）已連續 merged 並由 YC 在實機驗證行為符合預期。
+  - 距離上次 push 已累積三筆 commit，把 working tree 收乾淨並把這段時間
+    的設計決策定影到 CLAUDE.md，方便日後追溯。
+- 測試：
+  - 不改 logic，所以本次無新增測試。
+  - 行為驗證已記錄在前述三筆 entries（revision 1 / hotfix v1 / hotfix v2）。
+  - 程式內**無殘留 `console.debug`**（grep 確認；只剩 hotfix v1 已知的
+    `[BUN]` `console.warn` Method B fallback，預期保留）。
+- 相依：
+  - 不需要 `hospital-lab-patterns` 先發版（內容未變，僅刷新 sync 時間戳）。
+  - 與 `hospital-lab-viewer` 互不影響（兩者各自從 patterns 拉 mapping，
+    不互相 import）。
+- 行政：
+  - 把 `TASK_revision1_hotfix2_BRIEF.md` rename 成 `_done.md`，與
+    `TASK_revision1_BRIEF_done.md` / `TASK_revision1_hotfix_BRIEF_done.md`
+    對齊。`TASK_BRIEF_step2.md` 為未來工作 parking lot，保留原檔名。
+
 ## 2026-05-05 — Revision 1 hotfix v2：按鈕重排 ＋ 列內動作 ＋ 可排序可篩選表頭
 
 - 作者：claude（與 YC 共同）

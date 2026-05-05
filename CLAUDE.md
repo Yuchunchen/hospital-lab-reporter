@@ -180,6 +180,101 @@ DM / COPD），各 group 各自維護病人清單。Disease 模組將位於 `gro
 - PowerShell：`Get-Date -Format yyyy-MM-dd`
 - bash：`date +%Y-%m-%d`
 
+### CSV 匯出格式（revision 1, 2026-05-04 版）
+
+**Long format**：1 row = (chartNo × YYYYMM)。Wide-format（1 row/draw）
+已不採用。
+
+欄位順序：
+```
+id, YYYYMM,
+<TestId>.value, <TestId>.unit, <TestId>.lower, <TestId>.higher,
+... 4 cols per test, in labManifest order ...,
+URR.value, URR.unit, URR.lower, URR.higher
+```
+
+每個 test 的 4-tuple 順序為 **value / unit / lower / higher**
+（`lower` 在 `higher` 之前，符合自然閱讀方向）。
+
+`lower` / `higher` 來自 catalog entry 的 `lo` / `hi`。空值就保持空格，
+不要塞 `N/A` 或前一個月的值。
+
+唯一一個匯出按鈕：「匯出 CSV」。**不再有 JSON 匯出/匯入。**
+
+### Demographics 自動填入
+
+ernode lab-orders 頁面開頭格式：`全部醫囑 <chartNo> <name> <sex> <age> 歲 ...`
+
+每次 fetch 都重新解析這行，更新 patient record 的 `name` / `sex` / `age`。
+這三個欄位**不在 UI 上手動編輯**。
+
+使用者可手動編輯的兩個欄位（皆預設 `未設定`）：
+- `dialysisDays`：未設定 / 一三五 / 二四六
+- `shift`：未設定 / 上午 / 下午 / 夜班
+
+### 兩個資料動作按鈕 + 大顆 匯出 CSV（hotfix 2026-05-04）
+
+Action bar 由左到右：
+
+```
+[ ID input textarea ]
+[新增清單]                       ... [更新資料] [大顆 匯出 CSV]
+```
+
+- **`新增清單`** — 從輸入框拿 chartNo（單一或列表），加進清單並 fetch
+  labs + demographics。輸入框內容用完清空。
+- **`更新資料`** — 不看輸入框；針對清單中**現有的**所有病人，重新
+  fetch labs + demographics。執行時顯示進度（例 `更新中... 3 / 5`）。
+- **`匯出 CSV`** — 視覺上明顯大顆（primary action），跟 `更新資料` 形成
+  一組「對現有清單動作」。
+
+三者共用同一個 fetch / parse / store pipeline。差別只在處理對象從哪來。
+
+### Patient list 表格：sort + filter + per-row actions（hotfix v2 2026-05-04）
+
+每個 column header **可點擊排序**（asc → desc → off，箭頭指示）；header
+下面有 filter input：
+
+- text 欄位（chartNo / name / age）：`<input type=text>` 子字串配對
+- enum 欄位（sex / 洗腎日期 / 班別）：`<select>` 含 `(全部)` 預設
+- `未設定` 永遠排在 asc 末尾（不擋首頁畫面）
+
+Sort + filter 狀態存 localStorage（`patients_dialysis_sort` /
+`patients_dialysis_filters`），網頁重整會還原。
+
+每個 row **最右邊一欄** 有兩個 icon button：
+
+- `↻` — 單筆病人更新（reuse 同一個 fetch pipeline，只跑這個 chartNo）
+- `✕` — 從 `patients_dialysis` + `labs_dialysis` 移除，刪除前
+  `confirm()` 確認
+
+### BUN 前/後分類邏輯（hotfix v1 2026-05-04，目前實作）
+
+vhyl 把洗後 BUN 跟 CR 一起開（`BUN洗後分開印(YL),CR洗後分開印(YL)`），
+orderName 含逗號 → legacy `composite/standalone_bun` filter 判錯。
+目前實作改用以下兩段式分類，parser 跑完後做一次 post-processing pass：
+
+**主要：Method A（dateObj 排序）**
+
+對同一日期的 BUN entries，依 `dateObj` 升冪排序：
+
+- 1 筆 → BUN_pre，post = null
+- 2 筆 distinct dateObj → 早=BUN_pre、晚=BUN_post
+- 3+ 筆 全部 distinct → min/max 取兩端、中間棄置 + `console.warn`
+
+**備援：Method B（orderName 字樣）**
+
+當 dateObj 缺失或同日有 tie 時觸發 B：
+
+- orderName 含 `洗後`（含 `洗後分開印` / `(洗後)`）→ BUN_post
+- orderName 含 `洗前` → BUN_pre
+- 都沒 → 預設 BUN_pre + `console.warn`
+
+每次 B 觸發都會 `console.warn`，方便長期追蹤 parser 是否該修。
+
+存儲層 `BUN_pre[]` / `BUN_post[]` 經 post-processing 後**不會有重複**，
+每筆 entry 在 canonical 那邊只出現一次。
+
 ### 病人資料分離原則（重要）
 
 每個疾病 group 的病人清單**完全分離儲存**：
@@ -199,20 +294,28 @@ localStorage（或 chrome.storage.local）：
 同一位病人若同時在兩個 group（例如 DM + CKD），他在兩邊**各被輸入一次**。
 這是使用者明確的需求 — 不要自作主張改成「單一名單 + 標籤」。
 
-### 月檢識別邏輯（透析 group）
+### 月檢識別邏輯（透析 group — revision 1, 2026-05-04 版）
 
 報告每月一次，邏輯如下：
 
-1. 將病人所有 lab rows 依 `orderDate` 排序
-2. 切叢集：與前一筆相差 > 2 天就開新叢集
-3. 對每個叢集判斷是否為月檢：
-   - 叢集內測試項目與 `dialysis.labManifest` 重疊數 ≥
-     `minTestsForMonthly`（預設 8，容忍漏項）
-   - 叢集內必須出現 BUN（任一形式）
-4. BUN 前 / 後判定：
-   - 同叢集內若有 ≥2 筆 BUN：依**報告時間**排序，最早 = 洗腎前，
-     最晚 = 洗腎後
-   - 只有 1 筆：預設為洗腎前（post = null）
+1. **叢集鍵 = 完全相同的 `生效時間`**（同一張醫囑下開出來的 labs 共享同
+   一個 `生效時間` —— 那就是抽血事件的錨點）。不再用 ±2 天 orderDate
+   window。
+2. 對每個叢集判斷是否為「常規月檢」：
+   - 叢集內 test ids 與 **monthly required items** 重疊比例
+     ≥ `minMonthlyOverlapRatio`（預設 0.5）。
+   - monthly required items = `labManifest` 中 `periodicity` 為
+     `'monthly'` 或無 `periodicity` 欄位的項目。
+   - 叢集內必須出現 BUN（任一形式：`BUN` / `BUN_pre` / `BUN_post`）。
+3. BUN 前 / 後判定 — **依 `簽收時間`**：
+   - 同叢集內 ≥ 2 筆 BUN：依 `簽收時間` 排序，最早 = 洗腎前，
+     最晚 = 洗腎後。
+   - 只有 1 筆：預設為洗腎前（post = null）。
+   - 不再用 `reportDateTime` —— 簽收時間是 lab 真正完成的時間，
+     臨床上 pre 一定比 post 早簽收。
+4. **同月多次月檢取最早**：若一位病人在同一個日曆月份（YYYYMM）有 ≥ 2
+   個常規月檢，CSV 輸出取**最早的那筆**（生效時間最小的）。理由：月初的
+   抽血更接近「常規月檢」時間點。
 
 其他疾病 group 會有自己的識別邏輯（不同間隔、不同必要欄位）— 各自實作在
 `groups/<id>.js` 的 `detectDraws()`。
