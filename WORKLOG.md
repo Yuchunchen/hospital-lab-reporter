@@ -1,5 +1,27 @@
 # WORKLOG
 
+## 2026-05-07 — 跨 repo 文件大整理（patterns repo 端）coordination 記錄
+
+- 作者：claude（與 YC 共同）
+- 範圍：core（無程式碼異動，僅記錄跨 repo 文件大整理對本 repo 的影響）
+- 變更：—（本 repo 無檔案變更）
+- 檔案：—
+- 原因：sibling `hospital-lab-patterns` 本日（2026-05-07）做了文件大整理
+  — 搬移 BOOTSTRAP/COWORK_PI 到 `docs/`、新增 4 份中文 SOP（含
+  `sop-claude-code-guide.md` / `sop-cowork-guide.md`）、規則 #6 重寫為
+  分層更新策略、定義 workspace root CLAUDE.md 機制（Claude Code 從
+  `D:\self\hospital-lab` 啟動，自行 cd 到各 repo）。本 repo 的 CLAUDE.md
+  / README.md 內容未變，但下次操作建議遵循 sibling 的新指引：
+  - 不再 `cd hospital-lab-reporter && claude`，改為從 workspace root 啟動
+  - sync-patterns 之前先看 sibling repo `docs/learning-workflow.md` 與
+    `docs/sop-claude-code-guide.md`
+- 測試：—（無程式碼異動，無需開瀏覽器測）
+- 相依：sibling repo `hospital-lab-patterns` 同日 commit
+  `0adf376`（workspace 機制）+ `a42f5be`（搬位置）+ `6a4f6c8`（4 份 SOP）
+  + `19ee557`（規則 #7）。本 repo 無 sync 需求，
+  `__HOSPITAL_LAB_PATTERNS_BEGIN/END__` 與
+  `__HOSPITAL_LAB_GROUPS_BEGIN/END__` 兩段標記區塊內容無變化。
+
 ## 2026-05-07 — 補齊 CLAUDE.md 檔案地圖、新建 README.md
 
 - 作者：claude（與 YC 共同 — Cowork 模式）
