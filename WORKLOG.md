@@ -1,5 +1,55 @@
 # WORKLOG
 
+## 2026-05-07 — 補齊 CLAUDE.md 檔案地圖、新建 README.md
+
+- 作者：claude（與 YC 共同 — Cowork 模式）
+- 範圍：core（repo 文件，不影響執行邏輯）
+- 變更：修改 + 新增
+- 檔案：
+  - `CLAUDE.md`：
+    - Architecture 區補上 `groups/dialysis.js` 條目（labManifest /
+      detectMonthlyDrawsFromStored / CSV exporter），並標明它由
+      `sync-patterns.js` 內嵌進 HTML 的 groups 標記區塊。
+    - 把 `__HOSPITAL_LAB_PATTERNS_BEGIN/END__` 與
+      `__HOSPITAL_LAB_GROUPS_BEGIN/END__` 兩段標記區塊明列出來，附
+      2026-05-07 當下的大約行號（patterns ~322–1213，groups ~1215–）。
+    - 新增 server-side stack 條目（`fetcher.js` / `server.js` /
+      `cache.js` / `patients.js` / `csv-compiler.js` / `lab-mapping.js`），
+      標註「目前使用者實際 flow 走的是 client-side，這些檔案非主要
+      執行路徑」— 避免未來 Claude 誤改 server-side code 以為會生效
+      （與 2026-05-06 BUN(AD) bug 同樣的誤判）。
+    - 修正 Key Functions 表中已過時的行號區間：原表是 refactor
+      前（patterns/groups 還沒拆出來時）的行號，現在 sync 之後位置
+      整個位移，且 `exportAllLabData()` / `importPatients()` 已隨
+      JSON 匯出移除而不存在。改成「大約行號」並補一條 Note
+      提醒每次 `sync-patterns.js` 之後行號會位移，請用
+      `grep -n <functionName> hospital-lab-data.html` 定位。
+    - Pattern 更新流程補上 `npm run release` 步驟（validate +
+      build-json），並提到 sync 同時更新 patterns + groups 兩段標記。
+  - `README.md`（新建）：repo 對外簡介 — 用途、檔案清單（標出
+    server-side 非主要執行路徑）、pattern source、quick start、
+    feature list、隱私守則。給未進 Claude Code 的人看。
+- 原因：
+  - 2026-05-06 修 BUN(AD) bug 時發現 CLAUDE.md 沒提到
+    `groups/dialysis.js` 的存在，也沒提到 server-side stack 是備用的，
+    以致初步 debug 時誤往 `csv-compiler.js` 找 root cause；實際 bug
+    在 client-side `groups/dialysis.js` 的 `detectMonthlyDrawsFromStored`。
+    這次補齊檔案地圖，避免下次再走冤枉路。
+  - Key Functions 表的行號過時太久 — patterns/groups 內嵌之後，
+    主程式的 LAB_TESTS 從 line 363 漂到 ~1211，差將近 850 行，誤導
+    性比有用性高。改成「大約行號 + 用 grep 確認」更實用。
+  - README.md 此前不存在；GitHub repo 首頁直接顯示「No description」，
+    不利協作。
+- 測試：
+  - 純文件修改，無程式碼變更，未跑 `node sync-patterns.js`。
+  - 用 `grep -n` 抽查 CLAUDE.md 新表中的行號（LAB_TESTS、
+    extractLabValues、computeDerivedValues、renderPatientList）皆
+    對得上 `hospital-lab-data.html` 當下的位置，誤差 ≤ 5 行。
+  - `hospital-lab-data.html` 未動，瀏覽器行為不變。
+- 相依：
+  - 不需 patterns repo 發版。
+  - 不影響其他 disease group（目前只有 dialysis）。
+
 ## 2026-05-06 — 修復 CSV BUN(AD) 為空 root cause（drawDateIso 時區漂移）
 
 - 作者：claude（與 YC 共同）
