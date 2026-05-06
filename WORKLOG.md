@@ -1,5 +1,67 @@
 # WORKLOG
 
+## 2026-05-06 — 修復 CSV BUN(AD) 為空 root cause（drawDateIso 時區漂移）
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（前端 client-side CSV 匯出 — `groups/dialysis.js` 與
+  `hospital-lab-data.html` 內 `__HOSPITAL_LAB_GROUPS__` 標記區）
+- 變更：修改
+- 檔案：
+  - `groups/dialysis.js`：`detectMonthlyDrawsFromStored` 內
+    `drawDateIso` 推導改成 local-time 格式（沿用 `getFullYear()` /
+    `getMonth() / getDate()`），不再用 `bucket.effectiveTime.slice(0, 10)`。
+  - `hospital-lab-data.html`：跑 `node sync-patterns.js` 重新打包
+    inline groups 區塊，把上述修正同步進 HTML。
+- 原因：
+  - 使用者回報 `000006658A` 的 BUN(AD) 在 reporter 報表畫面正常顯示，
+    但「匯出 CSV」產生的 `dialysis_export_*.csv` 中所有
+    `BUN (AD) value / lower / higher` 全空，只有 `BUN (AD) unit` 有值
+    （unit 從 catalog 直接抓）。BUN(BD) 全部正常。
+  - 「匯出 CSV」按鈕完全跑在 client side
+    （`hospital-lab-data.html:2940-2955` `exportCombinedCSV` →
+    `loadLabData()` → `GROUP.exporter.formatAll`，再進
+    `groups/dialysis.js` 的 `detectMonthlyDrawsFromStored`），
+    本 repo 內 `fetcher.js / server.js / csv-compiler.js` 那條
+    server-side stack 跟使用者實際 flow 無關。
+  - root cause 在 `detectMonthlyDrawsFromStored`：
+    1. `bucket.effectiveTime` 是用 `Date.toISOString()` 產生的 UTC ISO
+       字串（`parseOrdersPage` line 1920 `effectiveDt.toISOString()`）。
+    2. `drawDateIso = bucket.effectiveTime.slice(0, 10)` 直接砍前 10
+       字元 → 在 TPE (UTC+8) 拿到的是「**前一天**」的 UTC date。
+       例：Taiwan local 2026-04-14 00:00 → ISO `2026-04-13T16:00:00Z`
+       → slice(0,10) = `2026-04-13`。
+    3. `bunIdx.post[drawDateIso]` 卻是用 entry `e.date` 當 key，而
+       `e.date = toSortableDate(dateObj)` 用的是 local 的
+       `getFullYear()/getMonth()/getDate()` → key 是 `2026-04-14`。
+    4. UTC `2026-04-13` ≠ local `2026-04-14` → 永遠 miss → CSV 的
+       `BUN (AD) value` 全空（unit / lower / higher 三欄是從 catalog
+       直接抓的，所以 unit 還在）。
+  - 為什麼 BUN(BD) 沒事：`pre` lookup 有 fallback
+    `bucket.byTestId.BUN_pre[0]`（pre entry 跟 panel 在同一個
+    effectiveTime 叢集），所以 `bunIdx.pre[drawDateIso]` miss 了還能
+    從 bucket 裡撿回來；`post` lookup **沒有 fallback**，因為 post 是
+    自己的 effectiveTime 叢集，不在 pre bucket 內。
+  - 為什麼 labview 螢幕顯示是對的：螢幕走的是
+    `resolveBunClustersFromStored`（line 1549–1582），它用
+    `_indexBunByDate` 直接拿 `e.date` 做 key、`Object.keys(preIdx ∪ postIdx)`
+    迭代，pair 邏輯不依賴 `effectiveTime` 推算的 drawDateIso，所以時區
+    漂移不影響它。
+- 測試：
+  - 用 `node -e` 確認時區行為：在 TPE，`new Date(2026, 3, 14).toISOString().slice(0,10)`
+    = `2026-04-13`，但 local 格式為 `2026-04-14` — 完全符合假設。
+  - 修法只動 drawDateIso 的推導路徑（同一個 Date 物件改用 local
+    accessors），不變更 bucket 邏輯也不動 BUN_pre/BUN_post 陣列內容。
+  - 手動驗證（瀏覽器）由使用者：
+    1. 重新整理 `hospital-lab-data.html`（拿到新版 inline groups）。
+    2. 不需要重抓資料 — 修法只影響 reader 端。
+    3. 點「匯出 CSV」→ 開啟 CSV，確認 `BUN (AD) value` 欄位有值。
+    4. 比對 `000006658A` 螢幕 vs CSV 的 BUN(AD)，應一致。
+- 相依：
+  - `hospital-lab-patterns` 不需動。
+  - `hospital-lab-viewer` 不需動。
+  - 不影響其他 disease group。
+  - 不影響 cache，不需重抓資料。
+
 ## 2026-05-06 — Sync EarlyCKD 非 CKD 時回傳「正常」(Phase C)
 
 - 作者：claude（與 YC 共同）

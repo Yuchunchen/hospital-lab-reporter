@@ -241,9 +241,21 @@ const DIALYSIS_GROUP = {
       if (reqBUN && !hasBUN) continue;
 
       // drawDate / yyyymm — prefer effectiveTime, fall back to any entry's date.
+      // 2026-05-06 hotfix: bucket.effectiveTime is an ISO string built via
+      // Date.toISOString() (UTC). Slicing the first 10 chars gave a UTC date
+      // that's off-by-one in TPE (UTC+8): a Taiwan local "2026-04-14 00:00"
+      // serialises to "2026-04-13T16:00:00Z". bunIdx is keyed by entry e.date
+      // which is built from the same Date via local accessors (YYYY-MM-DD),
+      // so the UTC slice missed every BUN(AD) lookup. Re-derive drawDateIso
+      // through the same local-time path so the keys match.
       let drawDateIso = null;
       if (bucket.effectiveTime) {
-        drawDateIso = bucket.effectiveTime.slice(0, 10);
+        const d = new Date(bucket.effectiveTime);
+        if (!isNaN(d.getTime())) {
+          drawDateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        } else {
+          drawDateIso = bucket.effectiveTime.slice(0, 10);
+        }
       } else {
         for (const id in bucket.byTestId) {
           const e0 = bucket.byTestId[id][0];
