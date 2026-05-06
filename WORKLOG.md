@@ -1,5 +1,26 @@
 # WORKLOG
 
+## 2026-05-07 — 加入 docs/format-specs/ 4 組健保上傳格式規格檔
+
+- 作者：claude（與 YC 共同）
+- 範圍：core（reference 文件，無程式碼變更）
+- 變更：新增（11 檔，分 4 組）
+- 檔案：
+  - `docs/format-specs/dm/`：糖尿病論質方案上傳格式 .txt + 說明 .pdf
+  - `docs/format-specs/early-ckd/`：腎平台 個案 / 檢驗數據 / 護理衛教
+    匯入格式 .xlsx（3 檔）
+  - `docs/format-specs/esrd/`：腎平台 個案 / 檢驗數據 / 營養衛教 /
+    護理衛教 匯入格式 .xlsx（4 檔）
+  - `docs/format-specs/nhi-ckd/`：初期慢性腎臟病醫療給付改善方案上傳
+    格式 .txt + 說明 .pdf
+- 原因：multi-disease group 框架（dialysis / CKD / DM / COPD）後續實作
+  各 group 的 CSV exporter 時，需以官方上傳格式為準。先把規格檔本體放
+  進 repo，commit 後就有單一 source of truth — 後續寫 `groups/<id>.js`
+  的 exporter 可直接對照欄位定義，不用每次重新到健保署/腎臟學會找檔。
+- 測試：—（純 reference 文件，不參與執行）
+- 相依：未來實作 dm / early-ckd / esrd / nhi-ckd group 的 CSV exporter
+  時，需依本目錄規格檔對齊欄位順序 / 編碼 / 必填規則。
+
 ## 2026-05-07 — gitignore 加 .claude/，停止追蹤 settings.local.json
 
 - 作者：claude（與 YC 共同）
