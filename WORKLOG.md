@@ -1,5 +1,21 @@
 # WORKLOG
 
+## 2026-05-07 — gitignore 加 .claude/，停止追蹤 settings.local.json
+
+- 作者：claude（與 YC 共同）
+- 範圍：core（gitignore + 解除追蹤本機 Claude Code 設定）
+- 變更：修改 + 移除（從版本控制）
+- 檔案：`.gitignore`（加 `.claude/`）、`.claude/settings.local.json`
+  （`git rm --cached`，本機檔保留）
+- 原因：`.claude/settings.local.json` 是 Claude Code 本機權限白名單
+  （per-machine、按字尾 `local` 慣例就是本機檔），之前不慎被 git track。
+  與 sibling repo `hospital-lab-patterns` 一致（彼端 commit `e77b73c`
+  早已忽略 `.claude/`）。本輪一併把它從 index 移除、`.gitignore` 加上
+  `.claude/`，未來本機 allowlist 累積不再進 commit。
+- 測試：`git status` 顯示 `.claude/` 整個資料夾已忽略（不再列入 untracked
+  也不在 modified 列）。
+- 相依：無；本次純清理。
+
 ## 2026-05-07 — 跨 repo 文件大整理（patterns repo 端）coordination 記錄
 
 - 作者：claude（與 YC 共同）

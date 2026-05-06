@@ -7,6 +7,9 @@
 .idea/
 *.swp
 
+# Claude Code local settings (per-machine permission allowlist; not for sharing)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
