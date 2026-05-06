@@ -1,11 +1,20 @@
 ## Hospital Lab Reporter
 
+<!-- 洗腎室（透析室）檢驗資料案管系統 — 獨立 HTML 網頁 -->
+
 洗腎室（血液透析室）檢驗資料管理系統。獨立的單一 HTML 網頁應用程式，供 2–5 人小團隊在院內使用，管理透析病患名單並自動抓取 ernode API 檢驗數據。
 
 ### Architecture
 
-- **hospital-lab-data.html** — 主程式檔案，所有 CSS 與大部分 JS 內嵌於此。直接用瀏覽器開啟即可使用。檔案中的 `LAB_CATEGORIES` / `LAB_TESTS` / `COMPUTED_TESTS` 區段被 `// __HOSPITAL_LAB_PATTERNS_BEGIN__` / `// __HOSPITAL_LAB_PATTERNS_END__` 標記框住，內容為自動產生，請勿手動編輯標記之間的程式碼。
-- **sync-patterns.js** — 從 sibling repo `../hospital-lab-patterns/` 同步檢驗項目定義到 HTML 標記區塊內。執行 `node sync-patterns.js` 後重新整理 HTML 即可載入新版本。
+<!-- 檔案清單 — html 是主程式，groups/ 是疾病模組 -->
+
+- **hospital-lab-data.html** — 主程式檔案（~3014 行），所有 CSS 與大部分 JS 內嵌於此。直接用瀏覽器開啟即可使用。兩段自動產生的標記區塊：
+  - `// __HOSPITAL_LAB_PATTERNS_BEGIN__` ~ `END__` (line ~322–1213) — patterns catalog + manifest + resolver
+  - `// __HOSPITAL_LAB_GROUPS_BEGIN__` ~ `END__` (line ~1215–) — disease group modules (currently: dialysis)
+- **groups/dialysis.js** — 透析 disease group module。包含 `labManifest`、`detectMonthlyDrawsFromStored`（月檢識別）、CSV exporter。由 `sync-patterns.js` 內嵌進 HTML 的 groups 標記區塊。
+- **sync-patterns.js** — 從 sibling repo `../hospital-lab-patterns/` 同步 patterns 區塊 + groups 區塊到 HTML。執行 `node sync-patterns.js` 後重新整理瀏覽器即可載入新版本。
+- **fetcher.js / server.js / cache.js / patients.js / csv-compiler.js / lab-mapping.js** — Server-side stack（Node.js）。目前使用者實際 flow 走的是 client-side（HTML 內嵌），這些檔案是早期版本殘留或備用，**非主要執行路徑**。
+- **package.json** — Node dependencies for sync-patterns.js.
 
 ### UI 結構
 
@@ -97,33 +106,35 @@ if (test.filter === 'standalone_bun' && order.orderName.includes(',')) continue;
 
 ### Key Functions
 
-| 函數 | 行號區間 | 說明 |
+<!-- 行號會隨 sync 變動，以下為 2026-05-07 快照 — 用 grep 確認 -->
+
+| 函數 | 大約行號 | 說明 |
 |------|---------|------|
-| `LAB_TESTS` | ~363–419 | 檢驗項目定義陣列 |
-| `COMPUTED_TESTS` | ~423–436 | 計算值定義 |
-| `formatChartNo()` | ~490 | 病歷號格式化（補零+大寫） |
-| `parseDateTaiwan()` | ~515 | 民國日期解析 |
-| `parseOrdersPage()` | ~570–611 | HTML 解析 ernode 回傳資料 |
-| `fetchAllOrders()` | ~619–647 | 分頁抓取所有檢驗醫囑 |
-| `extractLabValues()` | ~662–718 | Regex 擷取檢驗值（含 BUN filter） |
-| `computeDerivedValues()` | ~724 | 計算 URR、Ca×P |
-| `renderPatientList()` | ~793 | 渲染病患清單表格 |
-| `viewPatientLab()` | ~1053–1176 | 渲染完整歷史檢驗表格 |
-| `exportAllLabData()` | ~1229 | JSON 匯出 |
-| `importPatients()` | ~1192 | JSON 匯入 |
+| `LAB_TESTS` (= resolved manifest) | ~1211 | 檢驗項目定義（由 patterns 區塊 resolve） |
+| `COMPUTED_TESTS` | ~1212 | 計算值定義 |
+| `extractLabValues()` | ~2005 | Regex 擷取檢驗值（含 BUN filter） |
+| `computeDerivedValues()` | ~2207 | 計算 URR、Ca×P |
+| `renderPatientList()` | ~2447 | 渲染病患清單表格（含 sort/filter） |
+| `viewPatientLab()` | ~2417+ | 渲染完整歷史檢驗表格 |
+
+**Note:** Line numbers shift after every `sync-patterns.js` run. Use
+`grep -n <functionName> hospital-lab-data.html` to find current positions.
 
 ### Build
+
+<!-- 不需 build — 開 HTML 就能用；改 pattern 時跑 sync -->
 
 無需建置步驟，雙擊開啟 `hospital-lab-data.html` 即可。
 
 **Pattern 更新流程**：
 
-1. 在 sibling repo 編輯 `../hospital-lab-patterns/patterns/reporter.js`
-2. `git commit && git push`（patterns repo 內）
-3. `cd hospital-lab-reporter && node sync-patterns.js`
-4. 重新整理瀏覽器中的 `hospital-lab-data.html`
+1. 在 patterns repo 修改 catalog / reporter manifest / computed
+2. `cd hospital-lab-patterns && npm run release`（validate + build-json）
+3. `git commit && git push`（patterns repo）
+4. `cd hospital-lab-reporter && node sync-patterns.js`（同步 patterns + groups 區塊）
+5. 重新整理瀏覽器中的 `hospital-lab-data.html`
 
-詳見 [`../hospital-lab-patterns/docs/learning-workflow.md`](https://github.com/Yuchunchen/hospital-lab-patterns/blob/main/docs/learning-workflow.md) 的 Claude 互動式 pattern 學習流程。
+詳見 patterns repo 的 `docs/learning-workflow.md` 與 `docs/sop-claude-code-guide.md`。
 
 ### Related Project
 
