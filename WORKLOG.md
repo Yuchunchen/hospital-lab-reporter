@@ -1,5 +1,19 @@
 # WORKLOG
 
+## 2026-05-07 — sync 拉新版 catalog（肝炎 6 條 regex 加 i flag）
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（sync 拉新版 patterns 區塊）— 本 repo 端無 JS 邏輯改動
+- 變更：自動產生
+- 檔案：`hospital-lab-data.html`（patterns 區塊由 sync 更新）
+- 原因：patterns repo 同日 catalog 6 條肝炎 regex 全加 i flag，修 vhtt
+  全大寫 `ANTI-HCV` match 不到的 bug。本 repo 透過
+  `node sync-patterns.js` 拉新版進 patterns 區塊（HTML 行 322–1213）。
+- 測試：等 YC 重整 HTML + ↻ 重抓 92066B → 「檢驗資料」分頁
+  AntiHCV 應從 missing → 顯示 `Non-Reactive`（reporter 用 raw 定性
+  顯示，不走 viewer 的 computed display dispatcher）。
+- 相依：patterns repo 同日 commit（catalog hepatitis 6 條 i flag）。
+
 ## 2026-05-07 — extractLabValues 保留 `<N` / `>N` detection-limit 字串
 
 - 作者：claude（與 YC 共同）
