@@ -332,7 +332,7 @@ body {
 //   3. cd hospital-lab-reporter && node sync-patterns.js
 //   4. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-06T08:20:31.130Z
+// Synced at: 2026-05-07T03:18:03.886Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -611,7 +611,14 @@ const CATALOG = [
     ref:'< 30 mg/g',
     refLo:null, refHi:30, hi:30, lo:null,
     meaning:'腎臟早期傷害指標',
-    notes:'Viewer fetches sub-pages from opdweb (1-year window) when UACR not in main reportText.' },
+    subpage: {
+      // Opt-in to enrichMissingValues sub-page chase. orderName signals
+      // that the order is a urine albumin/creatinine panel — broader than
+      // strict matching to handle vhyl/vhtt naming variants.
+      orderNameMatch: /U-?ACR|UACR|microalbumin|micro-?albumin|urine\s*alb|albumin\/cr|alb\/cr|尿.*白蛋白|微量白蛋白/i,
+      // No resultPattern: UACR sub-page already carries the main "UACR:" label.
+    },
+    notes:'Viewer fetches sub-pages from opdweb (1-year window) when UACR not in main reportText. Sub-page chase opt-in via subpage.orderNameMatch (broad urine regex).' },
 
   { id:'UPCR',
     pattern: /(?:U-?PCR|UPCR|RATTC|TP\/Cr|Pr(?:otein)?\/Cr(?:eatinine)?|Urine\s*TP\/Cr):\s*([\d.]+)/i,
@@ -763,6 +770,37 @@ const CATALOG = [
     ref:'3.1–20.5 ng/mL',
     refLo:3.1, refHi:20.5, hi:20.5, lo:3.1,
     notes:'Allows variable internal whitespace (some hospitals print "Folic  acid:" with double space).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // TRACE METALS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // vhtt 2026-05-07: 18-patient survey, 12 had Blood Aluminum results.
+  // Main page: "Al鋁: 6" / "Al鋁: <2" (below detection limit).
+  // Sub-page (OpdOrderReport.aspx): "Result: 4" — handled by enrichment via
+  // the `subpage` config (synthesises "Al鋁: N" back into reportText so the
+  // main pattern matches downstream).
+  { id:'Aluminum',
+    // vhtt 2026-05-07: in-house results use "Al鋁: N", but historical
+    // out-sourced results (代檢單位：新南海醫事檢驗所) label the value with
+    // the external lab code "BALR0101: N". Both formats live in the main
+    // reportText — sub-page enrichment isn't actually needed for any of
+    // the patients sampled so far. The `subpage` config below stays for
+    // defensive future-proofing (in case a sub-page-only sample appears).
+    pattern: /(?:Al鋁|BALR0101):\s*([<>]?\s*[\d.]+)/,
+    displayName:'鋁 (Aluminum)', shortLabel:'Al',
+    unit:'µg/L', category:'微量元素',
+    ref:'<20 µg/L',
+    refLo:null, refHi:20, hi:20, lo:null,
+    meaning:'鋁中毒監測（長期透析）',
+    subpage: {
+      // orderName variants observed: "Blood Aluminum", "Blood Aluminum(TT)",
+      // and (defensive) any Chinese-only name containing 鋁.
+      orderNameMatch: /Aluminum|鋁/i,
+      resultPattern:  /Result:\s*([<>]?\s*[\d.]+)/,
+      synthLabel:     'Al鋁',
+    },
+    notes:'Annual test. vhtt confirmed 2026-05-07 (18-patient survey, 12 with data). Main pattern matches both "Al鋁: N" (in-house) and "BALR0101: N" (out-sourced lab code). Capture allows leading <> operator (handles "<2" below detection limit — but extractLabValues currently parseFloats it, so "<2" is silently dropped; pre-existing limitation, not fixed in this task). Ref <20 µg/L per KDOQI guidelines.' },
 
   // ═══════════════════════════════════════════════════════════════════════
   // TUMOR MARKERS
@@ -1074,6 +1112,7 @@ const CATEGORIES = [
   { id:'RENAL',    label:'腎功能' },
   { id:'LYTE',     label:'電解質' },
   { id:'IRON',     label:'鐵代謝' },
+  { id:'TRACE',    label:'微量元素' },
   { id:'PTH',      label:'副甲狀腺' },
   { id:'HEPAT',    label:'肝炎 / 感染' },
   { id:'COMPUTED', label:'計算值' },
@@ -1141,6 +1180,9 @@ const REPORTER_MANIFEST = [
   { id:'TSAT',     cat:'IRON',    label:'TSAT' },
   { id:'Ferritin', cat:'IRON',    label:'鐵蛋白',
     ref:'M:21.8-274.7 F:4.6-204.0', hi:null, lo:null },
+
+  // ── 微量元素 (annual; sub-page enrichment) ──
+  { id:'Aluminum', cat:'TRACE',   label:'鋁 Al' },
 
   // ── 副甲狀腺 ──
   { id:'iPTH',     cat:'PTH',     label:'i-PTH' },
@@ -1223,7 +1265,7 @@ var COMPUTED_TESTS = REPORTER_COMPUTED;
 //   2. node sync-patterns.js
 //   3. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-06T08:20:31.178Z
+// Synced at: 2026-05-07T03:18:03.897Z
 // Files:    dialysis.js
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -1314,6 +1356,8 @@ const DIALYSIS_GROUP = {
     { id: 'AntiHBs', periodicity: 'annual', displayLabel: 'Anti-HBS' },
     { id: 'AntiHCV', periodicity: 'annual', displayLabel: 'Anti-HCV' },
     { id: 'AFP',     periodicity: 'annual', displayLabel: 'α-FP' },
+    // ── 微量元素 — annual (sub-page enrichment via catalog `subpage` config) ──
+    { id: 'Aluminum', periodicity: 'annual', displayLabel: 'Al' },
     // ── 入院只做一次 — on-admission ──
     { id: 'HIV', periodicity: 'on-admission' },
     { id: 'RPR', periodicity: 'on-admission', displayLabel: 'VDRL/RPR' },
@@ -1536,6 +1580,39 @@ const DIALYSIS_GROUP = {
       const kb = b.effectiveTime || b.drawDate || '';
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
+
+    // Annual-periodicity tests (e.g. Aluminum, HBsAg) have their own
+    // 生效時間 and don't pass the monthly-overlap gate above, so the
+    // exporter would never see them. For each annual test, look up its
+    // entries in labData and attach each one onto the monthly draw that
+    // shares its YYYYMM. Edge case: an annual draw in a month with no
+    // monthly draw is dropped — same row-blanking convention as monthly.
+    const annualIds = (this.labManifest || [])
+      .map(resolveManifestEntry)
+      .filter(e => e.periodicity === 'annual')
+      .map(e => e.id);
+    if (annualIds.length && draws.length) {
+      const drawByMonth = new Map();
+      for (const d of draws) {
+        if (!d.yyyymm) continue;
+        // Prefer the earliest monthly draw of the month if multiple exist.
+        if (!drawByMonth.has(d.yyyymm)) drawByMonth.set(d.yyyymm, d);
+      }
+      for (const id of annualIds) {
+        const arr = labDataForPatient[id];
+        if (!Array.isArray(arr)) continue;
+        for (const e of arr) {
+          if (!e || !e.date) continue;
+          const yyyymm = e.date.slice(0, 4) + e.date.slice(5, 7);
+          const target = drawByMonth.get(yyyymm);
+          if (!target) continue;
+          // Don't clobber an entry the cluster already had (some annuals
+          // do happen to be drawn alongside the monthly panel).
+          if (!target.labs[id]) target.labs[id] = e;
+        }
+      }
+    }
+
     return draws;
   },
 
@@ -1988,6 +2065,172 @@ async function fetchAllOrders(chartno, onProgress) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SUB-PAGE ENRICHMENT (manifest-driven, two-pass)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Some lab orders only show "請 Click「正式報告」" in the main reportText —
+// the actual values live behind opdweb's OpdOrderReport.aspx sub-page. After
+// the caller's normal extraction, this pass:
+//   1. computes which manifest testIds are still missing,
+//   2. fetches the sub-pages of candidate "請 Click" orders within cutoff,
+//   3. splices any matched fragments back into order.reportText so the next
+//      extractLabValues() call picks them up.
+// Sub-page text is cached in localStorage by ordapno (lab reports are
+// signed off and immutable, so no TTL).
+
+const ENRICH_CACHE_KEY = 'enrichCache_dialysis';
+
+function loadEnrichCache() {
+  try { return JSON.parse(localStorage.getItem(ENRICH_CACHE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveEnrichCache(cache) {
+  try { localStorage.setItem(ENRICH_CACHE_KEY, JSON.stringify(cache)); }
+  catch (e) { console.warn('[enrichCache] save failed (likely quota):', e); }
+}
+function enrichCacheGet(ordapno) {
+  if (!ordapno) return null;
+  const c = loadEnrichCache();
+  const slot = c[String(ordapno)];
+  return slot ? slot.text : null;
+}
+function enrichCachePut(ordapno, text) {
+  if (!ordapno || !text) return;
+  const c = loadEnrichCache();
+  c[String(ordapno)] = { text, ts: Date.now() };
+  saveEnrichCache(c);
+}
+
+// Derive opdweb URL from ernode base, e.g.
+//   http://ernode.vghb12.vhtt.gov.tw:8000 → http://opdweb.vghb12.vhtt.gov.tw
+function getOpdwebBase(ernodeBaseUrl) {
+  try {
+    const u = new URL(ernodeBaseUrl);
+    u.hostname = u.hostname.replace(/^ernode\./, 'opdweb.');
+    u.port = '';
+    return u.origin;
+  } catch { return null; }
+}
+
+function buildSubpageUrl(ordapno, chartno, ernodeBaseUrl, opsid) {
+  const base = getOpdwebBase(ernodeBaseUrl);
+  if (!base) return null;
+  return `${base}/QueryReport/OpdOrderReport.aspx?OrdApNo=${ordapno}&hisnum=${chartno}&opid=${opsid}`;
+}
+
+async function fetchSubpageText(url) {
+  const resp = await fetch(url, { credentials: 'omit' });
+  if (!resp.ok) return '';
+  const html = await resp.text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body?.textContent || '';
+}
+
+// Splice into order.reportText whatever the sub-page reveals about the
+// missing tests. Returns true if anything was appended.
+function applySubpageText(order, subpageText, missingTests) {
+  if (!subpageText) return false;
+  const additions = [];
+  for (const t of missingTests) {
+    if (!t.pattern) continue;
+    // Phase A: sub-page already carries the main-page label.
+    const mMain = subpageText.match(t.pattern);
+    if (mMain && mMain[0]) {
+      additions.push(mMain[0]);
+      continue;
+    }
+    // Phase B: catalog `subpage` config — orderName-gated translation
+    // (e.g. Aluminum sub-page only has "Result: N", no "Al鋁:").
+    const sp = t.subpage;
+    if (!sp || !sp.resultPattern) continue;
+    if (sp.orderNameMatch && !sp.orderNameMatch.test(order.orderName || '')) continue;
+    const mSub = subpageText.match(sp.resultPattern);
+    if (mSub && mSub[1]) {
+      additions.push(`${sp.synthLabel || t.id}: ${String(mSub[1]).trim()}`);
+    }
+  }
+  if (!additions.length) return false;
+  order.reportText = (order.reportText ? order.reportText + ' ; ' : '')
+                   + additions.join(' ; ');
+  return true;
+}
+
+// Per-test chase semantics:
+//   - Tests WITHOUT a `subpage` config: chased only when the value is
+//     entirely missing across every order's reportText (single-value style).
+//   - Tests WITH a `subpage` config (e.g. Aluminum): chased per-order even
+//     when one main-page value already exists. Annual lab tracking needs
+//     ALL historical "請 Click" entries to fill the dialysis CSV column,
+//     not just the most-recent visible value.
+async function enrichMissingValues(labOrders, chartno, manifest, opts) {
+  opts = opts || {};
+  const onProgress = opts.onProgress;
+  const maxFetches = opts.maxFetches != null ? opts.maxFetches : 15;
+
+  const settings = loadSettings();
+  if (!settings.baseUrl || !settings.opsid) return;
+
+  const tests = (manifest || []).filter(t => t && t.pattern instanceof RegExp);
+  if (!tests.length) return;
+
+  // Pass 1: which testIds appear at least once in any order's reportText?
+  const presentIds = new Set();
+  for (const o of labOrders) {
+    if (!o.reportText) continue;
+    for (const t of tests) {
+      if (presentIds.has(t.id)) continue;
+      if (t.pattern.test(o.reportText)) presentIds.add(t.id);
+    }
+  }
+
+  // Only chase tests that explicitly opt in via catalog `subpage.orderNameMatch`.
+  // Without an orderName signal we'd brute-fetch every "missing" candidate
+  // (verified blow-up 2026-05-07: queue=132 for a patient missing AntiHCV/AFP,
+  // all CORS-blocked under file:// origin anyway). Tests opt in by adding
+  // subpage.orderNameMatch (and optionally subpage.resultPattern for
+  // sub-page label translation, e.g. Aluminum's "Result: N" → "Al鋁: N").
+  const chaseTests = tests.filter(t => t.subpage && t.subpage.orderNameMatch);
+  if (!chaseTests.length) return;
+
+  function relevantTestsForOrder(o) {
+    const out = [];
+    for (const t of chaseTests) {
+      if (t.pattern.test(o.reportText || '')) continue; // already on main page for this order
+      if (t.subpage.orderNameMatch.test(o.orderName || '')) out.push(t);
+    }
+    return out;
+  }
+
+  const queue = [];
+  for (const o of labOrders) {
+    if (!o.ordapno) continue;
+    const rel = relevantTestsForOrder(o);
+    if (rel.length) queue.push({ order: o, tests: rel });
+  }
+  if (!queue.length) return;
+
+  let fetched = 0;
+  for (let i = 0; i < queue.length && fetched < maxFetches; i++) {
+    const { order, tests: relTests } = queue[i];
+    const url = buildSubpageUrl(order.ordapno, chartno, settings.baseUrl, settings.opsid);
+    if (!url) continue;
+
+    let text = enrichCacheGet(order.ordapno);
+    if (!text) {
+      if (onProgress) onProgress(`補抓子頁面 ${fetched + 1}/${maxFetches}（candidate ${i + 1}/${queue.length}）`);
+      try {
+        text = await fetchSubpageText(url);
+        if (text) enrichCachePut(order.ordapno, text);
+      } catch { continue; }
+      fetched++;
+    }
+    if (!text) continue;
+
+    applySubpageText(order, text, relTests);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // LAB VALUE EXTRACTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2012,6 +2255,10 @@ function extractLabValues(orders) {
   cutoff.setHours(0, 0, 0, 0);
 
   const ALL_TIME_IDS = new Set(['HBsAg', 'AntiHBs', 'AntiHCV', 'HIV', 'RPR']);
+  // Tests with sub-page enrichment chase historical values (e.g. annual
+  // Aluminum). Give them all-time treatment too so the enriched older
+  // entries don't get dropped by the 12-month cutoff downstream.
+  LAB_TESTS.forEach(t => { if (t && t.subpage) ALL_TIME_IDS.add(t.id); });
 
   for (const order of orders) {
     if (order.ordType && order.ordType !== 'LAB') continue;
@@ -2606,6 +2853,19 @@ async function fetchAndStore(chartno) {
   const { orders, patientInfo } = await fetchAllOrders(chartno, (n, t) => {
     setStatus(`${chartno}: 已擷取 ${n} / ${t} 筆`, true);
   });
+
+  // Sub-page enrichment: any manifest testId still missing → selectively
+  // fetch the "請 Click「正式報告」" sub-pages within cutoff (cache-first).
+  // LAB_TESTS = resolved REPORTER_MANIFEST, so adding a new sub-page-only
+  // test now only requires a catalog/manifest change.
+  try {
+    await enrichMissingValues(orders, chartno, LAB_TESTS, {
+      onProgress: msg => setStatus(`${chartno}: ${msg}`, true),
+    });
+  } catch (e) {
+    console.warn('[enrichMissingValues] failed:', e);
+  }
+
   let labValues = extractLabValues(orders);
   labValues = computeDerivedValues(labValues);
   const allLabData = loadLabData();
