@@ -1,5 +1,36 @@
 # WORKLOG
 
+## 2026-05-07 — extractLabValues 保留 `<N` / `>N` detection-limit 字串
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（HTML body extractLabValues）
+- 變更：修改
+- 檔案：`hospital-lab-data.html`
+- 原因：113/11/27 那筆 `Al鋁: <2`（外送單位低於偵測下限）原本被
+  `parseFloat('<2')` → NaN → drop，導致 92066B 表格 Al 列從應有 6 筆變
+  5 筆。`<2` 在臨床上不是 missing — 是「抽了，低於偵測，安全」的有效
+  訊號，丟掉等於失去資訊。
+- 修正：`extractLabValues` 對 capture group 開頭是 `<` 或 `>` 時，把
+  trim 後的字串原樣存入（如 `"<2"`）；只有純數值才走原 parseFloat +
+  normalize 路徑。下游全自動相容：
+  - table 渲染：`parseFloat("<2")` → NaN → 跳過 alarm color → 直接
+    顯示 `<2` 原字串（位置在表格與其他數值同一格）
+  - URR / Ca×P / classifyBUNPrePost：既有 `Number(...)` + `isFinite`
+    防衛跳過 NaN，計算時自動忽略含 `<>` 的值（這些 test 也不會出現
+    `<>` 值，理論上不會踩到）
+  - CSV 匯出：`csvCell(val)` 字串化 → CSV 出現 literal `<2`
+  - normalize（unit conversion）對 `<>` 值跳過 — 目前所有帶 normalize
+    的 test 都是 CBC 數量級轉換，沒人會把帶 `<>` 的值丟過去
+- 測試：等 YC 重整 HTML + ↻ 重抓 92066B：
+  - 「檢驗資料」分頁 Al 列預期從 5 筆 → **6 筆**，113/11/27 的
+    `<2` 應顯示為「<2」字樣、無紅／藍 alarm 顏色（low/hi 比較跳過）
+  - CSV 該列 Al value 欄應為 literal `<2`
+- 相依：本修正只在 reporter HTML 內 JS body，patterns/groups 區塊未動，
+  不需 sync。Viewer 端 report.js 對 `<>` 值仍是 parseFloat-drop（AFP
+  `<2.00` 等）— 若門診衛教單需要顯示，下次另開 task。
+
+---
+
 ## 2026-05-07 — sub-page enrichment 第三輪：tighten chaseTests gate + diag log
 
 - 作者：claude（與 YC 共同）
