@@ -17,9 +17,36 @@
 //   3. splices any matched fragments back into order.reportText so the next
 //      extractLabValues() call picks them up.
 // Sub-page text is cached in localStorage by ordapno (lab reports are
-// signed off and immutable, so no TTL).
+// signed off and immutable, so no TTL). The cache is shared across disease
+// HTMLs — same ordapno in dialysis vs CKD vs DM has identical sub-page
+// content, so a per-disease key would just waste space + duplicate API calls.
 
-const ENRICH_CACHE_KEY = 'enrichCache_dialysis';
+const ENRICH_CACHE_KEY = 'enrichCache';
+
+// One-time migration: legacy per-disease key → shared key. Runs once on load;
+// merges if both keys somehow co-exist (the new key wins on collision since
+// any newer fetch under the unified key is fresher).
+(function migrateEnrichCache() {
+  const OLD_KEY = 'enrichCache_dialysis';
+  const NEW_KEY = 'enrichCache';
+  try {
+    const old = localStorage.getItem(OLD_KEY);
+    if (!old) return;
+    const cur = localStorage.getItem(NEW_KEY);
+    if (!cur) {
+      localStorage.setItem(NEW_KEY, old);
+      localStorage.removeItem(OLD_KEY);
+      console.log('[enrichCache] migrated enrichCache_dialysis → enrichCache');
+    } else {
+      const merged = Object.assign({}, JSON.parse(old), JSON.parse(cur));
+      localStorage.setItem(NEW_KEY, JSON.stringify(merged));
+      localStorage.removeItem(OLD_KEY);
+      console.log('[enrichCache] merged enrichCache_dialysis into enrichCache');
+    }
+  } catch (e) {
+    console.warn('[enrichCache] migration failed:', e);
+  }
+})();
 
 function loadEnrichCache() {
   try { return JSON.parse(localStorage.getItem(ENRICH_CACHE_KEY)) || {}; }
