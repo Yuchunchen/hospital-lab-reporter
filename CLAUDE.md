@@ -99,6 +99,33 @@ if (test.filter === 'standalone_bun' && order.orderName.includes(',')) continue;
 | URR (尿素清除率) | `(1 - BUN洗後/BUN洗前) × 100` | 配對同日期的洗前洗後 BUN，目標 ≥ 65% |
 | Ca×P (鈣磷乘積) | `Ca × P` | 配對同日期，目標 < 55 |
 
+### Sub-page enrichment (manifest-driven, 2026-05-07)
+
+`fetchAndStore()` 在 `extractLabValues()` 之前跑通用 `enrichMissingValues()`：
+對 catalog 帶 `subpage.orderNameMatch` opt-in 的 test，若該 order 主
+reportText 抓不到主 regex，就 fetch opdweb `OpdOrderReport.aspx` 子頁面
+補值。子頁面文字以 `ordapno` 為 key 持久化進 localStorage
+`enrichCache_dialysis`（lab 報告簽收後不變動，無 TTL）。Strict opt-in：
+non-subpage missing 的 test **不會** brute-fetch（避免一個 globally-missing
+test 拖累全 order 被 fetch）。機制細節見
+`hospital-lab-patterns/PROJECT_CONTEXT.md` §4。
+
+**`file://` CORS 限制**：直接雙擊開啟 HTML 時 origin 是 `null`，opdweb
+沒設 `Access-Control-Allow-Origin` → 所有 sub-page fetch 全 CORS blocked。
+Aluminum 透過 catalog 主 regex 同時匹配 `Al鋁:`（in-house）與外送
+單位 `BALR0101:` 解決，沒踩到此限制。**未來若有真的 sub-page-only
+test**，需把 HTML 移到 localhost server（如 `python -m http.server`）
+或裝 CORS bypass extension；viewer Chrome MV3 extension 不受影響。
+
+### Detection-limit values (`<N` / `>N`, 2026-05-07)
+
+`extractLabValues()` 對主 regex capture group 開頭是 `<` 或 `>` 時，
+trim 後保留為 string（如 `"<2"`），不走 parseFloat。下游全自動相容：
+table 渲染走 `parseFloat → NaN → 跳 alarm color → 顯示原字串`、CSV
+`csvCell` 字串化、URR/Ca×P/classifyBUN 既有 `Number()` + `isFinite`
+跳過 NaN。Aluminum `<2`（外送單位低於偵測下限 = 抽了、安全）是這條
+的主要驅動 case。
+
 ### 資料儲存
 
 - **localStorage** — 病患清單 (`dialysis_patients`)、檢驗資料 (`dialysis_lab_data`)、設定 (`dialysis_settings`)。
