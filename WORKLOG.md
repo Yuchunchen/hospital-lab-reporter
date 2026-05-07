@@ -1,5 +1,47 @@
 # WORKLOG
 
+## 2026-05-08 — Phase 1.5: 病患勾選匯出（checkbox）
+
+- 作者：claude（與 YC 共同）
+- 範圍：core / dialysis（病患清單表 + 兩個匯出按鈕）
+- 變更：新增 + 修改
+- 檔案：`hospital-lab-data.html`
+- 原因：使用者要能挑選部分病患匯出（KiDiTi / combined CSV 都要），目前
+  只能「全部一次」。core 功能（不分 disease group），所以放在主 HTML
+  而不是 `groups/dialysis.js`。
+- 具體變更：
+  - 病患清單表最左加 `_select` 欄（width:36px、不參與 sort/filter）：
+    - 表頭：`<input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)">`
+    - 每列：`<input type="checkbox" class="patient-select" value="<chartno>" onchange="togglePatientSelect(...)">`
+    - 勾選列加淡藍底 `background:#eaf4fd` + class `row-selected`。
+  - 新 in-memory `selectedPatients = new Set()`（**不**持久化到 localStorage —
+    重整後清除是預期行為，brief §1.3 + §7 明確指定）。
+  - 新 5 個函式：`toggleSelectAll(checked)`（只動可見列）、
+    `togglePatientSelect(chartno, checked)`、`updateSelectState`
+    （同步 master checkbox 的 checked / indeterminate）、
+    `updateSelectUI`（按鈕文字加 `(N)` 提示）、`getSelectedChartNos()`
+    （回 array 或 null）。
+  - `renderPatientList()` 渲染後呼叫 `updateSelectState()`（filter/sort
+    / refresh 都會觸發 → 勾選狀態維持）。
+  - `confirmRemovePatient()` 成功刪除後 `selectedPatients.delete(chartno)`，
+    避免 dangling reference。
+  - `exportKiDiTiCSV()` / `exportCombinedCSV()` 都先呼叫
+    `getSelectedChartNos()`：null → 全部、array → 只匯這些。toast 顯示
+    `N 位勾選` vs `N 位全部` 區分 scope。
+  - 按鈕 id 沿用 Phase 2 的 `btnExportKiDiTi` / `btnExportCSV`，
+    `updateSelectUI` 動態更新文字（`匯出KiDiTi資料 (3)` / `匯出csv (3)`）。
+- 測試：YC 在實機驗收 — (1) 表格最左欄出現 checkbox；(2) 全選打勾 →
+  全部列跟著打勾、按鈕文字變 `匯出KiDiTi資料 (N)`；(3) 取消其中一筆 →
+  master checkbox 變 indeterminate（瀏覽器顯示 `—` 或半勾狀態）；
+  (4) 篩選後再按全選 → 只勾可見列、不影響被篩掉的列；
+  (5) 改 sort / filter → 勾選狀態保留；
+  (6) 無勾選按匯出 → 匯出全部（與 Phase 2 行為一致）；
+  (7) 勾選 3 位按匯出 → CSV 只有 3 位的資料；
+  (8) 刪掉一位已勾選病患 → master checkbox 數字同步減 1；
+  (9) 重整頁面 → 勾選清空（預期）。
+- 相依：本 repo 內部修改。**不需** patterns repo 改動，**不需** 動
+  `groups/dialysis.js`（group module 不感知勾選機制）。
+
 ## 2026-05-08 — Phase 2: 匯出KiDiTi資料 + button bar 改版
 
 - 作者：claude（與 YC 共同）
