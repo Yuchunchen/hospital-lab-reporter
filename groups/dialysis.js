@@ -84,6 +84,8 @@ const DIALYSIS_GROUP = {
     { id: 'AntiHBs', periodicity: 'annual', displayLabel: 'Anti-HBS' },
     { id: 'AntiHCV', periodicity: 'annual', displayLabel: 'Anti-HCV' },
     { id: 'AFP',     periodicity: 'annual', displayLabel: 'α-FP' },
+    // ── 微量元素 — annual (sub-page enrichment via catalog `subpage` config) ──
+    { id: 'Aluminum', periodicity: 'annual', displayLabel: 'Al' },
     // ── 入院只做一次 — on-admission ──
     { id: 'HIV', periodicity: 'on-admission' },
     { id: 'RPR', periodicity: 'on-admission', displayLabel: 'VDRL/RPR' },
@@ -306,6 +308,39 @@ const DIALYSIS_GROUP = {
       const kb = b.effectiveTime || b.drawDate || '';
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
+
+    // Annual-periodicity tests (e.g. Aluminum, HBsAg) have their own
+    // 生效時間 and don't pass the monthly-overlap gate above, so the
+    // exporter would never see them. For each annual test, look up its
+    // entries in labData and attach each one onto the monthly draw that
+    // shares its YYYYMM. Edge case: an annual draw in a month with no
+    // monthly draw is dropped — same row-blanking convention as monthly.
+    const annualIds = (this.labManifest || [])
+      .map(resolveManifestEntry)
+      .filter(e => e.periodicity === 'annual')
+      .map(e => e.id);
+    if (annualIds.length && draws.length) {
+      const drawByMonth = new Map();
+      for (const d of draws) {
+        if (!d.yyyymm) continue;
+        // Prefer the earliest monthly draw of the month if multiple exist.
+        if (!drawByMonth.has(d.yyyymm)) drawByMonth.set(d.yyyymm, d);
+      }
+      for (const id of annualIds) {
+        const arr = labDataForPatient[id];
+        if (!Array.isArray(arr)) continue;
+        for (const e of arr) {
+          if (!e || !e.date) continue;
+          const yyyymm = e.date.slice(0, 4) + e.date.slice(5, 7);
+          const target = drawByMonth.get(yyyymm);
+          if (!target) continue;
+          // Don't clobber an entry the cluster already had (some annuals
+          // do happen to be drawn alongside the monthly panel).
+          if (!target.labs[id]) target.labs[id] = e;
+        }
+      }
+    }
+
     return draws;
   },
 

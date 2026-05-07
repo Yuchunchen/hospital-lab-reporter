@@ -1,5 +1,104 @@
 # WORKLOG
 
+## 2026-05-07 — sub-page enrichment 第三輪：tighten chaseTests gate + diag log
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（HTML body enrichMissingValues 候選邏輯）
+- 變更：修改
+- 檔案：`hospital-lab-data.html`
+- 原因：實機測 92066B 揭露兩個 production bug：
+  1. 主 reportText 已含全 6 筆 Al，只是歷史 5 筆 label 是外送 `BALR0101:`
+     而不是 `Al鋁:`。catalog regex 漏 → 誤判 missing → 觸發 sub-page chase
+     → CORS blocked。**根本不該觸發 sub-page**（patterns repo 已修 regex）。
+  2. `chaseTests` 之前的條件是 `t.subpage || !presentIds.has(t.id)` —
+     對 globally missing 的 non-subpage test（AntiHCV / AFP）會把所有
+     within-cutoff order 全推進 queue。實測 queue=132 → 全部 fetch →
+     全部 CORS blocked。
+- 修正：`chaseTests = tests.filter(t => t.subpage && t.subpage.orderNameMatch)`
+  — 只 chase 明確 opt-in 的 test（catalog 加了 subpage config）。
+  Non-subpage missing 的 test 視為「主頁面找不到就算了」，避免 brute-fetch。
+  UACR（viewer 用）已在 patterns repo 加 subpage.orderNameMatch opt-in。
+- 測試：YC 在 92066B 實機驗證通過：
+  - console: `presentIds` 含 Aluminum、`chaseTests=['Aluminum']`、
+    `qualified=0`、`queue size: 0`（6 筆 Al order 主 regex 全對到，
+    完全不需 sub-page chase，0 fetch、0 CORS error）
+  - 「檢驗資料」分頁 Al 列從 1 筆 → **5 筆**（114/11/28 4 + 112/12/01 3 +
+    111/12/02 6 + 110/12/01 5 + 109/11/30 6；113/11/27 的 `<2` 被
+    extractLabValues 的 parseFloat drop，pre-existing 限制）
+- 收尾：debug log（`console.debug('[enrich] ...')`）已全部拆掉。
+- 相依：patterns repo 同日 catalog 改動（Aluminum regex 加 BALR0101 + UACR
+  加 subpage.orderNameMatch）— 已 sync 進 HTML patterns 區塊。
+
+## 2026-05-07 — sub-page enrichment 第二輪：subpage tests 改 per-order chase + all-time cutoff
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（HTML 本體 enrichMissingValues + extractLabValues）
+- 變更：修改
+- 檔案：`hospital-lab-data.html`
+- 原因：第一輪實作後 YC 在瀏覽器測一筆有多筆 Al 紀錄的病人，**只顯示 1 筆**。
+  排查後找到兩個 bug：
+  1. `enrichMissingValues` 用 binary missing 邏輯：只要 Aluminum 主頁
+     有任一筆值就把整個 test 標為「present」、跳過所有 sub-page chase。
+     對 OPD 單值顯示 OK，對 reporter 歷史欄位錯了。
+  2. `extractLabValues` 有 12-month cutoff（只 hepatitis/HIV/RPR 例外）。
+     即使 enrichment 成功 chase 到歷史 Aluminum 值，extract 階段又把
+     >12 個月的丟掉。
+- 修正：
+  1. `chaseTests` 改成 per-test semantics：有 `subpage` config 的 test
+     **永遠** chase（per-order missing — 主頁面已展開的單筆不重複抓，
+     `請 Click` 的歷史筆全部去抓）；無 `subpage` config 的 test 維持
+     原 binary missing。
+  2. 候選清單改為 per-order 計算 `relevantTestsForOrder`：subpage-aware
+     test bypass 12-month cutoff（chase 歷史年），non-subpage test 維持
+     cutoff（避免無謂抓老舊 UACR-style sub-pages）。
+  3. `ALL_TIME_IDS` 動態加入所有帶 `subpage` 的 test id（hepatitis 名單
+     維持 hardcode），讓 enrichment 灌進來的歷史 Aluminum 不被 extract
+     階段的 cutoff 二次過濾。
+- 測試：待瀏覽器再驗（同一筆病人應該從 1 筆 → 多筆 Al 列）。
+- 相依：viewer 端做了同步等價修正（除了 cache backend / buildSubpageUrl
+  簽名 — 兩端 enrichMissingValues 演算法保持一致，方便未來新增
+  sub-page-only test 時兩邊改一處邏輯就夠）。
+- **已知殘留**：dialysis CSV exporter 是 monthly-row 結構，annual
+  Aluminum 不會被 `detectMonthlyDrawsFromStored` 納入任一 monthly
+  cluster（自己的 `生效時間`，與月檢 panel 不同），所以 CSV 雖有
+  `Al value/unit/lower/higher` 欄但 cell 會空白。同樣症狀的 HBsAg /
+  AntiHBs 等 annual 項目當它們剛好跟月檢同 panel 抽血時才會被收進。
+  這是 CSV exporter 結構性問題，**非本輪 task scope**，先記下來。
+
+## 2026-05-07 — 加入 sub-page enrichment + Aluminum 進 dialysis CSV
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis + core（HTML 本體新增 enrichment 工具函式 + 整合進
+  fetchAndStore；dialysis labManifest 加 Aluminum）
+- 變更：新增 / 修改
+- 檔案：`hospital-lab-data.html`（patterns 區塊由 sync 更新；本檔 JS
+  body 新增 enrichMissingValues 區塊 + fetchAndStore 整合）、
+  `groups/dialysis.js`（labManifest 加 Aluminum annual entry）
+- 原因：reporter 之前完全沒 sub-page fetch 能力，年檢血鋁等
+  「請 Click 才看得到」的歷史值全沒被擷取。Phase 3 把 viewer 端剛重構
+  好的通用 enrichMissingValues 整套搬進 reporter HTML body：
+  - getOpdwebBase / buildSubpageUrl / fetchSubpageText 同 viewer
+  - enrichCache 改用 localStorage（key `enrichCache_dialysis`，shape
+    `{ ordapno: { text, ts } }`），lab 報告簽收後不會變動，無 TTL
+  - applySubpageText：先試主 regex（`Al鋁:`），沒中再用 catalog
+    `subpage.resultPattern` + orderName 翻譯（`Result:` → 注入
+    `Al鋁: N`，下游 extractLabValues regex 即可命中）
+  - fetchAndStore 在 extractLabValues 前插 enrichment pass，傳入
+    LAB_TESTS（= 已 resolve 的 REPORTER_MANIFEST）
+  Aluminum 在 dialysis labManifest 用 `periodicity:'annual'`（不算進
+  monthly-required overlap，CSV 匯出仍會出現該欄位 — exporter iterate
+  整個 labManifest）。
+- 測試：本檔 sync 完成、未在瀏覽器測過。建議驗收：
+  - 載入 §3.1 任一有資料病人 → 表格出現「微量元素 / Al」列
+  - 第二次載入 → F12 Network 0 OpdOrderReport 請求（cache 命中）
+  - CSV 匯出檢查：含 `Al value/unit/lower/higher` 4 欄
+  - 載入 23982H：應顯示 `<2`（保留字串、不轉數值比較）
+- 相依：依賴 `hospital-lab-patterns` 同日的 catalog Aluminum + reporter
+  manifest TRACE category；已透過 `node sync-patterns.js` 拉進 HTML 的
+  patterns 區塊。`enrichMissingValues` 是 manifest-driven，未來新增
+  sub-page-only test 只需 catalog 加 `subpage` 配置 + reporter manifest
+  + dialysis labManifest 加一筆即可。
+
 ## 2026-05-07 — 加入 docs/format-specs/ 4 組健保上傳格式規格檔
 
 - 作者：claude（與 YC 共同）
