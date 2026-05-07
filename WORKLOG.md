@@ -1,5 +1,40 @@
 # WORKLOG
 
+## 2026-05-08 — Phase 1 fix: enrichCache key 改成 disease-neutral 共用
+
+- 作者：claude（與 YC 共同）
+- 範圍：core（enrichment）
+- 變更：修改
+- 檔案：`core/enrichment.js`、build 重產 `hospital-lab-dialysis.html`
+- 原因：`enrichCache_dialysis` 存的是 `ordapno → 子頁面 raw text` 對應，
+  **內容跟 disease 無關**（同一個 ordapno 在 dialysis / CKD / DM 抓回
+  的 sub-page 完全一樣）。Phase 3+ 加入新 disease 時若沿用「每個
+  disease 一份 enrichCache」就會重複 fetch + 重複占 localStorage。
+- 具體變更：
+  - `ENRICH_CACHE_KEY = 'enrichCache_dialysis'` → `'enrichCache'`
+  - 加 one-time `migrateEnrichCache` IIFE（放在 `ENRICH_CACHE_KEY`
+    定義之後）：開頁面時若有 `enrichCache_dialysis` 就搬到 `enrichCache`
+    並刪舊 key；若兩個都存在則 merge，新 key 上的 entries 在 collision
+    時優先（任何後來的 fetch 寫入新 key 都比較新）。
+  - 4 個 helper（`loadEnrichCache` / `saveEnrichCache` / `enrichCacheGet`
+    / `enrichCachePut`）不變 — 都已透過 `ENRICH_CACHE_KEY` 取值。
+- 不動：IndexedDB raw orders cache（早就 disease-neutral）、localStorage
+  `patients_*` / `labs_*`（各 disease 分開是正確設計）、legacy
+  `hospital-lab-data.html`（不在 Phase 1 重構範圍）。
+- 驗證：
+  - `node build.js dialysis` 重產 153.9 KB；built HTML 含
+    `const ENRICH_CACHE_KEY = 'enrichCache';`
+  - `node -c` 過 syntax；`enrichCache` 字串在輸出 18 次（key 定義 +
+    migration IIFE + 既有 helper 訊息），看起來正確
+- YC 在實機驗收要點：(1) 開新版 HTML 後 DevTools → Application →
+  Local Storage → 應有 `enrichCache`，沒有 `enrichCache_dialysis`；
+  (2) console 應印一行 `[enrichCache] migrated...` 或 merge 訊息；
+  (3) 既有 enrichCache 條目的 ordapno 不會再次 fetch sub-page。
+- 相依：本 repo 內部修改，不需 patterns repo。Legacy
+  `hospital-lab-data.html` 仍使用舊 key — 過渡期內若 YC 同時打開兩
+  邊，cache 會分裂；不影響功能（legacy 自己 fetch 自己用），等 YC
+  停用 legacy 時自然解決。
+
 ## 2026-05-08 — Phase 1: repo restructure（core/ + build.js + 1900 行 JS 拆 16 模組）
 
 - 作者：claude（與 YC 共同）
