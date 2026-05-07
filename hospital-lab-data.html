@@ -2285,17 +2285,29 @@ function extractLabValues(orders) {
 
       let value = match[1];
       if (!test.qualitative) {
-        value = parseFloat(value);
-        if (isNaN(value)) continue;
-        if (test.normalize) {
-          // catalog references normalizers by string name (so it stays
-          // JSON-serialisable); look up the function from the bundled
-          // NORMALIZERS table. Tolerate function references too for
-          // forward/backward compat.
-          const fn = typeof test.normalize === 'function'
-            ? test.normalize
-            : (typeof NORMALIZERS !== 'undefined' && NORMALIZERS[test.normalize]);
-          if (typeof fn === 'function') value = fn(value);
+        // Detection-limit markers: keep "<N" / ">N" as a normalised string
+        // (e.g. "Al鋁: <2"). Downstream consumers naturally degrade — table
+        // rendering parseFloat → NaN → renders as plain text without alarm
+        // colour; URR/Ca×P guard with isFinite; CSV stringifies as-is.
+        // Skipping normalize() for these is safe — the `<` / `>` markers
+        // historically come from manual lab annotations, not unit-conversion
+        // candidates (no test today applies normalize to such values).
+        const trimmed = String(value).replace(/\s+/g, '');
+        if (/^[<>]/.test(trimmed)) {
+          value = trimmed;
+        } else {
+          value = parseFloat(value);
+          if (isNaN(value)) continue;
+          if (test.normalize) {
+            // catalog references normalizers by string name (so it stays
+            // JSON-serialisable); look up the function from the bundled
+            // NORMALIZERS table. Tolerate function references too for
+            // forward/backward compat.
+            const fn = typeof test.normalize === 'function'
+              ? test.normalize
+              : (typeof NORMALIZERS !== 'undefined' && NORMALIZERS[test.normalize]);
+            if (typeof fn === 'function') value = fn(value);
+          }
         }
       }
 
