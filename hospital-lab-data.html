@@ -2127,28 +2127,81 @@ async function fetchIncremental(chartno, cachedOrders, onProgress) {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RAW ORDERS CACHE (for incremental fetch, 2026-05-07)
+// RAW ORDERS CACHE (for incremental fetch, 2026-05-08)
 // ═══════════════════════════════════════════════════════════════════════════════
-// localStorage `ordersCache_dialysis`: { chartno: { orders, ts } }
-// Used as the baseline for fetchIncremental. ~3MB for 30 patients (well within
-// 5–10MB localStorage budget). Quota errors are caught and logged — patient
-// just falls back to a full fetch next time. Cache is invalidated by quota,
-// not TTL; signed-off orders are immutable.
+// IndexedDB `LabReporterOrdersCache` / store `orders` (keyPath=chartno):
+//   { chartno, orders: [...], ts }
+// Used as the baseline for fetchIncremental. Migrated from localStorage on
+// 2026-05-08 — 30 patients × ~100KB approached the 5MB localStorage cap; per-
+// origin IndexedDB quota is several hundred MB, so quota concerns disappear.
+// enrichCache_dialysis (sub-page text by ordapno) stays in localStorage — it's
+// smaller and out of scope for this migration.
 
-const ORDERS_CACHE_KEY = 'ordersCache_dialysis';
+const ORDERS_DB_NAME = 'LabReporterOrdersCache';
+const ORDERS_DB_VER  = 1;
+const ORDERS_STORE   = 'orders';
+let _ordersDb = null;
 
-function loadOrdersCache() {
-  try { return JSON.parse(localStorage.getItem(ORDERS_CACHE_KEY)) || {}; }
-  catch { return {}; }
+function openOrdersDB() {
+  if (_ordersDb) return Promise.resolve(_ordersDb);
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(ORDERS_DB_NAME, ORDERS_DB_VER);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(ORDERS_STORE)) {
+        db.createObjectStore(ORDERS_STORE, { keyPath: 'chartno' });
+      }
+    };
+    req.onsuccess = () => { _ordersDb = req.result; res(_ordersDb); };
+    req.onerror   = () => rej(req.error);
+  });
 }
-function saveOrdersCache(cache) {
-  try { localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify(cache)); }
-  catch (e) {
-    // Most likely QuotaExceededError. Log; the affected patient(s) will
-    // just do a full fetch next round — graceful degradation.
-    console.warn('[ordersCache] save failed:', e);
-  }
+
+async function ordersCacheGet(chartno) {
+  if (!chartno) return null;
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(ORDERS_STORE, 'readonly').objectStore(ORDERS_STORE).get(chartno);
+    r.onsuccess = () => {
+      const row = r.result;
+      res(row ? { orders: row.orders || [], ts: row.ts || 0 } : null);
+    };
+    r.onerror = () => rej(r.error);
+  });
 }
+
+async function ordersCachePut(chartno, orders) {
+  if (!chartno) return;
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(ORDERS_STORE, 'readwrite').objectStore(ORDERS_STORE)
+                .put({ chartno, orders, ts: Date.now() });
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+async function ordersCacheDelete(chartno) {
+  if (!chartno) return;
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(ORDERS_STORE, 'readwrite').objectStore(ORDERS_STORE)
+                .delete(chartno);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+// One-time migration: drop the legacy localStorage ordersCache. Anything in
+// it is throwaway baseline data — first fetch after upgrade re-populates the
+// IndexedDB store via fetchAllOrders.
+(function dropLegacyOrdersCache() {
+  try {
+    if (localStorage.getItem('ordersCache_dialysis')) {
+      localStorage.removeItem('ordersCache_dialysis');
+    }
+  } catch (_) { /* ignore */ }
+})();
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2894,17 +2947,13 @@ function confirmRemovePatient(chartno) {
   if (!p) return;
   document.getElementById('confirmMsg').textContent =
     `確定要從追蹤清單移除 ${p.name || ''} (${chartno}) 嗎？此病患的檢驗資料也會一併刪除。`;
-  document.getElementById('confirmOkBtn').onclick = () => {
+  document.getElementById('confirmOkBtn').onclick = async () => {
     const patients = loadPatients().filter(x => x.chartno !== chartno);
     savePatients(patients);
     const labData = loadLabData();
     delete labData[chartno];
     saveLabData(labData);
-    const ordersCache = loadOrdersCache();
-    if (ordersCache[chartno]) {
-      delete ordersCache[chartno];
-      saveOrdersCache(ordersCache);
-    }
+    try { await ordersCacheDelete(chartno); } catch (e) { console.warn('[ordersCache] delete failed:', e); }
     closeConfirm();
     renderPatientList();
     showToast('已移除', 'info');
@@ -2951,21 +3000,21 @@ function parseChartNoList(text) {
 
 /**
  * Fetch one chartNo end-to-end: hit the API, extract labs, persist to
- * localStorage, refresh demographics. Throws on network / parse error.
+ * storage, refresh demographics. Throws on network / parse error.
  *
- * Incremental path (2026-05-07): if `ordersCache_dialysis` already has raw
- * orders for this chartno, we run fetchIncremental — typically 1 API call
- * per patient instead of 5–15. First fetch (or empty cache) falls back to
+ * Incremental path: if the raw-orders IndexedDB cache already has orders
+ * for this chartno, we run fetchIncremental — typically 1 API call per
+ * patient instead of 5–15. First fetch (or empty cache) falls back to
  * fetchAllOrders.
  */
 async function fetchAndStore(chartno) {
-  const ordersCache = loadOrdersCache();
-  const cached = ordersCache[chartno];
+  const cached = await ordersCacheGet(chartno);
 
   let orders, patientInfo;
   if (cached && Array.isArray(cached.orders) && cached.orders.length > 0) {
     // Clone cached orders so the in-place status overwrites in
-    // fetchIncremental don't poison the in-memory cache object before save.
+    // fetchIncremental don't mutate the IndexedDB-derived array before
+    // the final put writes the merged result.
     const baseline = cached.orders.map(o => ({ ...o }));
     const result = await fetchIncremental(chartno, baseline, (n, t) => {
       setStatus(`${chartno}: 增量更新 ${n} / ${t} 筆`, true);
@@ -2996,9 +3045,12 @@ async function fetchAndStore(chartno) {
   }
 
   // Persist raw orders cache (post-enrichment so cached reportText already
-  // includes any sub-page splices). Quota-exceeded is caught in saveOrdersCache.
-  ordersCache[chartno] = { orders, ts: Date.now() };
-  saveOrdersCache(ordersCache);
+  // includes any sub-page splices).
+  try {
+    await ordersCachePut(chartno, orders);
+  } catch (e) {
+    console.warn('[ordersCache] put failed:', e);
+  }
 
   let labValues = extractLabValues(orders);
   labValues = computeDerivedValues(labValues);
