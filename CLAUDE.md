@@ -1,20 +1,49 @@
 ## Hospital Lab Reporter
 
-<!-- 洗腎室（透析室）檢驗資料案管系統 — 獨立 HTML 網頁 -->
+<!-- 洗腎室（透析室）檢驗資料案管系統 — Phase 1 後改為 build pipeline 產出 standalone HTML -->
 
-洗腎室（血液透析室）檢驗資料管理系統。獨立的單一 HTML 網頁應用程式，供 2–5 人小團隊在院內使用，管理透析病患名單並自動抓取 ernode API 檢驗數據。
+洗腎室（血液透析室）檢驗資料管理系統。供 2–5 人小團隊在院內使用，管理
+透析病患名單並自動抓取 ernode API 檢驗數據。Phase 1（2026-05-08）後，
+單檔 monolith 拆成 `core/` 模組 + `build.js` pipeline，**現用 HTML 是
+`hospital-lab-dialysis.html`**（build 產出）。Legacy `hospital-lab-data.html`
+保留作 reference 直到使用者完成遷移。
 
-### Architecture
+### Architecture (post Phase 1)
 
-<!-- 檔案清單 — html 是主程式，groups/ 是疾病模組 -->
+<!-- core 是共用 shell；groups/ 是疾病模組；build.js 串起來 -->
 
-- **hospital-lab-data.html** — 主程式檔案（~3014 行），所有 CSS 與大部分 JS 內嵌於此。直接用瀏覽器開啟即可使用。兩段自動產生的標記區塊：
-  - `// __HOSPITAL_LAB_PATTERNS_BEGIN__` ~ `END__` (line ~322–1213) — patterns catalog + manifest + resolver
-  - `// __HOSPITAL_LAB_GROUPS_BEGIN__` ~ `END__` (line ~1215–) — disease group modules (currently: dialysis)
-- **groups/dialysis.js** — 透析 disease group module。包含 `labManifest`、`detectMonthlyDrawsFromStored`（月檢識別）、CSV exporter。由 `sync-patterns.js` 內嵌進 HTML 的 groups 標記區塊。
-- **sync-patterns.js** — 從 sibling repo `../hospital-lab-patterns/` 同步 patterns 區塊 + groups 區塊到 HTML。執行 `node sync-patterns.js` 後重新整理瀏覽器即可載入新版本。
-- **fetcher.js / server.js / cache.js / patients.js / csv-compiler.js / lab-mapping.js** — Server-side stack（Node.js）。目前使用者實際 flow 走的是 client-side（HTML 內嵌），這些檔案是早期版本殘留或備用，**非主要執行路徑**。
-- **package.json** — Node dependencies for sync-patterns.js.
+```
+hospital-lab-reporter/
+├── core/
+│   ├── shell.html              ← HTML template（{{TITLE}} {{STYLES}} {{BODY_HTML}}
+│   │                              {{PATTERNS}} {{GROUPS}} {{CORE_JS}}
+│   │                              {{EXPORT_FORMATS}} {{DISEASE_INIT}} 占位符）
+│   ├── body.html               ← <body> markup（從 monolith 抽出）
+│   ├── styles.css              ← 從 monolith <style> 抽出
+│   └── 16 個 *.js              ← storage, fetch, indexeddb-cache, enrichment,
+│                                   lab-extract, compute, date-utils,
+│                                   ui-tabs / patient-list / patient-select /
+│                                   patient-crud / lab-view / settings /
+│                                   remove-patient, chart-format, export-utils,
+│                                   init
+├── groups/
+│   └── dialysis.js             ← 透析 disease 模組（labManifest +
+│                                   detectMonthlyDrawsFromStored + CSV exporter）
+├── export-formats/
+│   └── kiditi-csv.js           ← KiDiTi 58 欄 positional CSV（Phase 2）
+├── build.js                    ← 讀 shell + 串 patterns / groups / core /
+│                                   export-formats → 產出 hospital-lab-<id>.html
+├── sync-patterns.js            ← 維護 legacy markers + 順手呼叫 buildOne()
+├── hospital-lab-dialysis.html  ← **BUILT 產出（end-user 開啟對象）**
+└── hospital-lab-data.html      ← LEGACY monolith（仍由 sync 維護，過渡期保留）
+```
+
+**關鍵設計**：core/*.js 都是頂層 function 宣告，build 時 concat 進單一
+`<script>` — 透過 hoist 跨模組可見，**沒有** IIFE / bundler / namespace。
+與 legacy monolith 行為 1:1 對齊（風險最低）。`groups/dialysis.js` 不動。
+
+**早期 server-side 殘留**（`fetcher.js / server.js / cache.js /
+patients.js / csv-compiler.js / lab-mapping.js`）非主要執行路徑，可忽略。
 
 ### UI 結構
 
@@ -35,7 +64,11 @@
 
 ### 檢驗項目 (LAB_TESTS)
 
-37 項檢驗，定義集中於 [hospital-lab-patterns](https://github.com/Yuchunchen/hospital-lab-patterns) repo (`patterns/reporter.js`)，由 `sync-patterns.js` 同步進 HTML。每項定義包含：`id`, `cat`, `label`, `pattern` (regex), `unit`, `ref`, `hi`, `lo`, `filter`（可選）。
+41 項檢驗（2026-05-08 加 FreeCa / Mg / UIBC 三條給 KiDiTi 匯出），定義
+集中於 [hospital-lab-patterns](https://github.com/Yuchunchen/hospital-lab-patterns)
+repo (`patterns/reporter.js`)，由 `build.js`（dialysis HTML）和
+`sync-patterns.js`（legacy HTML）讀進來 resolve。每項定義包含：`id`,
+`cat`, `label`, `pattern` (regex), `unit`, `ref`, `hi`, `lo`, `filter`（可選）。
 
 **Note:** 下表為 2026-05-05 快照；2026-05-07 後所有 numeric capture group 已改成 `([<>]?\s*[\d.]+)` 支援偵測下限值。以 catalog.js 為準。
 
@@ -106,11 +139,13 @@ if (test.filter === 'standalone_bun' && order.orderName.includes(',')) continue;
 `fetchAndStore()` 在 `extractLabValues()` 之前跑通用 `enrichMissingValues()`：
 對 catalog 帶 `subpage.orderNameMatch` opt-in 的 test，若該 order 主
 reportText 抓不到主 regex，就 fetch opdweb `OpdOrderReport.aspx` 子頁面
-補值。子頁面文字以 `ordapno` 為 key 持久化進 localStorage `enrichCache_dialysis`
-（lab 報告簽收後不變動，無 TTL；體積小，保留 localStorage 不遷 IndexedDB）。Strict opt-in：
-non-subpage missing 的 test **不會** brute-fetch（避免一個 globally-missing
-test 拖累全 order 被 fetch）。機制細節見
-`hospital-lab-patterns/PROJECT_CONTEXT.md` §4。
+補值。子頁面文字以 `ordapno` 為 key 持久化進 localStorage `enrichCache`
+（disease-neutral 共用，2026-05-08 從 `enrichCache_dialysis` 改名 +
+migration IIFE — sub-page text 跟 disease 無關，未來 CKD/DM HTML 共用
+不重複 fetch；lab 報告簽收後不變動，無 TTL；體積小，保留 localStorage
+不遷 IndexedDB）。Strict opt-in：non-subpage missing 的 test **不會**
+brute-fetch（避免一個 globally-missing test 拖累全 order 被 fetch）。
+機制細節見 `hospital-lab-patterns/PROJECT_CONTEXT.md` §4。
 
 **`file://` CORS 限制**：直接雙擊開啟 HTML 時 origin 是 `null`，opdweb
 沒設 `Access-Control-Allow-Origin` → 所有 sub-page fetch 全 CORS blocked。
@@ -130,7 +165,7 @@ table 渲染走 `parseFloat → NaN → 跳 alarm color → 顯示原字串`、C
 
 ### 資料儲存
 
-- **localStorage** — 病患清單 (`dialysis_patients`)、檢驗資料 (`dialysis_lab_data`)、設定 (`dialysis_settings`)、sub-page enrichment cache (`enrichCache_dialysis`)。
+- **localStorage** — 病患清單 (`patients_dialysis`)、檢驗資料 (`labs_dialysis`)、設定 (`hd_settings`)、sub-page enrichment cache (`enrichCache`，2026-05-08 改名為 disease-neutral，未來 CKD/DM HTML 共用)。
 - **IndexedDB** `LabReporterOrdersCache` (DB_VER=1, store `orders`, keyPath=chartno) — incremental fetch 用的 raw orders cache。每位病患存完整 orders 陣列 + timestamp，不受 localStorage 5MB 限制。移除病人時 `ordersCacheDelete(chartno)` 清除對應 entry。
 - **JSON 匯出/匯入** — 供團隊成員間分享資料。匯出產生 `.json` 檔案下載，匯入從檔案讀入並合併。
 
@@ -143,35 +178,62 @@ orders，新醫囑 prepend、status 變動（未執行→正式報告）in-place
 病患 1 個 API call。30 位病患批次更新從 150–450 call 降到 ~30 call。
 無 cache 或 IndexedDB 錯誤 → graceful fall back 到 full fetch。
 
-### Key Functions
+### Key Functions（找原始檔，不要找 build 產出）
 
-<!-- 行號會隨 sync 變動，以下為 2026-05-07 快照 — 用 grep 確認 -->
+要看 / 改某個函數的實作，到 `core/<module>.js`（或 `export-formats/`、
+`groups/dialysis.js`），不要改 `hospital-lab-dialysis.html`（每次 build
+會被覆寫）。
 
-| 函數 | 大約行號 | 說明 |
-|------|---------|------|
-| `LAB_TESTS` (= resolved manifest) | ~1211 | 檢驗項目定義（由 patterns 區塊 resolve） |
-| `COMPUTED_TESTS` | ~1212 | 計算值定義 |
-| `extractLabValues()` | ~2005 | Regex 擷取檢驗值（含 BUN filter） |
-| `computeDerivedValues()` | ~2207 | 計算 URR、Ca×P |
-| `renderPatientList()` | ~2447 | 渲染病患清單表格（含 sort/filter） |
-| `viewPatientLab()` | ~2417+ | 渲染完整歷史檢驗表格 |
-
-**Note:** Line numbers shift after every `sync-patterns.js` run. Use
-`grep -n <functionName> hospital-lab-data.html` to find current positions.
+| 函數 | 所在檔 | 說明 |
+|---|---|---|
+| `LAB_TESTS` / `COMPUTED_TESTS` | resolver in `build.js` 注入的 patterns 區塊 | 由 `_resolveManifest(REPORTER_MANIFEST, CATALOG)` resolve |
+| `loadPatients` / `savePatients` / `loadLabData` / `saveLabData` | `core/storage.js` | localStorage helpers |
+| `formatChartNo` | `core/chart-format.js` | 9 位數 + 1 字母正規化 |
+| `parseDateTaiwan` / `parseDateResdttm` / `toMinguoDate` / `todayStr` | `core/date-utils.js` | 日期工具（含民國年） |
+| `fetchAllOrders` / `fetchIncremental` / `parseOrdersPage` | `core/fetch.js` | ernode HTML 抓取 + stable-frontier 增量 |
+| `openOrdersDB` / `ordersCacheGet/Put/Delete` | `core/indexeddb-cache.js` | IndexedDB raw orders cache |
+| `enrichMissingValues` | `core/enrichment.js` | 通用 sub-page 補值（含 enrichCache localStorage） |
+| `extractLabValues` | `core/lab-extract.js` | regex 擷取 + BUN A/B 後處理 + `<N>` 字串保留 |
+| `computeDerivedValues` | `core/compute.js` | URR、Ca×P |
+| `switchTab` / `showToast` | `core/ui-tabs.js` | tab 切換 + toast |
+| `selectedPatients` Set + `toggleSelectAll` / `togglePatientSelect` / `updateSelectState` / `updateSelectUI` / `getSelectedChartNos` | `core/ui-patient-list.js`（Phase 1.5 段） | 病患勾選機制 |
+| `buildPatientColumns` / `renderPatientList` / `renderPatientHead` / `renderPatientBody` / `cyclePatientSort` / `setPatientFilter` | `core/ui-patient-list.js` | 病患清單渲染 + sort + filter |
+| `confirmRemovePatient` / `closeConfirm` | `core/ui-remove-patient.js` | 移除病患（含 IndexedDB + selection 清理） |
+| `addAndUpdateFromInput` / `refreshExistingPatients` / `refreshOnePatient` / `fetchAndStore` | `core/ui-patient-crud.js` | CRUD + ID-list 解析 |
+| `viewPatientLab` | `core/ui-lab-view.js` | 病患歷史 lab table |
+| `loadSettingsUI` / `saveSettings` | `core/ui-settings.js` | 設定 tab |
+| `exportCombinedCSV` / `downloadBlob` | `core/export-utils.js` | long-format CSV 匯出（delegate to `groups/dialysis.js` exporter） |
+| `exportKiDiTiCSV` / `_kdt*` helpers | `export-formats/kiditi-csv.js` | KiDiTi 58 欄 positional CSV |
 
 ### Build
 
-<!-- 不需 build — 開 HTML 就能用；改 pattern 時跑 sync -->
+**End-user**：雙擊開啟 `hospital-lab-dialysis.html` 即可（build 產出）。
+Legacy `hospital-lab-data.html` 仍能開但不建議再用（改用 dialysis）。
 
-無需建置步驟，雙擊開啟 `hospital-lab-data.html` 即可。
+**改完 core / groups / export-formats 之後**：
 
-**Pattern 更新流程**：
+```powershell
+node build.js dialysis           # → hospital-lab-dialysis.html
+# 或一次重產所有 disease（目前只有 dialysis）：
+node build.js
+```
 
-1. 在 patterns repo 修改 catalog / reporter manifest / computed
-2. `cd hospital-lab-patterns && npm run release`（validate + build-json）
-3. `git commit && git push`（patterns repo）
-4. `cd hospital-lab-reporter && node sync-patterns.js`（同步 patterns + groups 區塊）
-5. 重新整理瀏覽器中的 `hospital-lab-data.html`
+**Pattern 更新流程**（patterns repo 改了 catalog / reporter manifest / computed）：
+
+1. 在 patterns repo 修改 → `npm run release` → commit + push
+2. 回 reporter repo 跑 `node sync-patterns.js`：
+   - 重產 legacy `hospital-lab-data.html` 的 `__PATTERNS__` / `__GROUPS__` 區塊
+   - **接著自動呼叫 `buildOne()` 重產所有 disease HTML**（sync 內部 chain 到 build）
+3. 重新整理瀏覽器（`hospital-lab-dialysis.html`）
+
+**npm scripts**：
+
+```json
+"build":           "node build.js",
+"build:dialysis":  "node build.js dialysis",
+"sync":            "node sync-patterns.js",
+"sync-and-build":  "node sync-patterns.js"   // 即 sync 已 chain build
+```
 
 詳見 patterns repo 的 `docs/learning-workflow.md` 與 `docs/sop-claude-code-guide.md`。
 
@@ -185,24 +247,31 @@ orders，新醫囑 prepend、status 變動（未執行→正式報告）in-place
 
 ## 工作協定（給 Claude — Cowork 與 Code 模式皆適用）
 
-本 repo 正在從「僅支援透析」擴展為「多疾病 group 框架」（dialysis / CKD /
-DM / COPD），各 group 各自維護病人清單。Disease 模組將位於 `groups/`，
-透過 `// __HOSPITAL_LAB_GROUPS_BEGIN__ / END__` 標記內嵌進
-`hospital-lab-data.html`（與目前 patterns 區塊相同手法）。
+本 repo 已過 Phase 1（2026-05-08）：單檔 monolith → `core/` 模組 +
+`build.js` pipeline。Phase 3+ 將加 CKD / DM / ESRD（各 group 各自維護
+病人清單，core/* 不需動）。
 
 ### 每次修改後必做（順序不可顛倒）
 
-1. **若需要新 pattern**：先到 `hospital-lab-patterns` 修改 → push →
-   再回本 repo `node sync-patterns.js`。**不要**手改
-   `hospital-lab-data.html` 裡標記之間的 pattern 區塊。
-2. **若改到 `groups/<disease>.js`**：跑 sync 重新打包進 HTML。
-3. **驗收**：直接用瀏覽器開 `hospital-lab-data.html` →
-   - 既有病人清單仍然正常
-   - 至少測一筆病人 chartNo 抓 lab → 渲染 → 匯出 CSV
-   - 開檔比對 CSV 內容（refactor 階段必須與 refactor 前一致）
-4. **更新 WORKLOG.md**：在最頂端新增條目，**繁體中文**。格式見下方。
-   一定要標明影響哪個 group（`dialysis | ckd | dm | copd | shell | core`）。
-5. **提示提交**：
+1. **若需要新 pattern**：先到 `hospital-lab-patterns` 修改 → `npm run release`
+   → commit + push → 回本 repo `node sync-patterns.js`（會自動 chain
+   到 `build.js`，順手重產 `hospital-lab-dialysis.html`）。**不要**手改
+   `hospital-lab-data.html` 裡標記之間的 pattern 區塊（sync 會覆蓋），
+   也**不要**手改 `hospital-lab-dialysis.html`（每次 build 會被覆寫）。
+2. **若改到 `groups/<disease>.js`**：跑 `node sync-patterns.js` 重新打包
+   進兩個 HTML（legacy + built）。
+3. **若改到 `core/*.js` / `core/*.html` / `core/styles.css` / `export-formats/*.js`**：
+   跑 `node build.js dialysis` 重產 built HTML（不影響 legacy）。
+4. **驗收**：用瀏覽器開 `hospital-lab-dialysis.html`（**主要驗收對象**） →
+   - 既有病人清單仍然正常（localStorage 不丟）
+   - 至少測一筆病人 chartNo 抓 lab → 渲染 → 匯出 CSV / 匯出 KiDiTi
+   - 勾選部分病患匯出，確認只匯出勾選的
+   - 開檔比對 CSV / KiDiTi 內容（refactor 階段必須 byte-identical 或
+     差異有清楚理由）
+5. **更新 WORKLOG.md**：在最頂端新增條目，**繁體中文**。格式見下方。
+   一定要標明影響哪個 group / 範圍（`dialysis | ckd | dm | esrd | shell |
+   core | export-formats | sync-script | build`）。
+6. **提示提交**：
 
    > 變更已完成，sync 已跑、瀏覽器手動測過。
    > 建議 commit message：`<scope>: <一句話說明>`
@@ -230,7 +299,7 @@ DM / COPD），各 group 各自維護病人清單。Disease 模組將位於 `gro
 - PowerShell：`Get-Date -Format yyyy-MM-dd`
 - bash：`date +%Y-%m-%d`
 
-### CSV 匯出格式（revision 1, 2026-05-04 版）
+### CSV 匯出格式（revision 1, 2026-05-04 版 — long format）
 
 **Long format**：1 row = (chartNo × YYYYMM)。Wide-format（1 row/draw）
 已不採用。
@@ -247,9 +316,51 @@ URR.value, URR.unit, URR.lower, URR.higher
 （`lower` 在 `higher` 之前，符合自然閱讀方向）。
 
 `lower` / `higher` 來自 catalog entry 的 `lo` / `hi`。空值就保持空格，
-不要塞 `N/A` 或前一個月的值。
+不要塞 `N/A` 或前一個月的值。按鈕：「匯出csv」。**不再有 JSON 匯出/匯入。**
 
-唯一一個匯出按鈕：「匯出 CSV」。**不再有 JSON 匯出/匯入。**
+### KiDiTi 檢驗記錄匯出（Phase 2, 2026-05-08）
+
+獨立按鈕「匯出KiDiTi資料」產出 KiDiTi 平台規格的 58 欄 positional CSV。
+程式碼在 `export-formats/kiditi-csv.js`：
+
+- UTF-8 with BOM、CRLF、**無 header row**、逗號分隔、檔名
+  `KiDiTi_檢驗記錄_YYYYMMDD.csv`
+- 58 個 positional 欄位（順序固定，索引對應規格表）
+- 日期欄位民國年 7 碼 RRRMMDD（如 `1140507` = 2025-05-07）
+- HBsAg / Anti-HCV：Reactive→`Y`、Non-Reactive→`N`、缺值→`O`（未做）
+- 數值欄位 `N x.y` → `toFixed(y)`；缺值 / 非數值 → 空字串（**不可填 0**，
+  KiDiTi 規格「填 0 會列入統計」）
+- UIBC = TIBC − Fe、Ca×P = Ca × P 在 export 函式 inline 計算（不污染
+  `computeDerivedValues`，不影響 viewer）
+- 月檢辨識重用 `DIALYSIS_GROUP.detectMonthlyDrawsFromStored` +
+  `pickEarliestPerMonth` — KiDiTi 與 long-format CSV 日期對齊
+- 規格 xls 在 `docs/format-specs/dialysis/dialysis資料轉入格式說明.xls`
+
+### 病患勾選匯出（Phase 1.5, 2026-05-08）
+
+病患清單表最左加 `_select` checkbox 欄（width 36px、不參與 sort/filter）。
+程式碼在 `core/ui-patient-list.js`（Phase 1.5 段）：
+
+- `selectedPatients = new Set()` 在 in-memory（**不**持久化 — 重整即清
+  是預期行為）
+- 5 個 helper：`toggleSelectAll`（只動可見列）、`togglePatientSelect`、
+  `updateSelectState`（同步 master checkbox 的 checked / indeterminate）、
+  `updateSelectUI`（按鈕文字加 `(N)` 提示）、`getSelectedChartNos`（回
+  array 或 null）
+- `exportKiDiTiCSV` / `exportCombinedCSV` 都先呼叫 `getSelectedChartNos()`：
+  null → 全部、array → 只匯這些
+- `confirmRemovePatient` 順手 `selectedPatients.delete(chartno)`
+- `renderPatientList` 渲染後呼叫 `updateSelectState()`（filter / sort 後
+  勾選狀態維持）
+
+### Button bar 三顆按鈕（Phase 2 + 1.5）
+
+```
+[新增清單(綠)]                 [全部更新(藍, 大)] gap [匯出KiDiTi資料(橘, 大)] [匯出csv(橘, 大)]
+```
+
+「全部更新」（原「更新資料」改名）放大成 primary action 級別；右組三顆
+同 size。勾選病患後按鈕文字加 `(N)` 計數。
 
 ### Demographics 自動填入
 
@@ -374,11 +485,19 @@ localStorage（或 chrome.storage.local）：
 
 - 不要自動 `git push`
 - 不要刪除 WORKLOG.md 既有條目
+- **不要手改 `hospital-lab-dialysis.html`** — 每次 `node build.js dialysis`
+  會被覆寫；改原始檔（`core/*.js` / `groups/*.js` / `export-formats/*.js`
+  / `core/{shell,body}.html` / `core/styles.css`）然後 build
 - 不要手改 `hospital-lab-data.html` 內
   `__HOSPITAL_LAB_PATTERNS_BEGIN/END__` 之間的內容（sync 會覆蓋）
-- 將來 groups 區塊上線後也不要手改
-  `__HOSPITAL_LAB_GROUPS_BEGIN/END__` 之間的內容
-- 不要將不同 disease group 的病人清單合併儲存
+- 不要手改 `__HOSPITAL_LAB_GROUPS_BEGIN/END__` 之間的內容（sync 會覆蓋）
+- 不要刪 legacy `hospital-lab-data.html`（過渡期保留 reference）
+- 不要在 `core/*.js` 加 IIFE / module wrapper — 設計就是頂層宣告 + concat，
+  加 wrapper 會破壞 hoist 行為與 monolith 的 byte-identical 對齊
+- 不要把不同 disease group 的病人清單合併儲存（`patients_<id>` /
+  `labs_<id>` 各自獨立是設計需求）
+- 不要把 `enrichCache` 改回 per-disease（2026-05-08 已 disease-neutral，
+  CKD/DM HTML 共用同一份 sub-page text 是正確的）
 - 不要 commit 真實病人 HTML / JSON 匯出檔
-- 不要在 refactor 階段（Step 1〜3）改變現有透析行為 — 必須 byte-identical
-  或差異有清楚理由
+- 不要在 refactor 階段改變現有透析行為 — 必須 byte-identical 或差異有
+  清楚理由
