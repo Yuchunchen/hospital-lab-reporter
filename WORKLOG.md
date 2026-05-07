@@ -1,5 +1,77 @@
 # WORKLOG
 
+## 2026-05-08 — Phase 1: repo restructure（core/ + build.js + 1900 行 JS 拆 16 模組）
+
+- 作者：claude（與 YC 共同）
+- 範圍：core / dialysis（單檔 monolith → core/ 模組 + build pipeline）
+- 變更：新增 + 修改
+- 檔案：
+  - 新：`core/styles.css`、`core/shell.html`、`core/body.html`、
+    `core/{storage,chart-format,date-utils,fetch,indexeddb-cache,enrichment,
+    lab-extract,compute,ui-tabs,ui-patient-list,ui-remove-patient,
+    ui-patient-crud,ui-lab-view,ui-settings,export-utils,init}.js`
+    （16 個 .js + 3 個 template/css）、`export-formats/kiditi-csv.js`、
+    `build.js`、`hospital-lab-dialysis.html`（build 產出）
+  - 改：`sync-patterns.js`（sync 完順手呼叫 `build.js` 的 `buildOne()`
+    重產所有 disease HTML）、`package.json`（加 `build` /
+    `build:dialysis` / `sync-and-build` scripts）
+- 原因：`hospital-lab-data.html` 累積到 ~3700 行（含 Phase 2 KiDiTi 匯出 +
+  Phase 1.5 checkbox 勾選），單檔很難 review/diff，也阻擋 Phase 3+ 多
+  disease（CKD / DM / ESRD）共用 core 邏輯。Phase 1 把 ~1900 行手寫
+  JS 抽到 core/，加上 `build.js` 把 core + groups + patterns +
+  export-formats 串成獨立 standalone HTML（`file://` 開即可）。
+- 具體決策：
+  - **不用 ES modules / bundler**：core/*.js 都是頂層 function 宣告，
+    build 時依固定順序 concatenate 成單一 `<script>` 區塊，跨模組呼叫
+    自動可見（top-level fn declarations hoist）。比 IIFE + `LabCore.X`
+    namespace 簡單、跟 monolith 行為 1:1 對齊（風險最低）。
+  - **byte-identical 行為**：每個 core/*.js 都是 `hospital-lab-data.html`
+    的 contiguous line range 逐字 copy（用 throwaway `__split.js` 一次
+    切完，避免手抄錯）。`groups/dialysis.js` 完全不動。
+  - **build.js disease 配置** — 目前只有 dialysis：
+    ```js
+    DISEASES = { dialysis: { title, groupId:'dialysis', exportFormats:['kiditi-csv'] } }
+    ```
+    Phase 3 / 4 / 5 加 ckd / dm / esrd 配置，core/ 不需動。
+  - **patterns + groups**：build.js 直接 read sibling repo 的
+    `patterns/{catalog,reporter,normalizers}.js` 與本 repo `groups/*.js`，
+    不依賴 markers（產出 HTML 沒有 markers，是 throwaway artifact）。
+    sync-patterns.js 仍維護 legacy `hospital-lab-data.html`（過渡期保留）。
+  - **disease init block** 目前只是 placeholder 註解；storage.js 沿用
+    `const ACTIVE_GROUP_ID = 'dialysis';` 硬碼。Phase 3 引入第二個
+    disease 時再改 storage.js 讀 `window.ACTIVE_GROUP_ID`，由 build
+    inject — 保留 Phase 1 byte-identity。
+  - **新檔案 core/date-utils.js** 額外加 canonical `toMinguoDate` /
+    `todayStr`（原本 `_kdtToMinguoDate` 私有 helper 留在 kiditi-csv.js
+    不動，未來 cleanup 可整併；`todayStr` 從 export-utils 區段挪過來，
+    避免 duplicate definition）。
+  - **CORE_ORDER**：load order 大致按依賴（storage → date-utils →
+    fetch → indexeddb → enrichment → lab-extract → compute → UI → init）。
+    function 宣告自動 hoist，所以順序主要是給 IIFE
+    （`migrateLegacyStorage` / `dropLegacyOrdersCache`）一個合理的執行
+    順序。`init.js` 必為最後（DOMContentLoaded handler 要看得到所有 helper）。
+- 驗證：
+  - `node build.js dialysis` → 產出 `hospital-lab-dialysis.html`（152.8 KB）
+  - 抽出 `<script>` 跑 `node -c` syntax check → 通過
+  - 自動驗證腳本確認：(1) KiDiTi row literal 仍 58 欄；(2) body 裡 7 個
+    inline `onclick`/`onchange`/`oninput` handler 全部對應到 top-level
+    function 宣告；(3) 29 個關鍵 function（loadPatients、fetchAllOrders、
+    fetchIncremental、fetchAndStore、exportKiDiTiCSV、exportCombinedCSV、
+    toggleSelectAll、getSelectedChartNos、computeDerivedValues、
+    enrichMissingValues、ordersCacheGet/Put、escHtml、setStatus、
+    showToast、switchTab、saveSettings、downloadBlob、todayStr、
+    toMinguoDate 等）全部在 concatenated script 裡找得到；
+    (4) `computeDerivedValues` 只定義一次（split 後沒重複）。
+- 待 YC 在實機驗收：
+  - `hospital-lab-dialysis.html` 與 `hospital-lab-data.html` 並排開啟
+    比對：病患清單、檢驗資料 table、KiDiTi 匯出、CSV 匯出、checkbox
+    勾選、incremental fetch、sub-page enrichment、IndexedDB cache、
+    `<2` detection-limit 顯示、settings 儲存等行為一致；
+  - `node sync-patterns.js` 一次同步 legacy + 重產 dialysis HTML。
+- 相依：本 repo 內部 refactor，**不需** patterns repo 改動，**不動**
+  `groups/dialysis.js`。Legacy `hospital-lab-data.html` 保留不刪
+  （migration 期間並存）。
+
 ## 2026-05-08 — Phase 1.5: 病患勾選匯出（checkbox）
 
 - 作者：claude（與 YC 共同）

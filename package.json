@@ -5,7 +5,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build": "node build.js",
+    "build:dialysis": "node build.js dialysis",
+    "sync": "node sync-patterns.js",
+    "sync-and-build": "node sync-patterns.js"
   },
   "dependencies": {
     "express": "^4.21.0",

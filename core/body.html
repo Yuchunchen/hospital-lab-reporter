@@ -1,0 +1,117 @@
+<body>
+
+<!-- ═══ Header ════════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <h1>洗腎室檢驗資料管理</h1>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="switchTab('patients')" title="病患清單">&#128100;</button>
+    <button class="btn-icon" onclick="switchTab('settings')" title="設定">&#9881;</button>
+  </div>
+</header>
+
+<!-- ═══ Toast Container ══════════════════════════════════════════════════════ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══ Main Container ════════════════════════════════════════════════════════ -->
+<div class="container">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="patients" onclick="switchTab('patients')">病患清單</button>
+    <button class="tab-btn" data-tab="labview" onclick="switchTab('labview')">檢驗資料</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">設定</button>
+  </div>
+
+  <!-- ═══ Tab: Patient List ════════════════════════════════════════════════── -->
+  <div class="tab-panel active" id="tab-patients">
+    <div class="card">
+      <div class="card-header">
+        <span>病患清單</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group" style="margin-bottom:8px">
+          <label>病歷號清單（一行一個，或以逗號 / 分號 / 空白分隔）</label>
+          <textarea id="chartnoInput" rows="3"
+            style="width:100%; padding:8px 10px; border:1px solid #ced4da; border-radius:4px; font-family:inherit; font-size:13px; resize:vertical;"
+            placeholder="000105069H&#10;000810385G"></textarea>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap">
+          <div style="display:flex; gap:8px">
+            <button class="btn btn-success btn-sm" id="btnAddToList" onclick="addAndUpdateFromInput()">新增清單</button>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center">
+            <button class="btn btn-primary" id="btnRefreshList" onclick="refreshExistingPatients()"
+              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(52,152,219,0.35); margin-right:16px;">全部更新</button>
+            <button class="btn btn-warning" id="btnExportKiDiTi" onclick="exportKiDiTiCSV()"
+              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出KiDiTi資料</button>
+            <button class="btn btn-warning" id="btnExportCSV" onclick="exportCombinedCSV()"
+              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出csv</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;border-top:1px solid #e9ecef">
+        <table class="patient-table">
+          <thead id="patientHead"></thead>
+          <tbody id="patientBody"></tbody>
+        </table>
+      </div>
+      <div class="status-bar" id="statusBar">就緒</div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab: Lab View ════════════════════════════════════════════════════── -->
+  <div class="tab-panel" id="tab-labview">
+    <div class="card">
+      <div class="card-header">
+        <div class="patient-detail-header" id="labPatientHeader" style="border:none;margin:0;padding:0">
+          <h2 id="labPatientName">請選擇病患</h2>
+          <span class="meta" id="labPatientMeta"></span>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-outline btn-sm" onclick="switchTab('patients')">返回清單</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="lab-wrapper" id="labTableWrapper">
+          <p class="text-center text-muted">請從病患清單點選病患以查看檢驗資料</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab: Settings ════════════════════════════════════════════════════── -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card settings-panel">
+      <div class="card-header"><span>系統設定</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>API Base URL</label>
+          <input type="text" id="settingBaseUrl" placeholder="http://ernode.vghb12.vhtt.gov.tw:8000">
+        </div>
+        <div class="form-group">
+          <label>操作人員代號 (OPSID)</label>
+          <input type="text" id="settingOpsid" placeholder="A123456789">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">儲存設定</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ Confirm Modal ═════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal" style="width:340px">
+    <div class="modal-header">
+      <span>確認刪除</span>
+      <button class="modal-close" onclick="closeConfirm()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg">確定要刪除此病患嗎？</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger btn-sm" id="confirmOkBtn">確定刪除</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,3886 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>洗腎室檢驗資料管理</title>
+<style>
+/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Segoe UI', Arial, sans-serif;
+  background: #f0f4f8; color: #2c3e50; line-height: 1.5; font-size: 14px;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────────────── */
+.app-header {
+  background: linear-gradient(135deg, #1a5276, #2980b9);
+  color: #fff; padding: 12px 24px; display: flex; align-items: center;
+  justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.app-header h1 { font-size: 20px; font-weight: 600; letter-spacing: 1px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ─── Buttons ──────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer;
+  font-size: 13px; font-family: inherit; transition: all .15s;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn-primary   { background: #2980b9; color: #fff; }
+.btn-success   { background: #27ae60; color: #fff; }
+.btn-warning   { background: #e67e22; color: #fff; }
+.btn-danger    { background: #c0392b; color: #fff; }
+.btn-secondary { background: #95a5a6; color: #fff; }
+.btn-outline   { background: transparent; border: 1px solid #bdc3c7; color: #2c3e50; }
+.btn-outline:hover { background: #ecf0f1; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-icon { padding: 6px 8px; font-size: 16px; background: transparent; color: #fff; border: none; cursor: pointer; }
+.btn-icon:hover { background: rgba(255,255,255,.15); border-radius: 4px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── Layout ───────────────────────────────────────────────────────────────── */
+.container { max-width: 1400px; margin: 0 auto; padding: 16px 24px; }
+.card {
+  background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  margin-bottom: 16px; overflow: hidden;
+}
+.card-header {
+  background: #f8f9fa; padding: 10px 16px; border-bottom: 1px solid #e9ecef;
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; font-size: 15px;
+}
+.card-body { padding: 16px; }
+
+/* ─── Tabs ─────────────────────────────────────────────────────────────────── */
+.tabs { display: flex; border-bottom: 2px solid #e9ecef; margin-bottom: 16px; }
+.tab-btn {
+  padding: 8px 20px; border: none; background: transparent; cursor: pointer;
+  font-size: 14px; font-family: inherit; color: #7f8c8d;
+  border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .2s;
+}
+.tab-btn.active { color: #1a5276; border-bottom-color: #1a5276; font-weight: 600; }
+.tab-btn:hover:not(.active) { color: #2c3e50; background: #f8f9fa; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ─── Patient Table ────────────────────────────────────────────────────────── */
+.patient-table { width: 100%; border-collapse: collapse; }
+.patient-table th {
+  background: #1a5276; color: #fff; padding: 8px 12px; text-align: left;
+  font-weight: 500; font-size: 13px; white-space: nowrap;
+}
+.patient-table td {
+  padding: 8px 12px; border-bottom: 1px solid #e9ecef; font-size: 13px;
+}
+.patient-table tr:hover td { background: #eaf2f8; }
+.patient-table .actions { white-space: nowrap; }
+.patient-table th.sortable { cursor: pointer; user-select: none; }
+.patient-table th.sortable:hover { background: #154360; }
+.patient-table th .sort-ind { font-size: 11px; opacity: .85; margin-left: 4px; }
+.patient-table tr.filter-row th {
+  background: #ecf0f1; padding: 4px 6px; font-weight: 400;
+}
+.patient-table tr.filter-row input,
+.patient-table tr.filter-row select {
+  width: 100%; padding: 3px 6px; font-size: 12px; font-family: inherit;
+  border: 1px solid #bdc3c7; border-radius: 3px; background: #fff; color: #2c3e50;
+}
+.patient-table .row-actions { display: inline-flex; gap: 4px; }
+.patient-table .row-actions .btn { padding: 3px 8px; font-size: 12px; line-height: 1; }
+.patient-table .row-actions .btn:disabled { opacity: .5; cursor: wait; }
+
+/* ─── Lab Data Table ───────────────────────────────────────────────────────── */
+.lab-wrapper { overflow-x: auto; }
+.lab-table { border-collapse: collapse; min-width: 100%; font-size: 12px; }
+.lab-table th, .lab-table td {
+  padding: 4px 8px; border: 1px solid #ddd; white-space: nowrap;
+}
+.lab-table thead th {
+  background: #1a5276; color: #fff; position: sticky; top: 0; z-index: 2;
+  font-weight: 500;
+}
+.lab-table .row-category {
+  background: #2c3e50; color: #fff; font-weight: 600; text-align: left;
+}
+.lab-table .row-item td:first-child {
+  background: #f8f9fa; font-weight: 500; position: sticky; left: 0; z-index: 1;
+  min-width: 120px; border-right: 2px solid #bdc3c7;
+}
+.lab-table .row-item td:nth-child(2) {
+  background: #f8f9fa; position: sticky; left: 120px; z-index: 1;
+  min-width: 90px; border-right: 2px solid #bdc3c7; color: #7f8c8d; font-size: 11px;
+}
+.val-hi { color: #c0392b; font-weight: 700; }
+.val-lo { color: #2471a3; font-weight: 700; }
+.val-q-pos { color: #c0392b; font-weight: 700; }
+.val-q-neg { color: #27ae60; }
+.latest-col { background: rgba(255,235,59,.1); }
+
+/* ─── Modal ────────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex;
+  align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: #fff; border-radius: 8px; width: 420px; max-width: 95vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-header {
+  padding: 14px 20px; border-bottom: 1px solid #e9ecef;
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 600; font-size: 16px;
+}
+.modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #7f8c8d; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid #e9ecef; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ─── Form ─────────────────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #34495e; }
+.form-group input, .form-group select {
+  width: 100%; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 4px;
+  font-size: 13px; font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #2980b9; box-shadow: 0 0 0 2px rgba(41,128,185,.2); }
+
+/* ─── Status bar ───────────────────────────────────────────────────────────── */
+.status-bar {
+  padding: 8px 16px; font-size: 12px; color: #7f8c8d;
+  border-top: 1px solid #e9ecef; background: #f8f9fa;
+}
+.status-bar .spinner { display: inline-block; width: 12px; height: 12px;
+  border: 2px solid #bdc3c7; border-top-color: #2980b9; border-radius: 50%;
+  animation: spin .6s linear infinite; margin-right: 6px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Settings panel ──────────────────────────────────────────────────────── */
+.settings-panel { max-width: 500px; }
+
+/* ─── Misc ─────────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-am { background: #fdebd0; color: #e67e22; }
+.badge-pm { background: #d5f5e3; color: #27ae60; }
+.badge-135 { background: #d6eaf8; color: #2980b9; }
+.badge-246 { background: #fadbd8; color: #c0392b; }
+.text-muted { color: #95a5a6; }
+.text-center { text-align: center; }
+.mt-8 { margin-top: 8px; }
+.mb-8 { margin-bottom: 8px; }
+.gap-8 { gap: 8px; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+
+/* ─── Patient detail header ────────────────────────────────────────────────── */
+.patient-detail-header {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+  padding-bottom: 12px; border-bottom: 2px solid #e9ecef;
+}
+.patient-detail-header h2 { font-size: 18px; }
+.patient-detail-header .meta { font-size: 13px; color: #7f8c8d; }
+
+/* ─── KtV / URR computed row ───────────────────────────────────────────────── */
+.computed-row { background: #fffde7; }
+
+/* ─── Toast ────────────────────────────────────────────────────────────────── */
+.toast-container { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 10px 16px; border-radius: 6px; color: #fff; font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15); animation: toastIn .3s ease;
+  max-width: 360px;
+}
+.toast-success { background: #27ae60; }
+.toast-error { background: #c0392b; }
+.toast-info { background: #2980b9; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+
+</style>
+</head>
+<body>
+
+<!-- ═══ Header ════════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <h1>洗腎室檢驗資料管理</h1>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="switchTab('patients')" title="病患清單">&#128100;</button>
+    <button class="btn-icon" onclick="switchTab('settings')" title="設定">&#9881;</button>
+  </div>
+</header>
+
+<!-- ═══ Toast Container ══════════════════════════════════════════════════════ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══ Main Container ════════════════════════════════════════════════════════ -->
+<div class="container">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="patients" onclick="switchTab('patients')">病患清單</button>
+    <button class="tab-btn" data-tab="labview" onclick="switchTab('labview')">檢驗資料</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">設定</button>
+  </div>
+
+  <!-- ═══ Tab: Patient List ════════════════════════════════════════════════── -->
+  <div class="tab-panel active" id="tab-patients">
+    <div class="card">
+      <div class="card-header">
+        <span>病患清單</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group" style="margin-bottom:8px">
+          <label>病歷號清單（一行一個，或以逗號 / 分號 / 空白分隔）</label>
+          <textarea id="chartnoInput" rows="3"
+            style="width:100%; padding:8px 10px; border:1px solid #ced4da; border-radius:4px; font-family:inherit; font-size:13px; resize:vertical;"
+            placeholder="000105069H&#10;000810385G"></textarea>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap">
+          <div style="display:flex; gap:8px">
+            <button class="btn btn-success btn-sm" id="btnAddToList" onclick="addAndUpdateFromInput()">新增清單</button>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center">
+            <button class="btn btn-primary" id="btnRefreshList" onclick="refreshExistingPatients()"
+              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(52,152,219,0.35); margin-right:16px;">全部更新</button>
+            <button class="btn btn-warning" id="btnExportKiDiTi" onclick="exportKiDiTiCSV()"
+              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出KiDiTi資料</button>
+            <button class="btn btn-warning" id="btnExportCSV" onclick="exportCombinedCSV()"
+              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出csv</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;border-top:1px solid #e9ecef">
+        <table class="patient-table">
+          <thead id="patientHead"></thead>
+          <tbody id="patientBody"></tbody>
+        </table>
+      </div>
+      <div class="status-bar" id="statusBar">就緒</div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab: Lab View ════════════════════════════════════════════════════── -->
+  <div class="tab-panel" id="tab-labview">
+    <div class="card">
+      <div class="card-header">
+        <div class="patient-detail-header" id="labPatientHeader" style="border:none;margin:0;padding:0">
+          <h2 id="labPatientName">請選擇病患</h2>
+          <span class="meta" id="labPatientMeta"></span>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-outline btn-sm" onclick="switchTab('patients')">返回清單</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="lab-wrapper" id="labTableWrapper">
+          <p class="text-center text-muted">請從病患清單點選病患以查看檢驗資料</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab: Settings ════════════════════════════════════════════════════── -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card settings-panel">
+      <div class="card-header"><span>系統設定</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>API Base URL</label>
+          <input type="text" id="settingBaseUrl" placeholder="http://ernode.vghb12.vhtt.gov.tw:8000">
+        </div>
+        <div class="form-group">
+          <label>操作人員代號 (OPSID)</label>
+          <input type="text" id="settingOpsid" placeholder="A123456789">
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">儲存設定</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ Confirm Modal ═════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal" style="width:340px">
+    <div class="modal-header">
+      <span>確認刪除</span>
+      <button class="modal-close" onclick="closeConfirm()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg">確定要刪除此病患嗎？</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger btn-sm" id="confirmOkBtn">確定刪除</button>
+    </div>
+  </div>
+</div>
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════════════
+// PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
+//   Synced at: 2026-05-07T18:03:01.877Z
+// ════════════════════════════════════════════════════════════════════════════
+'use strict';
+
+/**
+ * catalog.js — Master human-readable catalog of every lab/imaging entry
+ * we know how to detect from the ernode API.
+ *
+ * Goals:
+ *   1. Single source of truth: every test pattern lives here ONCE.
+ *   2. Human-readable: organised by clinical category with comments.
+ *   3. Universal fields only — NO app-specific layout (page/col/section/cat).
+ *      Each consuming app (viewer / reporter) has its own manifest that
+ *      picks ids from this catalog and adds layout / overrides.
+ *
+ * "Track-only" patterns (detect but don't render anywhere) just live here
+ * and aren't referenced by any manifest.
+ *
+ * See ../docs/pattern-spec.md for field definitions, ../docs/learning-workflow.md
+ * for the Claude-driven recipe to add new entries.
+ */
+
+const CATALOG = [
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HEMATOLOGY (CBC)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'WBC',
+    pattern: /WBC:\s*([<>]?\s*[\d.]+)(?!\s*[-–]\s*\d)/,
+    displayName:'白血球 (WBC)', shortLabel:'WBC',
+    unit:'×10³/µL', category:'血液',
+    ref:'4.0–11.0 ×10³/µL',
+    refLo:4.0, refHi:11.0, hi:11, lo:4,
+    normalize: 'wbcCount',
+    notes:'Negative lookahead in pattern rejects urine routine "WBC: 0-5". Normalize handles /µL (e.g. 6700) → ×10³/µL (6.7).' },
+
+  { id:'RBC',
+    pattern: /\bRBC:\s*([<>]?\s*[\d.]+)/,
+    displayName:'紅血球 (RBC)', shortLabel:'RBC',
+    unit:'×10⁶/µL', category:'血液',
+    ref:'男 4.2–6.2，女 3.7–5.5 ×10⁶/µL',
+    refLo:3.7, refHi:6.2,
+    loM:4.2, hiM:6.2, loF:3.7, hiF:5.5,
+    lo:3.7, hi:6.2 },
+
+  { id:'Hb',
+    pattern: /(?:Hb|HGB):\s*([<>]?\s*[\d.]+)/,
+    displayName:'血色素 (Hemoglobin)', shortLabel:'Hb',
+    unit:'g/dL', category:'血液',
+    ref:'男 14–18，女 12–16 g/dL',
+    refLo:12, refHi:18,
+    loM:14, hiM:18, loF:12, hiF:16,
+    lo:12, hi:18,
+    notes:'Pattern matches both "Hb:" and "HGB:" labels.' },
+
+  { id:'HCT',
+    pattern: /HCT:\s*([<>]?\s*[\d.]+)/,
+    displayName:'血比容 (HCT)', shortLabel:'HCT',
+    unit:'%', category:'血液',
+    ref:'男 39–53，女 33–47 %',
+    refLo:33, refHi:53,
+    loM:39, hiM:53, loF:33, hiF:47,
+    lo:33, hi:53 },
+
+  { id:'MCV',
+    pattern: /MCV:\s*([<>]?\s*[\d.]+)/,
+    displayName:'平均紅血球容積 (MCV)', shortLabel:'MCV',
+    unit:'fL', category:'血液',
+    ref:'79–99 fL',
+    refLo:79, refHi:99, hi:99, lo:79 },
+
+  { id:'Platelet',
+    pattern: /Platelet:\s*([<>]?\s*[\d.]+)/,
+    displayName:'血小板 (Platelet)', shortLabel:'PLT',
+    unit:'×10³/µL', category:'血液',
+    ref:'150–400 ×10³/µL',
+    refLo:150, refHi:400, hi:400, lo:150,
+    normalize: 'plateletCount',
+    notes:'Normalize handles /µL (e.g. 250000) → ×10³/µL (250).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PROTEINS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'TP',
+    pattern: /Total protein\(serum\):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'總蛋白 (Total Protein)', shortLabel:'TP',
+    unit:'g/dL', category:'蛋白質',
+    ref:'6.0–8.3 g/dL',
+    refLo:6.0, refHi:8.3, hi:8.3, lo:6.0 },
+
+  { id:'Albumin',
+    pattern: /(?:^|[\s;])Albumin(?:\([^)]*\))?:\s*([<>]?\s*[\d.]+)/i,
+    displayName:'白蛋白 (Albumin)', shortLabel:'Alb',
+    unit:'g/dL', category:'蛋白質',
+    ref:'3.5–5.0 g/dL',
+    refLo:3.5, refHi:5.0, hi:5.0, lo:3.5,
+    meaning:'營養狀態指標',
+    notes:'Boundary requirement (^ or whitespace/semicolon) prevents matching "U-Albumin:" or "Microalbumin:".' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIVER FUNCTION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'GOT',
+    pattern: /GOT:\s*([<>]?\s*[\d.]+)/,
+    displayName:'天門冬胺酸轉氨酶 (GOT / AST)', shortLabel:'GOT/AST',
+    unit:'U/L', category:'肝功能',
+    ref:'5–34 U/L',
+    refLo:5, refHi:34, hi:34, lo:null },
+
+  { id:'GPT',
+    pattern: /GPT:\s*([<>]?\s*[\d.]+)/,
+    displayName:'丙胺酸轉氨酶 (GPT / ALT)', shortLabel:'GPT/ALT',
+    unit:'U/L', category:'肝功能',
+    ref:'男<45，女<34 U/L',
+    refLo:7, refHi:45,
+    hiM:45, hiF:34,
+    hi:45, lo:null },
+
+  { id:'RGT',
+    pattern: /(?:r-?GT|R-?GT|γ-?GT|GGT|RGT):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'γ-麩胺醯轉移酶 (r-GT / GGT)', shortLabel:'r-GT',
+    unit:'U/L', category:'肝功能',
+    ref:'男 < 55，女 < 38 U/L',
+    refLo:0, refHi:55,
+    hiM:55, hiF:38,
+    hi:55, lo:null,
+    notes:'Pattern matches r-GT, R-GT, γ-GT, GGT, RGT — hospitals use various labels.' },
+
+  { id:'ALP',
+    pattern: /(?:Alk[\s.\-]*P|ALP|Alkaline\s*Phosphatase):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'鹼性磷酸酶 (Alk-P / ALP)', shortLabel:'Alk-P',
+    unit:'U/L', category:'肝功能',
+    ref:'40–130 U/L',
+    refLo:34, refHi:130, hi:130, lo:34 },
+
+  { id:'TBIL',
+    pattern: /T-BIL:\s*([<>]?\s*[\d.]+)/,
+    displayName:'總膽紅素 (T-BIL)', shortLabel:'T-BIL',
+    unit:'mg/dL', category:'肝功能',
+    ref:'0.3–1.0 mg/dL',
+    refLo:0.3, refHi:1.0, hi:1.0, lo:null },
+
+  { id:'DBIL',
+    pattern: /D-BIL:\s*([<>]?\s*[\d.]+)/,
+    displayName:'直接膽紅素 (D-BIL)', shortLabel:'D-BIL',
+    unit:'mg/dL', category:'肝功能',
+    ref:'0.03–0.18 mg/dL',
+    refLo:0.03, refHi:0.18, hi:0.18, lo:null },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIPIDS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'CHOL',
+    pattern: /CHOL:\s*([<>]?\s*[\d.]+)/,
+    displayName:'總膽固醇 (Cholesterol)', shortLabel:'CHOL',
+    unit:'mg/dL', category:'血脂',
+    ref:'< 200 mg/dL',
+    refLo:null, refHi:200, hi:200, lo:null },
+
+  { id:'HDLC',
+    pattern: /HDLC:\s*([<>]?\s*[\d.]+)/,
+    displayName:'高密度膽固醇 (HDL)', shortLabel:'HDL',
+    unit:'mg/dL', category:'血脂',
+    ref:'男 >40 mg/dL',
+    refLo:40, refHi:null, hi:null, lo:40,
+    meaning:'俗稱「好膽固醇」' },
+
+  { id:'LDL',
+    pattern: /LDL-C:\s*([<>]?\s*[\d.]+)/,
+    displayName:'低密度膽固醇 (LDL)', shortLabel:'LDL-C',
+    unit:'mg/dL', category:'血脂',
+    ref:'< 130 mg/dL',
+    refLo:null, refHi:130, hi:130, lo:null,
+    meaning:'俗稱「壞膽固醇」' },
+
+  { id:'TG',
+    pattern: /Triglyceride:\s*([<>]?\s*[\d.]+)/,
+    displayName:'三酸甘油脂 (Triglyceride)', shortLabel:'TG',
+    unit:'mg/dL', category:'血脂',
+    ref:'< 150 mg/dL',
+    refLo:null, refHi:150, hi:150, lo:null },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // GLUCOSE
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'GluAC',
+    pattern: /(?:Glucose(?:\([^)]*\))?|GLU[\s-]*(?:AC)?|Sugar(?:\([^)]*\))?|AC[\s-]*Sugar|飯前血糖):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'空腹血糖 (AC Sugar)', shortLabel:'空腹血糖',
+    unit:'mg/dL', category:'血糖',
+    ref:'74–100 mg/dL',
+    refLo:74, refHi:100, hi:100, lo:74,
+    notes:'Matches Glucose(...), GLU, GLU-AC, Sugar(...), AC Sugar, 飯前血糖 — many hospital label variants.' },
+
+  { id:'HbA1c',
+    pattern: /HBA[I1]C%?:\s*([<>]?\s*[\d.]+)/i,
+    displayName:'糖化血色素 (HbA1c)', shortLabel:'HbA1c',
+    unit:'%', category:'血糖',
+    ref:'4–6 %',
+    refLo:4, refHi:6, hi:6, lo:null,
+    notes:'Pattern allows HBA1C and HBAIC (some systems print I instead of 1).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RENAL FUNCTION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'BUN',
+    pattern: /BUN:\s*([<>]?\s*[\d.]+)/,
+    displayName:'血尿素氮 (BUN)', shortLabel:'BUN',
+    unit:'mg/dL', category:'腎功能',
+    ref:'男 8.9–20.6，女 7.0–18.7 mg/dL',
+    refLo:7, refHi:25,
+    hiM:20.6, hiF:18.7,
+    hi:25.7, lo:null,
+    notes:'Fallback hi:25.7 is the original soft buffer for unknown gender; known-gender uses hiM/hiF for precision.' },
+
+  // BUN_pre / BUN_post — dialysis-specific. Only the reporter uses these.
+  // The orderNameFilter discriminates pre-dialysis (composite panel
+  // containing comma in orderName) from post-dialysis (standalone "BUN" order).
+  { id:'BUN_pre',
+    pattern: /BUN:\s*([<>]?\s*[\d.]+)/,
+    orderNameFilter: /,/,
+    displayName:'BUN（洗前）', shortLabel:'BUN(洗前)',
+    unit:'mg/dL', category:'腎功能',
+    ref:'7–25 mg/dL',
+    refLo:7, refHi:25, hi:25, lo:7,
+    meaning:'透析前 BUN — 與 BUN_post 配對計算 URR',
+    notes:'Filter selects orders whose orderName contains a comma (composite dialysis panel).' },
+
+  { id:'BUN_post',
+    pattern: /BUN:\s*([<>]?\s*[\d.]+)/,
+    orderNameFilter: /^BUN$/i,
+    displayName:'BUN（洗後）', shortLabel:'BUN(洗後)',
+    unit:'mg/dL', category:'腎功能',
+    ref:'',
+    refLo:null, refHi:null, hi:null, lo:null,
+    meaning:'透析後 BUN — 通常 6–7，與 BUN_pre 配對計算 URR',
+    notes:'Filter selects orders where orderName is exactly "BUN" (standalone post-dialysis draw).' },
+
+  { id:'CREAT',
+    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'肌酸酐 (Creatinine, Cr)', shortLabel:'Cr',
+    unit:'mg/dL', category:'腎功能',
+    ref:'男 0.6–1.2，女 0.5–1.0 mg/dL',
+    refLo:0.5, refHi:1.3,
+    hiM:1.2, hiF:1.0,
+    hi:1.2, lo:null,
+    notes:'Pattern matches "Creatinine(serum):" and "CREAT:" but NOT "Creatinine(24hrs Urine):".' },
+
+  { id:'UA',
+    pattern: /(?:UA|Uric\s*acid):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'尿酸 (Uric acid, UA)', shortLabel:'UA',
+    unit:'mg/dL', category:'腎功能',
+    ref:'男 3.3–7.7，女 2.5–6.2 mg/dL',
+    refLo:2.5, refHi:7.7,
+    hiM:7.7, hiF:6.2,
+    hi:7.7, lo:null },
+
+  { id:'eGFR',
+    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([<>]?\s*[\d.]+)/i,
+    computed:'eGFR',
+    displayName:'腎絲球過濾率 (eGFR)', shortLabel:'eGFR',
+    unit:'mL/min/1.73m²', category:'腎功能',
+    ref:'> 60 mL/min/1.73m²',
+    refLo:60, refHi:null, hi:null, lo:60,
+    meaning:'腎功能指標',
+    notes:'Computed from Creatinine via CKD-EPI 2021 (race-free). Pattern shares Creatinine capture so the same regex works.' },
+
+  { id:'UACR',
+    pattern: /(?:U-?ACR|UACR|Alb(?:umin)?\/Cr(?:eatinine)?|Urine\s*Alb\/Cr):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'尿白蛋白／肌酸酐比 (UACR)', shortLabel:'UACR',
+    unit:'mg/g', category:'腎功能',
+    ref:'< 30 mg/g',
+    refLo:null, refHi:30, hi:30, lo:null,
+    meaning:'腎臟早期傷害指標',
+    subpage: {
+      // Opt-in to enrichMissingValues sub-page chase. orderName signals
+      // that the order is a urine albumin/creatinine panel — broader than
+      // strict matching to handle vhyl/vhtt naming variants.
+      orderNameMatch: /U-?ACR|UACR|microalbumin|micro-?albumin|urine\s*alb|albumin\/cr|alb\/cr|尿.*白蛋白|微量白蛋白/i,
+      // No resultPattern: UACR sub-page already carries the main "UACR:" label.
+    },
+    notes:'Viewer fetches sub-pages from opdweb (1-year window) when UACR not in main reportText. Sub-page chase opt-in via subpage.orderNameMatch (broad urine regex).' },
+
+  { id:'UPCR',
+    pattern: /(?:U-?PCR|UPCR|RATTC|TP\/Cr|Pr(?:otein)?\/Cr(?:eatinine)?|Urine\s*TP\/Cr):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'尿蛋白／肌酸酐比 (UPCR)', shortLabel:'UPCR',
+    unit:'mg/g', category:'腎功能',
+    ref:'< 150 mg/g',
+    refLo:null, refHi:150, hi:150, lo:null,
+    notes:'RATTC label is also used at some sites for total-protein/creatinine ratio.' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // KIDNEY DISEASE STAGING (computed)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'GFRStage',  computed:'GFRStage',  pattern:null,
+    displayName:'GFR 分級 (正常, CKD2-5)', category:'腎臟病分期' },
+
+  { id:'UACRStage', computed:'UACRStage', pattern:null,
+    displayName:'微蛋白尿(UACR)分級 (正常, A2-3)', category:'腎臟病分期' },
+
+  { id:'UPCRStage', computed:'UPCRStage', pattern:null,
+    displayName:'蛋白尿(UPCR)分級 (正常/輕度/顯著/腎病)', category:'腎臟病分期' },
+
+  { id:'KDIGORisk', computed:'KDIGORisk', pattern:null,
+    displayName:'腎臟病風險 (KDIGO, 低/中/高/極高)', category:'腎臟病分期' },
+
+  { id:'TaiwanCKD', computed:'TaiwanCKD', pattern:null,
+    displayName:'慢性腎臟病分期 (正常, 第1~5期)', category:'腎臟病分期' },
+
+  { id:'EarlyCKD',  computed:'EarlyCKD',  pattern:null,
+    displayName:'健保 CKD 分群 (P1早期/P2中晚期)', category:'腎臟病分期' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ELECTROLYTES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'Na',
+    pattern: /NA\(Serum\):\s*([<>]?\s*[\d.]+)/,
+    displayName:'鈉 (Na)', shortLabel:'Na',
+    unit:'mmol/L', category:'電解質',
+    ref:'136–145 mmol/L',
+    refLo:136, refHi:145, hi:145, lo:136 },
+
+  { id:'K',
+    pattern: /K \(Serum\):\s*([<>]?\s*[\d.]+)/,
+    displayName:'鉀 (K)', shortLabel:'K',
+    unit:'mmol/L', category:'電解質',
+    ref:'3.5–5.1 mmol/L',
+    refLo:3.5, refHi:5.1, hi:5.1, lo:3.5 },
+
+  { id:'Cl',
+    pattern: /Cl\(Serum\):\s*([<>]?\s*[\d.]+)/,
+    displayName:'氯 (Cl)', shortLabel:'Cl',
+    unit:'mmol/L', category:'電解質',
+    ref:'98–107 mmol/L',
+    refLo:98, refHi:107, hi:107, lo:98 },
+
+  { id:'Ca',
+    pattern: /Calcium\(Serum\):\s*([<>]?\s*[\d.]+)/,
+    displayName:'鈣 (Ca)', shortLabel:'Ca',
+    unit:'mg/dL', category:'電解質',
+    ref:'8.6–10.3 mg/dL',
+    refLo:8.6, refHi:10.3, hi:10.3, lo:8.6 },
+
+  { id:'FreeCa',
+    pattern: /Free Ca\+\+:\s*([<>]?\s*[\d.]+)/,
+    displayName:'游離鈣 (Free Ca)', shortLabel:'Free Ca',
+    unit:'mmol/L', category:'電解質',
+    ref:'1.15–1.32 mmol/L',
+    refLo:1.15, refHi:1.32, hi:1.32, lo:1.15 },
+
+  { id:'P',
+    pattern: /Phosphorus:\s*([<>]?\s*[\d.]+)/,
+    displayName:'磷 (P)', shortLabel:'P',
+    unit:'mg/dL', category:'電解質',
+    ref:'2.5–5.0 mg/dL',
+    refLo:2.5, refHi:5.0, hi:5.0, lo:2.5 },
+
+  { id:'Mg',
+    pattern: /MG:\s*([<>]?\s*[\d.]+)/,
+    displayName:'鎂 (Magnesium, Mg)', shortLabel:'Mg',
+    unit:'mg/dL', category:'電解質',
+    ref:'1.6–2.6 mg/dL',
+    refLo:1.6, refHi:2.6, hi:2.6, lo:1.6 },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // IRON METABOLISM
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // vhyl sample (2026-05-05): "更正報告 FE: 58TIBC: 267.00TS: 22"
+  { id:'Fe',
+    pattern: /(?:Fe|Iron)\s*(?:\((?:TT|YL)\))?:\s*([<>]?\s*[\d.]+)/i,
+    displayName:'血清鐵 (Fe)', shortLabel:'Fe',
+    unit:'µg/dL', category:'鐵代謝',
+    ref:'男 65–175，女 50–170 µg/dL',
+    refLo:50, refHi:175,
+    loM:65, hiM:175, loF:50, hiF:170,
+    lo:50, hi:175 },
+
+  { id:'TIBC',
+    pattern: /TIBC:\s*([<>]?\s*[\d.]+)/,
+    displayName:'總鐵結合力 (TIBC)', shortLabel:'TIBC',
+    unit:'µg/dL', category:'鐵代謝',
+    ref:'男 134–415，女 120–480 µg/dL',
+    refLo:120, refHi:480,
+    loM:134, hiM:415, loF:120, hiF:480,
+    lo:120, hi:480 },
+
+  // vhyl sample (2026-05-05): "更正報告 FE: 58TIBC: 267.00TS: 22"
+  { id:'TSAT',
+    pattern: /(?<![A-Za-z])(?:TSAT|TS|SAT):\s*([<>]?\s*[\d.]+)/,
+    displayName:'鐵飽和度 (TSAT)', shortLabel:'TSAT',
+    unit:'%', category:'鐵代謝',
+    ref:'20–45 %',
+    refLo:20, refHi:45, hi:45, lo:20 },
+
+  { id:'UIBC', computed:'UIBC', pattern:null,
+    displayName:'不飽和鐵結合力 (UIBC)', shortLabel:'UIBC',
+    unit:'µg/dL', category:'鐵代謝',
+    ref:'110–370 µg/dL',
+    refLo:110, refHi:370, lo:110, hi:370,
+    notes:'Computed: TIBC − Fe. ernode does not report UIBC directly.' },
+
+  { id:'Ferritin',
+    pattern: /(?:Ferritin|FERRITIN):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'鐵蛋白 (Ferritin)', shortLabel:'Ferritin',
+    unit:'ng/mL', category:'鐵代謝',
+    ref:'男 21.81–274.66，女 4.63–204.00 ng/mL',
+    refLo:4.63, refHi:274.66,
+    loM:21.81, hiM:274.66, loF:4.63, hiF:204.00,
+    lo:4.63, hi:274.66,
+    notes:'Capture allows leading <> operator (handles "<5.0", ">2000" results).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PARATHYROID + VITAMINS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'iPTH',
+    pattern: /i-PTH:\s*([<>]?\s*[\d.]+)/,
+    displayName:'副甲狀腺素 (iPTH)', shortLabel:'i-PTH',
+    unit:'pg/mL', category:'副甲狀腺',
+    ref:'15–68.3 pg/mL',
+    refLo:15, refHi:68.3, hi:68.3, lo:15 },
+
+  { id:'VitB12',
+    pattern: /(?:Vit(?:amin)?\.?\s*B12|VIT\.?\s*B12|B12):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'維生素 B12 (Vit. B12)', shortLabel:'Vit B12',
+    unit:'pg/mL', category:'維生素',
+    ref:'187–883 pg/mL',
+    refLo:187, refHi:883, hi:883, lo:187,
+    notes:'Matches "Vit. B12:", "Vitamin B12:", "VIT.B12:", "B12:".' },
+
+  { id:'FolicAcid',
+    pattern: /(?:Folic\s+acid|Folate):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'葉酸 (Folic Acid)', shortLabel:'Folate',
+    unit:'ng/mL', category:'維生素',
+    ref:'3.1–20.5 ng/mL',
+    refLo:3.1, refHi:20.5, hi:20.5, lo:3.1,
+    notes:'Allows variable internal whitespace (some hospitals print "Folic  acid:" with double space).' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // TRACE METALS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // vhtt 2026-05-07: 18-patient survey, 12 had Blood Aluminum results.
+  // Main page: "Al鋁: 6" / "Al鋁: <2" (below detection limit).
+  // Sub-page (OpdOrderReport.aspx): "Result: 4" — handled by enrichment via
+  // the `subpage` config (synthesises "Al鋁: N" back into reportText so the
+  // main pattern matches downstream).
+  { id:'Aluminum',
+    // vhtt 2026-05-07: in-house results use "Al鋁: N", but historical
+    // out-sourced results (代檢單位：新南海醫事檢驗所) label the value with
+    // the external lab code "BALR0101: N". Both formats live in the main
+    // reportText — sub-page enrichment isn't actually needed for any of
+    // the patients sampled so far. The `subpage` config below stays for
+    // defensive future-proofing (in case a sub-page-only sample appears).
+    pattern: /(?:Al鋁|BALR0101):\s*([<>]?\s*[\d.]+)/,
+    displayName:'鋁 (Aluminum)', shortLabel:'Al',
+    unit:'µg/L', category:'微量元素',
+    ref:'<20 µg/L',
+    refLo:null, refHi:20, hi:20, lo:null,
+    meaning:'鋁中毒監測（長期透析）',
+    subpage: {
+      // orderName variants observed: "Blood Aluminum", "Blood Aluminum(TT)",
+      // and (defensive) any Chinese-only name containing 鋁.
+      orderNameMatch: /Aluminum|鋁/i,
+      resultPattern:  /Result:\s*([<>]?\s*[\d.]+)/,
+      synthLabel:     'Al鋁',
+    },
+    notes:'Annual test. vhtt confirmed 2026-05-07 (18-patient survey, 12 with data). Main pattern matches both "Al鋁: N" (in-house) and "BALR0101: N" (out-sourced lab code). Capture allows leading <> operator (handles "<2" below detection limit; reporter extractLabValues preserves "<N" as string since 2026-05-07). Ref <20 µg/L per KDOQI guidelines.' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // TUMOR MARKERS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // vhyl sample (2026-05-05): "正式報告 AFP(YL): < 2.00"
+  { id:'AFP',
+    pattern: /AFP\s*(?:\((?:TT|YL)\))?:\s*([<>]?\s*[\d.]+)/,
+    displayName:'甲胎蛋白 (AFP)', shortLabel:'AFP',
+    unit:'ng/mL', category:'癌症指數',
+    ref:'< 20 ng/mL（肝臟）',
+    refLo:null, refHi:20, hi:20, lo:null },
+
+  { id:'CEA',
+    pattern: /CEA:\s*([<>]?[\d.]+)/,
+    displayName:'癌胚抗原 (CEA)', shortLabel:'CEA',
+    unit:'ng/mL', category:'癌症指數',
+    ref:'< 5 ng/mL（大腸直腸）',
+    refLo:null, refHi:5, hi:5, lo:null },
+
+  { id:'CA199',
+    pattern: /CA.?19.?9:\s*([<>]?[\d.]+)/i,
+    displayName:'CA-199', shortLabel:'CA-199',
+    unit:'U/mL', category:'癌症指數',
+    ref:'< 37 U/mL（胰臟、膽道）',
+    refLo:null, refHi:37, hi:37, lo:null },
+
+  { id:'PSA',
+    pattern: /\bPSA:\s*([<>]?\s*[\d.]+)/,
+    displayName:'攝護腺特異抗原 (PSA)', shortLabel:'PSA',
+    unit:'ng/mL', category:'癌症指數',
+    ref:'< 4 ng/mL（男性／攝護腺）',
+    refLo:null, refHi:4, hi:4, lo:null,
+    gender:'M' },
+
+  { id:'FreePSA',
+    pattern: /(?:Free PSA|RATIO):\s*([<>]?\s*[\d.]+)/,
+    displayName:'游離 PSA (Free PSA)', shortLabel:'Free PSA',
+    unit:'ng/mL', category:'癌症指數',
+    gender:'M' },
+
+  { id:'PSARatio', computed:'PSARatio', pattern:null,
+    displayName:'Free/Total PSA 比值', shortLabel:'F/T PSA',
+    unit:'%', category:'癌症指數',
+    ref:'>25% 正常，10-25% 注意，<10% 警示',
+    meaning:'PSA>4 時參考此比值',
+    gender:'M' },
+
+  { id:'CA125',
+    pattern: /CA[-\s.]?125:\s*([<>]?[\d.]+)/i,
+    displayName:'CA-125', shortLabel:'CA-125',
+    unit:'U/mL', category:'癌症指數',
+    ref:'< 35 U/mL（女性／卵巢）',
+    refLo:null, refHi:35, hi:35, lo:null,
+    gender:'F' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // THYROID
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'TSH',
+    pattern: /TSH:\s*([<>]?\s*[\d.]+)/,
+    displayName:'促甲狀腺刺激素 (TSH)', shortLabel:'TSH',
+    unit:'µIU/mL', category:'甲狀腺',
+    ref:'0.35–4.94 µIU/mL',
+    refLo:0.35, refHi:4.94, hi:4.94, lo:0.35 },
+
+  { id:'FreeT4',
+    pattern: /Free T4:\s*([<>]?\s*[\d.]+)/,
+    displayName:'游離甲狀腺素 (Free T4)', shortLabel:'fT4',
+    unit:'ng/dL', category:'甲狀腺',
+    ref:'0.7–1.48 ng/dL',
+    refLo:0.7, refHi:1.48, hi:1.48, lo:0.7 },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HEPATITIS / INFECTION (qualitative — values are text, not numbers)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Raw qualitative pattern — used by reporter for direct table display.
+  // Viewer overrides these in its manifest with `computed: '<id>'` to render
+  // a patient-friendly verdict (帶原 / 正常) via report.js helpers.
+
+  // vhyl sample (2026-05-05): "正式報告 HBsAg: 0.21HBsAg (YL): Non-Reactive (Non-Reactive)"
+  { id:'HBsAg',
+    pattern: /HBsAg\s*(?:\((?:TT|YL)\))?:\s*([^\s\d]\S*)/i,
+    displayName:'B型肝炎表面抗原 (HBsAg)', shortLabel:'HBsAg',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    notes:'(TT) suffix used at vhtt; alternation handles both hospitals.' },
+
+  // vhyl sample (2026-05-06): aligned to HBsAg/AntiHCV style — accepts
+  // optional (TT|YL) hospital tag and stops the value capture before any
+  // digits so vhyl's concatenated numeric+qualitative line parses cleanly.
+  { id:'AntiHBs',
+    pattern: /Anti-HBs\s*(?:\((?:TT|YL)\))?:\s*([^\s\d]\S*)/i,
+    displayName:'B型肝炎表面抗體 (Anti-HBs)', shortLabel:'Anti-HBs',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    meaning:'疫苗免疫指標' },
+
+  // vhyl sample (2026-05-05): "正式報告 Anti-HCV: 0.12Anti-HCV (YL): Non-Reactive (Non-Reactive)"
+  { id:'AntiHCV',
+    pattern: /(?:HCV Ab|Anti-HCV)\s*(?:\((?:TT|YL)\))?:\s*([^\s\d]\S*)/i,
+    displayName:'C型肝炎抗體 (Anti-HCV)', shortLabel:'Anti-HCV',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    notes:'vhtt uses "HCV Ab(TT):", vhyl uses "Anti-HCV:".' },
+
+  // Raw numeric titer entries — viewer's computed display wrappers consume
+  // these to produce 帶原/正常/有抗體 + (label titer) tuples. vhyl emits
+  // "HBsAg: 0.21HBsAg (YL): Non-Reactive" — \[\d.\]+ stops at the next "H"
+  // so we get the numeric without the qualitative text bleeding in.
+  { id:'HBsAgTiter',
+    pattern: /HBsAg:\s*([<>]?\s*[\d.]+)/i,
+    displayName:'HBsAg 滴度', shortLabel:'HBsAg titer',
+    unit:'', category:'肝炎 / 感染',
+    notes:'Numeric titer for HBsAg. Consumed by HBsAgDisplay computed wrapper.' },
+
+  { id:'AntiHBsTiter',
+    pattern: /Anti-HBs:\s*([<>]?\s*[\d.]+)/i,
+    displayName:'Anti-HBs 滴度', shortLabel:'Anti-HBs titer',
+    unit:'', category:'肝炎 / 感染',
+    notes:'Numeric titer for Anti-HBs. Consumed by AntiHBsDisplay computed wrapper.' },
+
+  { id:'AntiHCVTiter',
+    pattern: /(?:HCV Ab|Anti-HCV):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'Anti-HCV 滴度', shortLabel:'Anti-HCV titer',
+    unit:'', category:'肝炎 / 感染',
+    notes:'Numeric titer for Anti-HCV. Consumed by HCV computed wrapper.' },
+
+  // Computed display wrappers — viewer points its manifest at these ids
+  // (HCV / HBsAgDisplay / AntiHBsDisplay) to render the patient-friendly
+  // verdict tuple. Reporter keeps using raw HBsAg / AntiHBs / AntiHCV.
+  { id:'HBsAgDisplay', computed:'HBsAgDisplay', pattern:null,
+    needs:['HBsAg','HBsAgTiter'],
+    displayName:'B型肝炎(顯示)', shortLabel:'HBsAg',
+    category:'肝炎 / 感染',
+    qualitative:true, singleValue:true,
+    notes:'Computed display wrapper. viewer 用此 id 顯示;reporter 用 raw HBsAg。' },
+
+  { id:'AntiHBsDisplay', computed:'AntiHBsDisplay', pattern:null,
+    needs:['AntiHBs','AntiHBsTiter'],
+    displayName:'B肝抗體(顯示)', shortLabel:'Anti-HBs',
+    category:'肝炎 / 感染',
+    qualitative:true, singleValue:true,
+    notes:'Anti-HBs polarity 與 HBsAg/HCV 相反:Reactive=有抗體=normal。' },
+
+  // Viewer's computed wrapper — same concept as AntiHCV, but produces
+  // 帶原/正常 + numeric titer for the patient handout. Kept as a separate
+  // catalog entry so report.js's special-case code can reference id "HCV".
+  { id:'HCV', computed:'HCV', pattern:null,
+    needs:['AntiHCV','AntiHCVTiter'],
+    displayName:'C型肝炎', shortLabel:'HCV',
+    category:'肝炎 / 感染',
+    qualitative:true, singleValue:true,
+    notes:'Computed display wrapper around AntiHCV raw + AntiHCVTiter numeric.' },
+
+  { id:'HIV',
+    pattern: /HIV[^:]*:\s*(\S+)/i,
+    displayName:'HIV', shortLabel:'HIV',
+    category:'肝炎 / 感染',
+    qualitative:true },
+
+  { id:'RPR',
+    pattern: /REACT:\s*(\S+)/,
+    displayName:'RPR 梅毒篩檢', shortLabel:'RPR',
+    category:'肝炎 / 感染',
+    qualitative:true,
+    notes:'Reporter uses raw REACT pattern; viewer overrides with computed wrapper for titer + verdict.' },
+
+  { id:'TPHA',
+    pattern: /TPHA(?:\(TT\))?:\s*(\S+)/,
+    displayName:'TPHA 梅毒血球凝集試驗', shortLabel:'TPHA',
+    category:'肝炎 / 感染',
+    qualitative:true },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HIV MONITORING (only rendered when HIV checkbox is on in viewer)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'HIVLoad',
+    pattern: /HIV virus load:\s*([\d,.]+)/,
+    displayName:'HIV 病毒量 (Viral Load)', shortLabel:'HIV VL',
+    category:'HIV',
+    notes:'Capture allows commas (thousands separator).' },
+
+  { id:'CD4',
+    pattern: /LEU3AN:\s*([<>]?\s*[\d.]+)/,
+    displayName:'CD4 淋巴球 (LEU3AN)', shortLabel:'CD4',
+    category:'HIV' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // IMAGING / TEXT-BLOCK ENTRIES (page 2 of viewer — fillable text forms)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  { id:'BoneDensity',
+    kind:'text',
+    orderNameMatch: /骨(?:質|密|鬆)|DEXA|BMD|Bone\s*Density|T[-\s]?score/i,
+    rows: [
+      { label:'AI分析',
+        fields:[{ name:'T分數', pattern:/AI[^0-9\-]{0,15}(-?\d+\.?\d*)/i }],
+        options:['疏鬆','缺損','正常'] },
+      { label:'腰椎',
+        fields:[{ name:'T分數', pattern:/(?:腰椎|Lumbar|L[\s-]?spine|L1-?L4)[^0-9\-]{0,15}(-?\d+\.?\d*)/i }],
+        options:['疏鬆','缺損','正常'] },
+      { label:'髖關節',
+        fields:[{ name:'T分數', pattern:/(?:髖(?:關節)?|Hip|Femoral|Femur)[^0-9\-]{0,15}(-?\d+\.?\d*)/i }],
+        options:['疏鬆','缺損','正常'] },
+    ],
+    displayName:'骨密度', category:'影像 / 文字報告' },
+
+  { id:'Endoscopy',
+    kind:'text',
+    orderNameMatch: /胃鏡|內視鏡|UGI|Endoscop|Gastroscop|EGD|Panendoscop/i,
+    rows: [
+      { label:'上消化道', options:['胃食道逆流','胃潰瘍','十二指腸潰瘍'], trailing:'胃藥治療' },
+      { label:'細菌',     options:['胃幽門桿菌'],                            trailing:'三合一治療' },
+    ],
+    displayName:'上消化道內視鏡', category:'影像 / 文字報告' },
+
+  { id:'AbdSono',
+    kind:'text',
+    orderNameMatch: /超音波|Sonograph|Ultrasound|Abd.*Echo|Abdominal\s*US|腹部.*US/i,
+    rows: [
+      { label:'肝臟', options:['正常','脂肪肝','水泡','血管瘤'] },
+      { label:'膽',   options:['正常','膽結石','膽息肉'] },
+      { label:'右腎', options:['正常','水泡','萎縮','結石'] },
+      { label:'左腎', options:['正常','水泡','萎縮','結石'] },
+    ],
+    displayName:'腹部超音波', category:'影像 / 文字報告' },
+
+];
+
+// ─── Exports (CommonJS + browser global) ─────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = CATALOG;
+}
+if (typeof window !== 'undefined') {
+  window.HOSPITAL_LAB_PATTERNS_CATALOG = CATALOG;
+}
+'use strict';
+
+/**
+ * normalizers.js — Named numeric-value transforms used by catalog entries.
+ *
+ * Why named: catalog entries reference normalizers by string name (e.g.
+ * `normalize: 'wbcCount'`) so the catalog can be JSON-serialised for
+ * runtime fetch. Functions can't go in JSON; string names can.
+ *
+ * To add a new normalizer:
+ *   1. Add a named function below
+ *   2. Reference it from a catalog entry: `normalize: 'yourName'`
+ *   3. validate.js will confirm the name resolves
+ *
+ * NOTE: adding a new normalizer requires extension redistribution
+ * (the bundled `normalizers.js` snapshot must be updated on each OPD
+ * computer). Existing normalizers are stable and cover both current
+ * use-cases below.
+ */
+
+const NORMALIZERS = {
+  // WBC: API may report /µL (e.g. 6700) or ×10³/µL (6.7).
+  // Normalize to ×10³/µL — divide by 1000 if value > 100.
+  wbcCount: function (v) {
+    return v > 100 ? +(v / 1000).toFixed(1) : v;
+  },
+
+  // Platelet: API may report /µL (e.g. 250000) or ×10³/µL (250).
+  // Normalize to ×10³/µL — divide by 1000 if value > 1000.
+  plateletCount: function (v) {
+    return v > 1000 ? +(v / 1000).toFixed(0) : v;
+  },
+};
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = NORMALIZERS;
+}
+if (typeof window !== 'undefined') {
+  window.HOSPITAL_LAB_PATTERNS_NORMALIZERS = NORMALIZERS;
+}
+'use strict';
+
+/**
+ * reporter.js — Manifest for the dialysis-room app (hospital-lab-reporter).
+ *
+ * Each manifest entry references a catalog id (see catalog.js) and adds
+ * reporter-specific fields (cat, label, filter) plus any per-app overrides.
+ *
+ * To add a test to the dialysis table:
+ *   1. Make sure it exists in catalog.js (add it there if not).
+ *   2. Append a manifest entry below in the appropriate category.
+ *   3. Run `node sync-patterns.js` from hospital-lab-reporter/.
+ *
+ * Two equivalent forms accepted:
+ *   - String: just the id        e.g. 'WBC'
+ *   - Object: id + overrides     e.g. { id:'WBC', cat:'CBC', label:'白血球 WBC' }
+ *
+ * Resolution: index.js merges each manifest entry on top of its catalog
+ * entry. Manifest fields override catalog defaults.
+ */
+
+// ─── Categories (groups in the table view) ───────────────────────────────
+const CATEGORIES = [
+  { id:'CBC',      label:'血液' },
+  { id:'PROTEIN',  label:'蛋白質' },
+  { id:'LIVER',    label:'肝功能' },
+  { id:'LIPID',    label:'血脂' },
+  { id:'SUGAR',    label:'血糖' },
+  { id:'RENAL',    label:'腎功能' },
+  { id:'LYTE',     label:'電解質' },
+  { id:'IRON',     label:'鐵代謝' },
+  { id:'TRACE',    label:'微量元素' },
+  { id:'PTH',      label:'副甲狀腺' },
+  { id:'HEPAT',    label:'肝炎 / 感染' },
+  { id:'COMPUTED', label:'計算值' },
+];
+
+// ─── Manifest (41 entries — dialysis-room outpatient list) ──────────────
+const REPORTER_MANIFEST = [
+  // ── 血液常規 ──
+  { id:'WBC',      cat:'CBC',     label:'白血球 WBC' },
+  { id:'RBC',      cat:'CBC',     label:'紅血球 RBC',
+    hi:null, lo:null },                                   // catalog has alarms; reporter shows raw values
+  { id:'Hb',       cat:'CBC',     label:'血色素 Hb',
+    hi:null, lo:null },
+  { id:'HCT',      cat:'CBC',     label:'血比容 HCT',
+    hi:null, lo:null },
+  { id:'MCV',      cat:'CBC',     label:'MCV' },
+  { id:'Platelet', cat:'CBC',     label:'血小板 PLT',
+    ref:'120-320', hi:320, lo:120 },                      // dialysis-specific tighter range
+
+  // ── 蛋白質 ──
+  { id:'TP',       cat:'PROTEIN', label:'總蛋白 TP' },
+  { id:'Albumin',  cat:'PROTEIN', label:'白蛋白 Alb' },
+
+  // ── 肝功能 ──
+  { id:'GOT',      cat:'LIVER',   label:'GOT/AST',
+    ref:'13-39', hi:39 },                                 // reporter uses 13-39 range
+  { id:'GPT',      cat:'LIVER',   label:'GPT/ALT',
+    ref:'7-52', hi:52 },                                  // reporter uses 7-52 range
+  { id:'ALP',      cat:'LIVER',   label:'Alk-P',
+    ref:'34-104', hi:104, lo:34 },                        // reporter uses 34-104
+  { id:'TBIL',     cat:'LIVER',   label:'總膽紅素 T-BIL',
+    lo:0.3 },                                             // reporter flags low T-BIL
+
+  // ── 血脂 ──
+  { id:'CHOL',     cat:'LIPID',   label:'總膽固醇' },
+  { id:'LDL',      cat:'LIPID',   label:'LDL-C',
+    ref:'<140', hi:140 },                                 // reporter uses 140 cutoff (catalog: 130)
+  { id:'TG',       cat:'LIPID',   label:'三酸甘油脂' },
+
+  // ── 血糖 ──
+  { id:'GluAC',    cat:'SUGAR',   label:'飯前血糖',
+    ref:'74-106', hi:106 },                               // reporter uses 106 upper (catalog: 100)
+  { id:'HbA1c',    cat:'SUGAR',   label:'HbA1c' },
+
+  // ── 腎功能 ──
+  { id:'BUN_pre',  cat:'RENAL',   label:'BUN(洗前)' },
+  { id:'BUN_post', cat:'RENAL',   label:'BUN(洗後)' },
+  { id:'CREAT',    cat:'RENAL',   label:'肌酸酐 Cr',
+    ref:'M:0.7-1.3 F:0.6-1.2', hi:null, lo:null },        // reporter shows raw, no alarms
+  { id:'UA',       cat:'RENAL',   label:'尿酸 UA',
+    ref:'M:4.4-7.6 F:2.3-6.6', hi:null, lo:null },
+
+  // ── 電解質 ──
+  { id:'Na',       cat:'LYTE',    label:'鈉 Na' },
+  { id:'K',        cat:'LYTE',    label:'鉀 K' },
+  { id:'Cl',       cat:'LYTE',    label:'氯 Cl' },
+  { id:'Ca',       cat:'LYTE',    label:'鈣 Ca' },
+  { id:'FreeCa',   cat:'LYTE',    label:'離子鈣 Free Ca' },   // KiDiTi field 34
+  { id:'P',        cat:'LYTE',    label:'磷 P' },
+  { id:'Mg',       cat:'LYTE',    label:'鎂 Mg' },             // KiDiTi field 41
+
+  // ── 鐵代謝 ──
+  { id:'Fe',       cat:'IRON',    label:'血清鐵 Fe',
+    ref:'M:65-175 F:50-170', hi:null, lo:null },
+  { id:'TIBC',     cat:'IRON',    label:'TIBC',
+    ref:'M:134-415 F:120-480', hi:null, lo:null },
+  { id:'UIBC',     cat:'IRON',    label:'UIBC' },              // computed: TIBC − Fe; KiDiTi field 37
+  { id:'TSAT',     cat:'IRON',    label:'TSAT' },
+  { id:'Ferritin', cat:'IRON',    label:'鐵蛋白',
+    ref:'M:21.8-274.7 F:4.6-204.0', hi:null, lo:null },
+
+  // ── 微量元素 (annual; sub-page enrichment) ──
+  { id:'Aluminum', cat:'TRACE',   label:'鋁 Al' },
+
+  // ── 副甲狀腺 ──
+  { id:'iPTH',     cat:'PTH',     label:'i-PTH' },
+
+  // ── 肝炎 / 感染 (qualitative) ──
+  { id:'HBsAg',    cat:'HEPAT',   label:'HBsAg' },
+  { id:'AntiHBs',  cat:'HEPAT',   label:'Anti-HBs' },
+  { id:'AntiHCV',  cat:'HEPAT',   label:'Anti-HCV' },
+  { id:'AFP',      cat:'HEPAT',   label:'AFP' },
+  { id:'HIV',      cat:'HEPAT',   label:'HIV' },
+  { id:'RPR',      cat:'HEPAT',   label:'RPR' },
+];
+
+// ─── Computed tests (URR, Ca×P) — reporter-specific derivations ─────────
+// These coexist with patterns/computed.js; reporter's HTML loads them
+// as COMPUTED_TESTS via a backwards-compat alias.
+const REPORTER_COMPUTED = [
+  { id:'URR',  cat:'COMPUTED', label:'URR',  unit:'%', ref:'>65%', hi:null, lo:65,
+    needs:['BUN_pre', 'BUN_post'],
+    compute: (pre, post) => {
+      if (pre == null || post == null || pre === 0) return null;
+      return +((1 - post / pre) * 100).toFixed(1);
+    } },
+  { id:'CaxP', cat:'COMPUTED', label:'Ca×P', unit:'',  ref:'<55',  hi:55,   lo:null,
+    needs:['Ca', 'P'],
+    compute: (ca, p) => {
+      if (ca == null || p == null) return null;
+      return +(ca * p).toFixed(1);
+    } },
+];
+
+// ─── Exports (CommonJS + browser global) ─────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    CATEGORIES,
+    REPORTER_MANIFEST,
+    REPORTER_COMPUTED,
+  };
+}
+if (typeof window !== 'undefined') {
+  window.HOSPITAL_LAB_PATTERNS_REPORTER_PKG = {
+    CATEGORIES,
+    REPORTER_MANIFEST,
+    REPORTER_COMPUTED,
+  };
+}
+
+// ─── Resolver: merge each manifest entry on top of its catalog entry ──
+function _resolveManifest(manifest, cat) {
+  var byId = new Map(cat.map(function (e) { return [e.id, e]; }));
+  var out = [];
+  manifest.forEach(function (m) {
+    var id = typeof m === "string" ? m : m.id;
+    var base = byId.get(id);
+    if (!base) {
+      console.warn("[hospital-lab build] manifest references unknown id: " + id);
+      return;
+    }
+    out.push(typeof m === "string"
+      ? Object.assign({}, base)
+      : Object.assign({}, base, m));
+  });
+  return out;
+}
+
+// ─── Backwards-compat aliases — names the rest of the app expects ──
+var LAB_CATEGORIES = CATEGORIES;
+var LAB_TESTS      = _resolveManifest(REPORTER_MANIFEST, CATALOG);
+var COMPUTED_TESTS = REPORTER_COMPUTED;
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// GROUPS BLOCK (built by build.js, source: groups/*.js)
+//   Files: dialysis.js
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── groups/dialysis.js ─────────────────────────────────────────────────
+'use strict';
+
+/**
+ * groups/dialysis.js — 透析（血液透析）疾病群組模組
+ *
+ * Revision 1 (2026-05-04):
+ *   - patientFields trimmed to dialysisDays + shift (defaults 未設定);
+ *     demographics (name/sex/age) auto-filled on every API fetch.
+ *   - monthlyDetection cluster key = exact 生效時間 (effectiveTime).
+ *     Classified as monthly when the cluster's test ids overlap with the
+ *     monthly-required panel by ≥ minMonthlyOverlapRatio AND ≥ 1 BUN
+ *     entry is present.
+ *   - resolveBUN sorts by 簽收時間 (signOffTime): earliest = pre, latest = post.
+ *   - exporter produces a combined long-format CSV — one row per
+ *     (chartNo × YYYYMM), 4 cols per test in value/unit/lower/higher order,
+ *     URR last.
+ *   - Same-month multiple monthly draws → take the earliest effectiveTime.
+ *
+ * Auto-inlined into hospital-lab-data.html between
+ *   __HOSPITAL_LAB_GROUPS_BEGIN__ / __HOSPITAL_LAB_GROUPS_END__
+ * by sync-patterns.js. Browser registry: window.GROUPS.dialysis.
+ */
+
+// ─── Helper: normalize labManifest entries ──────────────────────────────────
+// Manifest mixes string and object forms; this returns a normalized object
+// with default periodicity = 'monthly'.
+function resolveManifestEntry(entry) {
+  if (typeof entry === 'string') return { id: entry, periodicity: 'monthly' };
+  return Object.assign({ periodicity: 'monthly' }, entry);
+}
+
+const DIALYSIS_GROUP = {
+  id: 'dialysis',
+  label: '透析',
+
+  storageKey: {
+    patients: 'patients_dialysis',
+    labs:     'labs_dialysis',
+  },
+
+  // Revision 1: only two user-editable fields. Demographics (name/sex/age)
+  // come from the API on every fetch and are not user-editable. Legacy
+  // fields (startDate, frequency, access, primaryDx, note) are dropped —
+  // old records may still carry them in localStorage but the UI ignores them.
+  patientFields: [
+    { key: 'dialysisDays', label: '洗腎日期', type: 'select',
+      options: ['未設定', '一三五', '二四六'], default: '未設定' },
+    { key: 'shift', label: '班別', type: 'select',
+      options: ['未設定', '上午', '下午', '夜班'], default: '未設定' },
+  ],
+
+  // Lab manifest — order aligned with vhtt 病人定期檢查記錄 (2019.11.07).
+  // ID = catalog id; displayLabel overrides for paper-form-style header text.
+  // periodicity drives "monthly required" set used by monthlyDetection.
+  labManifest: [
+    // ── 血液 — monthly ──
+    'WBC', 'RBC', 'Hb', 'HCT', 'MCV', 'Platelet',
+    // ── 蛋白質 — monthly ──
+    'TP', 'Albumin',
+    // ── 肝功能 — monthly ──
+    { id: 'GOT',  displayLabel: 'AST' },
+    { id: 'GPT',  displayLabel: 'ALT' },
+    'ALP',
+    { id: 'TBIL', displayLabel: 'TBili' },
+    // ── 血脂 — monthly ──
+    { id: 'CHOL', displayLabel: 'TCho' },
+    'LDL', 'TG',
+    // ── 血糖 — monthly ──
+    'GluAC',
+    // ── 腎功能 (BUN + renal) — monthly ──
+    { id: 'BUN_pre',  displayLabel: 'BUN (BD)' },
+    { id: 'BUN_post', displayLabel: 'BUN (AD)' },
+    'CREAT', 'UA',
+    // ── 電解質 — monthly ──
+    'Na', 'K', 'Cl', 'Ca', 'P',
+    // ── 鐵代謝 — monthly ──
+    'Fe', 'TIBC', 'TSAT', 'Ferritin',
+    // ── 副甲狀腺 — monthly ──
+    'iPTH',
+    // ── 糖化血色素 — monthly for everyone (not DM-only) ──
+    'HbA1c',
+    // ── 年度肝炎 / 終身指標 — annual ──
+    { id: 'HBsAg',   periodicity: 'annual' },
+    { id: 'AntiHBs', periodicity: 'annual', displayLabel: 'Anti-HBS' },
+    { id: 'AntiHCV', periodicity: 'annual', displayLabel: 'Anti-HCV' },
+    { id: 'AFP',     periodicity: 'annual', displayLabel: 'α-FP' },
+    // ── 微量元素 — annual (sub-page enrichment via catalog `subpage` config) ──
+    { id: 'Aluminum', periodicity: 'annual', displayLabel: 'Al' },
+    // ── 入院只做一次 — on-admission ──
+    { id: 'HIV', periodicity: 'on-admission' },
+    { id: 'RPR', periodicity: 'on-admission', displayLabel: 'VDRL/RPR' },
+  ],
+
+  // Derived values appended after the per-test columns.
+  computed: ['URR'],
+
+  // Revision 1: 月檢識別由「生效時間 + 重疊比例 + requireBUN」決定。
+  // 不再使用 ±N 天的時間視窗（實作上 cluster key 直接是 exact effectiveTime）。
+  monthlyDetection: {
+    minMonthlyOverlapRatio: 0.5,
+    requireBUN: true,
+  },
+
+  // BUN testIds. Revision 1 hotfix (2026-05-05): extractLabValues now
+  // post-processes BUN_pre[] / BUN_post[] so each draw appears once in the
+  // correct bucket, classified by signOffTime (Method A) with orderName
+  // fallback (Method B). The two arrays are no longer mirror images.
+  // BUN (legacy single-bucket id) is kept for back-compat with stale records.
+  _bunIds: ['BUN_pre', 'BUN_post', 'BUN'],
+
+  // Build a date → entry lookup over the cleaned BUN_pre[] / BUN_post[]
+  // arrays. After the hotfix these arrays hold one canonical entry per date,
+  // which lets us pair pre/post across separate effectiveTime clusters
+  // (洗前 panel and 洗後 single-BUN order have different 生效時間).
+  _indexBunByDate(labDataForPatient) {
+    const pre = {}, post = {};
+    if (!labDataForPatient) return { pre, post };
+    for (const e of (labDataForPatient.BUN_pre || [])) {
+      if (e && e.date && !pre[e.date]) pre[e.date] = e;
+    }
+    for (const e of (labDataForPatient.BUN_post || [])) {
+      if (e && e.date && !post[e.date]) post[e.date] = e;
+    }
+    return { pre, post };
+  },
+
+  // Resolve BUN pre/post within a single cluster (i.e. entries that already
+  // share the same 生效時間). Sort by 簽收時間 (signOffTime): earliest = pre,
+  // latest = post. Falls back to the legacy orderName rule when no
+  // signOffTime data is available (e.g. pre-revision-1 storage records).
+  resolveBUN(bunEntries) {
+    if (!bunEntries || bunEntries.length === 0) return { pre: null, post: null };
+
+    // Dedupe — same physical draw appears in BUN_pre and BUN_post arrays.
+    const seen = new Set();
+    const dedup = [];
+    for (const e of bunEntries) {
+      const k = (e.signOffTime || e.reportDateTime || e.date || '') + '|' + (e.value != null ? e.value : '');
+      if (seen.has(k)) continue;
+      seen.add(k);
+      dedup.push(e);
+    }
+
+    if (dedup.length === 1) return { pre: dedup[0], post: null };
+
+    const missingTime = dedup.filter(e => !e.signOffTime).length;
+    const allMissing  = missingTime === dedup.length;
+
+    if (allMissing) {
+      try { console.warn('[dialysis.resolveBUN] all entries missing signOffTime — falling back to legacy orderName rule'); } catch (_) {}
+      return resolveBUNByLegacyOrderName(dedup);
+    }
+    if (missingTime > 0) {
+      try { console.warn('[dialysis.resolveBUN] some entries missing signOffTime — those default to "pre"', dedup); } catch (_) {}
+    }
+
+    const sorted = [...dedup].sort((a, b) => {
+      const ta = a.signOffTime ? new Date(a.signOffTime).getTime() : 0;
+      const tb = b.signOffTime ? new Date(b.signOffTime).getTime() : 0;
+      return ta - tb;
+    });
+
+    if (sorted.length > 2) {
+      try { console.warn('[dialysis.resolveBUN] 3+ BUN entries on cluster — taking earliest as pre, latest as post', sorted); } catch (_) {}
+    }
+
+    let pre  = sorted[0];
+    let post = sorted[sorted.length - 1];
+
+    // Tie-break — same signOffTime: post is usually much smaller (6–25)
+    // than pre (60–90). If reversed, swap.
+    if (pre.signOffTime && post.signOffTime &&
+        pre.signOffTime === post.signOffTime &&
+        pre !== post) {
+      const pv = Number(pre.value), sv = Number(post.value);
+      if (Number.isFinite(pv) && Number.isFinite(sv) && pv !== sv && sv > pv) {
+        const tmp = pre; pre = post; post = tmp;
+      }
+    }
+    return { pre, post };
+  },
+
+  // Bucket every stored entry by its cluster key (= exact effectiveTime ISO).
+  // Entries missing effectiveTime fall back to a date-based bucket (with
+  // a one-shot console.warn) — this only happens for pre-revision-1 records
+  // that haven't been refetched.
+  _flattenEntriesByCluster(labDataForPatient) {
+    const buckets = new Map();
+    let warnedMissing = false;
+    for (const id in labDataForPatient) {
+      if (id.startsWith('_')) continue; // _lastUpdate etc.
+      const arr = labDataForPatient[id];
+      if (!Array.isArray(arr)) continue;
+      for (const e of arr) {
+        let key;
+        if (e.effectiveTime) {
+          key = e.effectiveTime;
+        } else {
+          key = 'date:' + (e.date || '');
+          if (!warnedMissing) {
+            try { console.warn('[dialysis] entries missing effectiveTime — bucketing by date as fallback. Refetch to populate.'); } catch (_) {}
+            warnedMissing = true;
+          }
+        }
+        if (!buckets.has(key)) buckets.set(key, { effectiveTime: e.effectiveTime || null, byTestId: {} });
+        const slot = buckets.get(key).byTestId;
+        if (!slot[id]) slot[id] = [];
+        slot[id].push(e);
+      }
+    }
+    return buckets;
+  },
+
+  // Detect monthly draws from stored lab data (per patient).
+  // Returns [{ effectiveTime, drawDate, yyyymm, labs: {testId: entry}, computed: {URR?} }].
+  // Only clusters that pass the monthly-required overlap + BUN-presence gate
+  // are returned. Sorted ascending by effectiveTime (then drawDate).
+  //
+  // Revision 1 hotfix: 洗前 (composite panel) and 洗後 (standalone BUN) have
+  // different 生效時間, so they live in separate effectiveTime clusters. The
+  // monthly cluster is the pre cluster (passes overlap thanks to the full
+  // panel); the matching BUN_post is looked up by date from the cleaned
+  // BUN_post[] array.
+  detectMonthlyDrawsFromStored(labDataForPatient) {
+    if (!labDataForPatient) return [];
+    const monthlyReq = monthlyRequiredIds(this);
+    const minRatio   = this.monthlyDetection.minMonthlyOverlapRatio;
+    const reqBUN     = this.monthlyDetection.requireBUN;
+    const buckets    = this._flattenEntriesByCluster(labDataForPatient);
+    const bunIdx     = this._indexBunByDate(labDataForPatient);
+
+    const draws = [];
+    for (const [, bucket] of buckets) {
+      const ids = new Set(Object.keys(bucket.byTestId));
+
+      // Overlap with monthly-required panel
+      let overlap = 0;
+      for (const id of ids) if (monthlyReq.has(id)) overlap++;
+      const ratio = monthlyReq.size > 0 ? overlap / monthlyReq.size : 0;
+      if (ratio < minRatio) continue;
+
+      const hasBUN = this._bunIds.some(b => ids.has(b));
+      if (reqBUN && !hasBUN) continue;
+
+      // drawDate / yyyymm — prefer effectiveTime, fall back to any entry's date.
+      // 2026-05-06 hotfix: bucket.effectiveTime is an ISO string built via
+      // Date.toISOString() (UTC). Slicing the first 10 chars gave a UTC date
+      // that's off-by-one in TPE (UTC+8): a Taiwan local "2026-04-14 00:00"
+      // serialises to "2026-04-13T16:00:00Z". bunIdx is keyed by entry e.date
+      // which is built from the same Date via local accessors (YYYY-MM-DD),
+      // so the UTC slice missed every BUN(AD) lookup. Re-derive drawDateIso
+      // through the same local-time path so the keys match.
+      let drawDateIso = null;
+      if (bucket.effectiveTime) {
+        const d = new Date(bucket.effectiveTime);
+        if (!isNaN(d.getTime())) {
+          drawDateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        } else {
+          drawDateIso = bucket.effectiveTime.slice(0, 10);
+        }
+      } else {
+        for (const id in bucket.byTestId) {
+          const e0 = bucket.byTestId[id][0];
+          if (e0 && e0.date) { drawDateIso = e0.date; break; }
+        }
+        drawDateIso = drawDateIso || '';
+      }
+
+      // BUN pre: prefer the cleaned date-indexed pre, fall back to whatever
+      // sat in this cluster's BUN_pre / BUN bucket (legacy data path).
+      const pre = bunIdx.pre[drawDateIso]
+        || (bucket.byTestId.BUN_pre && bucket.byTestId.BUN_pre[0])
+        || (bucket.byTestId.BUN     && bucket.byTestId.BUN[0])
+        || null;
+      // BUN post: cross-cluster lookup by date (post lives in its own cluster).
+      const post = bunIdx.post[drawDateIso] || null;
+
+      // Collect non-BUN labs (one entry per testId — they share the cluster
+      // key, so any duplicate is a parser-side dedupe miss).
+      const labs = {};
+      for (const id in bucket.byTestId) {
+        if (this._bunIds.indexOf(id) >= 0) continue;
+        labs[id] = bucket.byTestId[id][0];
+      }
+      if (pre)  labs.BUN_pre  = pre;
+      if (post) labs.BUN_post = post;
+
+      // URR
+      const computed = {};
+      const pv = pre  ? Number(pre.value)  : NaN;
+      const sv = post ? Number(post.value) : NaN;
+      if (Number.isFinite(pv) && Number.isFinite(sv) && pv > 0) {
+        computed.URR = +((1 - sv / pv) * 100).toFixed(1);
+      }
+
+      const yyyymm = drawDateIso ? drawDateIso.slice(0, 4) + drawDateIso.slice(5, 7) : '';
+
+      draws.push({
+        effectiveTime: bucket.effectiveTime,
+        drawDate: drawDateIso,
+        yyyymm,
+        labs,
+        computed,
+      });
+    }
+    draws.sort((a, b) => {
+      const ka = a.effectiveTime || a.drawDate || '';
+      const kb = b.effectiveTime || b.drawDate || '';
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+
+    // Annual-periodicity tests (e.g. Aluminum, HBsAg) have their own
+    // 生效時間 and don't pass the monthly-overlap gate above, so the
+    // exporter would never see them. For each annual test, look up its
+    // entries in labData and attach each one onto the monthly draw that
+    // shares its YYYYMM. Edge case: an annual draw in a month with no
+    // monthly draw is dropped — same row-blanking convention as monthly.
+    const annualIds = (this.labManifest || [])
+      .map(resolveManifestEntry)
+      .filter(e => e.periodicity === 'annual')
+      .map(e => e.id);
+    if (annualIds.length && draws.length) {
+      const drawByMonth = new Map();
+      for (const d of draws) {
+        if (!d.yyyymm) continue;
+        // Prefer the earliest monthly draw of the month if multiple exist.
+        if (!drawByMonth.has(d.yyyymm)) drawByMonth.set(d.yyyymm, d);
+      }
+      for (const id of annualIds) {
+        const arr = labDataForPatient[id];
+        if (!Array.isArray(arr)) continue;
+        for (const e of arr) {
+          if (!e || !e.date) continue;
+          const yyyymm = e.date.slice(0, 4) + e.date.slice(5, 7);
+          const target = drawByMonth.get(yyyymm);
+          if (!target) continue;
+          // Don't clobber an entry the cluster already had (some annuals
+          // do happen to be drawn alongside the monthly panel).
+          if (!target.labs[id]) target.labs[id] = e;
+        }
+      }
+    }
+
+    return draws;
+  },
+
+  // Group monthly draws by YYYYMM, take the one with smallest effectiveTime
+  // per month. Returns { 'YYYYMM': draw }.
+  pickEarliestPerMonth(monthlyDraws) {
+    const out = {};
+    for (const d of (monthlyDraws || [])) {
+      if (!d.yyyymm) continue;
+      const cur = out[d.yyyymm];
+      if (!cur) { out[d.yyyymm] = d; continue; }
+      const ka = cur.effectiveTime || cur.drawDate || '';
+      const kb = d.effectiveTime   || d.drawDate   || '';
+      if (kb < ka) out[d.yyyymm] = d;
+    }
+    return out;
+  },
+
+  // Lab-table BUN cluster map for the labview tab.
+  // Revision 1 hotfix: built directly from the cleaned BUN_pre[] / BUN_post[]
+  // arrays (one canonical entry per date) so pre/post pair correctly even
+  // when 洗前 and 洗後 sit in separate effectiveTime clusters.
+  resolveBunClustersFromStored(labDataForPatient) {
+    const out = {};
+    if (!labDataForPatient) return out;
+    const { pre: preIdx, post: postIdx } = this._indexBunByDate(labDataForPatient);
+    const allDates = new Set([...Object.keys(preIdx), ...Object.keys(postIdx)]);
+    for (const date of allDates) {
+      const pre  = preIdx[date]  || null;
+      const post = postIdx[date] || null;
+      const slot = {
+        pre, post,
+        preDate:  pre  ? pre.date  : null,
+        postDate: post ? post.date : null,
+        urr: null,
+        effectiveTime: (pre && pre.effectiveTime) || (post && post.effectiveTime) || null,
+      };
+      const pv = pre  ? Number(pre.value)  : NaN;
+      const sv = post ? Number(post.value) : NaN;
+      if (Number.isFinite(pv) && Number.isFinite(sv) && pv > 0) {
+        slot.urr = +((1 - sv / pv) * 100).toFixed(1);
+      }
+      out[date] = slot;
+    }
+    return out;
+  },
+
+  // ─── CSV exporter — combined long format ────────────────────────────────
+  // One row per (chartNo × YYYYMM). 4 cols per test (value/unit/lower/higher),
+  // URR appended at the end. Empty cells stay empty (no carry-forward).
+  exporter: {
+    interval: 'monthly',
+
+    filename(today) {
+      const t = today instanceof Date ? today : new Date();
+      const yyyymmdd = `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`;
+      return `dialysis_export_${yyyymmdd}.csv`;
+    },
+
+    formatAll(patients, allLabData, opts) {
+      opts = opts || {};
+      const catalog         = opts.catalog         || (typeof CATALOG          !== 'undefined' ? CATALOG          : []);
+      const computedCatalog = opts.computedCatalog || (typeof REPORTER_COMPUTED !== 'undefined' ? REPORTER_COMPUTED : []);
+      const catById  = new Map(catalog.map(e => [e.id, e]));
+      const compById = new Map(computedCatalog.map(e => [e.id, e]));
+      const manifest = DIALYSIS_GROUP.labManifest.map(resolveManifestEntry);
+      const computedIds = DIALYSIS_GROUP.computed;
+
+      const labelOf = entry => entry.displayLabel
+        || (catById.get(entry.id) && (catById.get(entry.id).shortLabel || catById.get(entry.id).displayName))
+        || entry.id;
+      const unitOf = id => {
+        const c = catById.get(id) || compById.get(id);
+        return c && c.unit ? c.unit : '';
+      };
+      const hiOf = id => {
+        const c = catById.get(id) || compById.get(id);
+        if (!c) return '';
+        if (c.hi != null) return c.hi;
+        if (c.refHi != null) return c.refHi;
+        return '';
+      };
+      const loOf = id => {
+        const c = catById.get(id) || compById.get(id);
+        if (!c) return '';
+        if (c.lo != null) return c.lo;
+        if (c.refLo != null) return c.refLo;
+        return '';
+      };
+      const csvCell = v => {
+        if (v == null) return '';
+        const s = String(v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+
+      // Header — id, YYYYMM, then 4 cols per test, then 4 cols per computed.
+      const header = ['id', 'YYYYMM'];
+      for (const entry of manifest) {
+        const lbl = labelOf(entry);
+        header.push(`${lbl} value`, `${lbl} unit`, `${lbl} lower`, `${lbl} higher`);
+      }
+      for (const id of computedIds) {
+        const lbl = (compById.get(id) && compById.get(id).label) || id;
+        header.push(`${lbl} value`, `${lbl} unit`, `${lbl} lower`, `${lbl} higher`);
+      }
+      const lines = [header.map(csvCell).join(',')];
+
+      // Rows: sort patients by chartNo, then per-patient sort YYYYMM ascending.
+      const patientList = [...(patients || [])].sort((a, b) => {
+        const ca = String(a.chartno || a.chartNo || '');
+        const cb = String(b.chartno || b.chartNo || '');
+        return ca.localeCompare(cb);
+      });
+
+      for (const p of patientList) {
+        const cn = p.chartno || p.chartNo || '';
+        if (!cn) continue;
+        const labData = (allLabData && allLabData[cn]) || null;
+        if (!labData) continue;
+        const draws  = DIALYSIS_GROUP.detectMonthlyDrawsFromStored(labData);
+        const byMonth = DIALYSIS_GROUP.pickEarliestPerMonth(draws);
+        const months = Object.keys(byMonth).sort();
+        for (const yyyymm of months) {
+          const draw = byMonth[yyyymm];
+          const row = [cn, yyyymm];
+          for (const entry of manifest) {
+            const cell = draw.labs && draw.labs[entry.id];
+            const val  = cell && cell.value != null ? cell.value : '';
+            const unit = (cell && cell.unit) || unitOf(entry.id);
+            row.push(val, unit, loOf(entry.id), hiOf(entry.id));
+          }
+          for (const id of computedIds) {
+            const val = draw.computed && draw.computed[id] != null ? draw.computed[id] : '';
+            row.push(val, unitOf(id), loOf(id), hiOf(id));
+          }
+          lines.push(row.map(csvCell).join(','));
+        }
+      }
+      return lines.join('\n');
+    },
+  },
+};
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+// Cached set of testIds that count as "monthly required" for the overlap
+// test. Manifest is fixed at module load — safe to memo.
+let _monthlyReqIdsCache = null;
+function monthlyRequiredIds(group) {
+  if (!_monthlyReqIdsCache) {
+    _monthlyReqIdsCache = new Set(
+      group.labManifest
+        .map(resolveManifestEntry)
+        .filter(e => e.periodicity === 'monthly')
+        .map(e => e.id)
+    );
+  }
+  return _monthlyReqIdsCache;
+}
+
+// Legacy fallback for resolveBUN — only used when every BUN entry in a
+// cluster is missing signOffTime (i.e. records written before revision 1).
+function resolveBUNByLegacyOrderName(entries) {
+  let pre = null, post = null;
+  for (const e of entries) {
+    const name = (e.orderName || '').trim();
+    if (!post && name === 'BUN') post = e;
+    else if (!pre && name.includes(',')) pre = e;
+  }
+  if (!pre) pre = entries.find(e => e !== post) || null;
+  return { pre, post };
+}
+
+// ─── exports ─────────────────────────────────────────────────────────────────
+// Browser registry (preferred): window.GROUPS.dialysis
+// Node CommonJS fallback for headless tests.
+
+if (typeof window !== 'undefined') {
+  window.GROUPS = window.GROUPS || {};
+  window.GROUPS.dialysis = DIALYSIS_GROUP;
+  window.resolveManifestEntry = window.resolveManifestEntry || resolveManifestEntry;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { DIALYSIS_GROUP, resolveManifestEntry };
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// CORE JS (built by build.js, source: core/*.js, load order fixed)
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── core/storage.js ──────────────────────────────────────────────────
+// ─── storage.js ───────────────────────────────────────────────
+// Active group resolution + localStorage helpers
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Active disease group — Step 1 hardcodes 'dialysis'; the disease-tab UI
+// (Step 3) will switch this at runtime. Storage keys for patients/labs come
+// from the active group module; settings stays shell-global.
+const ACTIVE_GROUP_ID = 'dialysis';
+const GROUP = (window.GROUPS || {})[ACTIVE_GROUP_ID];
+if (!GROUP) {
+  throw new Error('[hospital-lab-data] active group "' + ACTIVE_GROUP_ID +
+    '" not loaded — run `node sync-patterns.js`');
+}
+
+const STORAGE_KEYS = {
+  patients: GROUP.storageKey.patients,   // 'patients_dialysis'
+  settings: 'hd_settings',                // shell-global
+  labData:  GROUP.storageKey.labs,        // 'labs_dialysis'
+  // Hotfix v2 (2026-05-05): per-group sort + filter UI state.
+  patientSort:    GROUP.storageKey.patients + '_sort',    // {column, dir}
+  patientFilters: GROUP.storageKey.patients + '_filters', // {col: value, ...}
+};
+
+// One-time migration from legacy hd_* keys (one-release fallback per the
+// disease-group refactor plan). Legacy keys are preserved as backup.
+(function migrateLegacyStorage() {
+  if (!localStorage.getItem(STORAGE_KEYS.patients) && localStorage.getItem('hd_patients')) {
+    localStorage.setItem(STORAGE_KEYS.patients, localStorage.getItem('hd_patients'));
+  }
+  if (!localStorage.getItem(STORAGE_KEYS.labData) && localStorage.getItem('hd_labData')) {
+    localStorage.setItem(STORAGE_KEYS.labData, localStorage.getItem('hd_labData'));
+  }
+})();
+
+/** Load patients from localStorage. Returns array of patient objects. */
+function loadPatients() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.patients)) || []; }
+  catch { return []; }
+}
+function savePatients(list) {
+  localStorage.setItem(STORAGE_KEYS.patients, JSON.stringify(list));
+}
+
+/** Load lab data from localStorage. Returns { chartno: { testId: [{date,value},...] } } */
+function loadLabData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.labData)) || {}; }
+  catch { return {}; }
+}
+function saveLabData(data) {
+  localStorage.setItem(STORAGE_KEYS.labData, JSON.stringify(data));
+}
+
+/** Load settings */
+function loadSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.settings)) || {
+      baseUrl: 'http://ernode.vghb12.vhtt.gov.tw:8000',
+      opsid: '',
+    };
+  } catch {
+    return { baseUrl: 'http://ernode.vghb12.vhtt.gov.tw:8000', opsid: '' };
+  }
+}
+function saveSettingsData(s) {
+  localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(s));
+}
+
+
+// ─── core/chart-format.js ─────────────────────────────────────────────
+// ─── chart-format.js ───────────────────────────────────────────────
+// formatChartNo (9-digit + 1-letter normalisation)
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHART NUMBER FORMATTING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Normalize chart number to 9-digit + 1-letter format (e.g. "810385G" -> "000810385G").
+ */
+function formatChartNo(raw) {
+  const s = raw.trim();
+  if (!s) throw new Error('請輸入病歷號');
+  const last = s[s.length - 1];
+  if (!/[a-zA-Z]/.test(last)) throw new Error('病歷號須以英文字母結尾 (如 810385G)');
+  const letter = last.toUpperCase();
+  const digitStr = s.slice(0, -1).replace(/\D/g, '');
+  if (!digitStr) throw new Error('病歷號中未找到數字');
+  if (digitStr.length > 9) throw new Error('數字部分最多 9 碼');
+  return digitStr.padStart(9, '0') + letter;
+}
+
+
+// ─── core/date-utils.js ───────────────────────────────────────────────
+// ─── date-utils.js ───────────────────────────────────────────────
+// Taiwan / Gregorian / 民國 date helpers + todayStr
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATE UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Parse RESDTTM: "20260414203800" -> Date (with HH:MM:SS retained when present).
+ * Step 2 needs the time-of-day suffix to sort BUN_pre vs BUN_post by report time.
+ */
+function parseDateResdttm(str) {
+  if (!str || str.length < 8) return null;
+  const y  = +str.slice(0, 4),
+        m  = +str.slice(4, 6) - 1,
+        d  = +str.slice(6, 8),
+        hh = str.length >= 10 ? +str.slice(8, 10) : 0,
+        mm = str.length >= 12 ? +str.slice(10, 12) : 0,
+        ss = str.length >= 14 ? +str.slice(12, 14) : 0;
+  return new Date(y, m, d, hh, mm, ss);
+}
+
+/**
+ * Parse Taiwan calendar date: "115/04/14 19:36" -> Date (with HH:MM[:SS] retained).
+ * Step 2 needs the time-of-day suffix when RESDTTM is missing.
+ */
+function parseDateTaiwan(str) {
+  if (!str) return null;
+  const match = str.match(/^(\d+)\/(\d+)\/(\d+)(?:\s+(\d+):(\d+)(?::(\d+))?)?/);
+  if (!match) return null;
+  return new Date(
+    +match[1] + 1911,
+    +match[2] - 1,
+    +match[3],
+    +(match[4] || 0),
+    +(match[5] || 0),
+    +(match[6] || 0)
+  );
+}
+
+/** Format Date to Taiwan calendar string: "115/04/14" */
+function toTaiwanDate(d) {
+  if (!d) return '';
+  const y = d.getFullYear() - 1911;
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
+
+/** Format Date to short display: "04/14" */
+function toShortDate(d) {
+  if (!d) return '';
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/** Format Date as YYYY-MM-DD for sorting */
+function toSortableDate(d) {
+  if (!d) return '';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/** YYYY-MM-DD → 民國年 7 碼 RRRMMDD (e.g. 2025-05-07 → "1140507"). */
+function toMinguoDate(isoDate) {
+  if (!isoDate) return '';
+  const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const y = (parseInt(m[1], 10) - 1911);
+  return `${y}${m[2]}${m[3]}`;
+}
+
+/** YYYYMMDD for filenames. */
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+
+// ─── core/fetch.js ────────────────────────────────────────────────────
+// ─── fetch.js ───────────────────────────────────────────────
+// ernode HTML scraping + stable-frontier incremental fetch
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// API FETCHING & HTML PARSING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Parse patient info from the ernode HTML header.
+ * Header text example: "全部醫囑 000123456A 王小明 M 51 歲"
+ */
+function parsePatientInfo(doc, chartno) {
+  const headerText = doc.querySelector('table.Header')?.textContent || '';
+  const rest = chartno ? headerText.split(chartno)[1] || '' : headerText;
+  const m = rest.match(/\s+(.+?)\s+([MF])\s+(\d+)\s*歲/);
+  if (!m) return null;
+  return {
+    chartno,
+    name:   m[1].trim(),
+    gender: m[2] === 'M' ? '男' : '女',
+    genderCode: m[2],
+    age:    m[3],
+  };
+}
+
+/**
+ * Parse a single page of order results from the ernode API HTML.
+ * Returns { orders[], nextUrl, total, patientInfo }.
+ */
+function parseOrdersPage(html, chartno, baseUrl) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const grid = doc.querySelector('table.Grid');
+  if (!grid) return { orders: [], nextUrl: null, total: 0, patientInfo: null };
+
+  const patientInfo = parsePatientInfo(doc, chartno);
+  const orders = [];
+
+  grid.querySelectorAll('tr.Row').forEach(row => {
+    if (row.cells.length < 6) return;
+    const h = name => row.querySelector(`input[name="${name}"]`)?.value?.trim() || '';
+    const orderDateRaw   = row.cells[4]?.textContent.trim() || '';   // 生效時間
+    const receiveDateRaw = row.cells[5]?.textContent.trim() || '';   // 簽收時間
+    const effectiveDt = parseDateTaiwan(orderDateRaw);
+    const signOffDt   = parseDateTaiwan(receiveDateRaw);
+    orders.push({
+      ordseq:     h('ORDSEQ'),
+      comKey:     h('COM_KEY'),
+      ordapno:    h('ORDAPNO'),
+      resdttm:    h('RESDTTM'),
+      pfcode:     h('PFCODE'),
+      ordType:    h('ORDTYPE'),
+      orderName:  row.cells[0]?.textContent.trim() || '',
+      status:     row.cells[1]?.textContent.trim() || '',
+      reportText: row.cells[2]?.textContent.trim() || '',
+      dept:       row.cells[3]?.textContent.trim() || '',
+      orderDate:  orderDateRaw,
+      receiveDate: receiveDateRaw,
+      // Revision 1: explicit named fields per the lab-orders page columns.
+      // effectiveTime = 生效時間 (cluster anchor for monthly draws);
+      // signOffTime  = 簽收時間 (BUN pre/post sort key — pre signs off
+      // mid-morning, post signs off afternoon/evening).
+      effectiveTime: effectiveDt ? effectiveDt.toISOString() : null,
+      signOffTime:   signOffDt   ? signOffDt.toISOString()   : null,
+    });
+  });
+
+  // Pagination: find ">>" link
+  let nextUrl = null;
+  doc.querySelectorAll('a').forEach(a => {
+    if (a.textContent.trim() === '>>' && !nextUrl) {
+      const href = a.getAttribute('href');
+      nextUrl = href ? baseUrl + href : null;
+    }
+  });
+
+  const footerText = doc.querySelector('tr.Footer')?.textContent || '';
+  const totalMatch = footerText.match(/總筆數：(\d+)/);
+  const total = totalMatch ? +totalMatch[1] : 0;
+
+  return { orders, nextUrl, total, patientInfo };
+}
+
+/**
+ * Fetch all pages of lab orders for a given chart number.
+ * @param {string} chartno - Formatted chart number (e.g. "000810385G")
+ * @param {Function} onProgress - Callback(fetched, total)
+ * @returns {Promise<{orders: Array, patientInfo: Object}>}
+ */
+async function fetchAllOrders(chartno, onProgress) {
+  const settings = loadSettings();
+  const baseUrl = settings.baseUrl;
+  let url = `${baseUrl}/order/get_lab_orders?chartno=${chartno}&opsid=${settings.opsid}`;
+  const all = [];
+  let page = 0, total = 0, patientInfo = null;
+
+  while (url) {
+    page++;
+    if (page > 50) break; // safety limit
+
+    const resp = await fetch(url, { credentials: 'omit' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const html = await resp.text();
+
+    const result = parseOrdersPage(html, chartno, baseUrl);
+    if (page === 1) {
+      if (result.total) total = result.total;
+      if (result.patientInfo) patientInfo = result.patientInfo;
+    }
+    all.push(...result.orders);
+
+    if (onProgress) onProgress(all.length, total || '?');
+    if (!result.nextUrl || (total && all.length >= total)) break;
+    url = result.nextUrl;
+  }
+
+  return { orders: all, patientInfo };
+}
+
+/**
+ * Stable-frontier incremental fetch. ernode returns orders newest-first;
+ * signed-off reports (正式報告/更正報告) are immutable, only 未執行 orders
+ * can change (later get a report). So once we hit a page where every order
+ * is known AND its status is unchanged, every page beyond is also unchanged.
+ *
+ * Common case (no new orders) = 1 API call instead of 5–15.
+ *
+ * @param {string} chartno
+ * @param {Array}  cachedOrders - prior orders (will have status updates
+ *                                applied in-place; clone before passing if
+ *                                the caller needs to keep the original).
+ * @param {Function} onProgress - (fetched, total) => void
+ */
+async function fetchIncremental(chartno, cachedOrders, onProgress) {
+  const settings = loadSettings();
+  const baseUrl = settings.baseUrl;
+
+  const knownMap = new Map();
+  cachedOrders.forEach((o, i) => knownMap.set(o.ordseq, { idx: i, status: o.status }));
+
+  const newOrders = [];
+  let url = `${baseUrl}/order/get_lab_orders?chartno=${chartno}&opsid=${settings.opsid}`;
+  let page = 0, total = 0, patientInfo = null;
+
+  while (url) {
+    page++;
+    if (page > 50) break;
+
+    const resp = await fetch(url, { credentials: 'omit' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const html = await resp.text();
+    const result = parseOrdersPage(html, chartno, baseUrl);
+    if (page === 1) {
+      if (result.total) total = result.total;
+      if (result.patientInfo) patientInfo = result.patientInfo;
+    }
+
+    let allKnown = true;
+    for (const order of result.orders) {
+      const known = knownMap.get(order.ordseq);
+      if (!known) {
+        newOrders.push(order);
+        allKnown = false;
+      } else if (known.status !== order.status) {
+        // Typically 未執行 → 正式報告 — overwrite cached entry with new data.
+        cachedOrders[known.idx] = order;
+        allKnown = false;
+      }
+      // else: known + unchanged → stable hit
+    }
+
+    if (onProgress) onProgress(cachedOrders.length + newOrders.length, total || '?');
+    if (allKnown || !result.nextUrl) break;
+    url = result.nextUrl;
+  }
+
+  // newOrders are newer (came from earlier pages) → prepend to keep newest-first.
+  const merged = newOrders.concat(cachedOrders);
+  return { orders: merged, patientInfo, pagesChecked: page };
+}
+
+
+// ─── core/indexeddb-cache.js ──────────────────────────────────────────
+// ─── indexeddb-cache.js ───────────────────────────────────────────────
+// IndexedDB-backed raw orders cache (LabReporterOrdersCache)
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RAW ORDERS CACHE (for incremental fetch, 2026-05-08)
+// ═══════════════════════════════════════════════════════════════════════════════
+// IndexedDB `LabReporterOrdersCache` / store `orders` (keyPath=chartno):
+//   { chartno, orders: [...], ts }
+// Used as the baseline for fetchIncremental. Migrated from localStorage on
+// 2026-05-08 — 30 patients × ~100KB approached the 5MB localStorage cap; per-
+// origin IndexedDB quota is several hundred MB, so quota concerns disappear.
+// enrichCache_dialysis (sub-page text by ordapno) stays in localStorage — it's
+// smaller and out of scope for this migration.
+
+const ORDERS_DB_NAME = 'LabReporterOrdersCache';
+const ORDERS_DB_VER  = 1;
+const ORDERS_STORE   = 'orders';
+let _ordersDb = null;
+
+function openOrdersDB() {
+  if (_ordersDb) return Promise.resolve(_ordersDb);
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(ORDERS_DB_NAME, ORDERS_DB_VER);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(ORDERS_STORE)) {
+        db.createObjectStore(ORDERS_STORE, { keyPath: 'chartno' });
+      }
+    };
+    req.onsuccess = () => { _ordersDb = req.result; res(_ordersDb); };
+    req.onerror   = () => rej(req.error);
+  });
+}
+
+async function ordersCacheGet(chartno) {
+  if (!chartno) return null;
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(ORDERS_STORE, 'readonly').objectStore(ORDERS_STORE).get(chartno);
+    r.onsuccess = () => {
+      const row = r.result;
+      res(row ? { orders: row.orders || [], ts: row.ts || 0 } : null);
+    };
+    r.onerror = () => rej(r.error);
+  });
+}
+
+async function ordersCachePut(chartno, orders) {
+  if (!chartno) return;
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(ORDERS_STORE, 'readwrite').objectStore(ORDERS_STORE)
+                .put({ chartno, orders, ts: Date.now() });
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+async function ordersCacheDelete(chartno) {
+  if (!chartno) return;
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(ORDERS_STORE, 'readwrite').objectStore(ORDERS_STORE)
+                .delete(chartno);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+// One-time migration: drop the legacy localStorage ordersCache. Anything in
+// it is throwaway baseline data — first fetch after upgrade re-populates the
+// IndexedDB store via fetchAllOrders.
+(function dropLegacyOrdersCache() {
+  try {
+    if (localStorage.getItem('ordersCache_dialysis')) {
+      localStorage.removeItem('ordersCache_dialysis');
+    }
+  } catch (_) { /* ignore */ }
+})();
+
+
+// ─── core/enrichment.js ───────────────────────────────────────────────
+// ─── enrichment.js ───────────────────────────────────────────────
+// Manifest-driven sub-page enrichment (opdweb 請 Click 正式報告)
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUB-PAGE ENRICHMENT (manifest-driven, two-pass)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Some lab orders only show "請 Click「正式報告」" in the main reportText —
+// the actual values live behind opdweb's OpdOrderReport.aspx sub-page. After
+// the caller's normal extraction, this pass:
+//   1. computes which manifest testIds are still missing,
+//   2. fetches the sub-pages of candidate "請 Click" orders within cutoff,
+//   3. splices any matched fragments back into order.reportText so the next
+//      extractLabValues() call picks them up.
+// Sub-page text is cached in localStorage by ordapno (lab reports are
+// signed off and immutable, so no TTL).
+
+const ENRICH_CACHE_KEY = 'enrichCache_dialysis';
+
+function loadEnrichCache() {
+  try { return JSON.parse(localStorage.getItem(ENRICH_CACHE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveEnrichCache(cache) {
+  try { localStorage.setItem(ENRICH_CACHE_KEY, JSON.stringify(cache)); }
+  catch (e) { console.warn('[enrichCache] save failed (likely quota):', e); }
+}
+function enrichCacheGet(ordapno) {
+  if (!ordapno) return null;
+  const c = loadEnrichCache();
+  const slot = c[String(ordapno)];
+  return slot ? slot.text : null;
+}
+function enrichCachePut(ordapno, text) {
+  if (!ordapno || !text) return;
+  const c = loadEnrichCache();
+  c[String(ordapno)] = { text, ts: Date.now() };
+  saveEnrichCache(c);
+}
+
+// Derive opdweb URL from ernode base, e.g.
+//   http://ernode.vghb12.vhtt.gov.tw:8000 → http://opdweb.vghb12.vhtt.gov.tw
+function getOpdwebBase(ernodeBaseUrl) {
+  try {
+    const u = new URL(ernodeBaseUrl);
+    u.hostname = u.hostname.replace(/^ernode\./, 'opdweb.');
+    u.port = '';
+    return u.origin;
+  } catch { return null; }
+}
+
+function buildSubpageUrl(ordapno, chartno, ernodeBaseUrl, opsid) {
+  const base = getOpdwebBase(ernodeBaseUrl);
+  if (!base) return null;
+  return `${base}/QueryReport/OpdOrderReport.aspx?OrdApNo=${ordapno}&hisnum=${chartno}&opid=${opsid}`;
+}
+
+async function fetchSubpageText(url) {
+  const resp = await fetch(url, { credentials: 'omit' });
+  if (!resp.ok) return '';
+  const html = await resp.text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body?.textContent || '';
+}
+
+// Splice into order.reportText whatever the sub-page reveals about the
+// missing tests. Returns true if anything was appended.
+function applySubpageText(order, subpageText, missingTests) {
+  if (!subpageText) return false;
+  const additions = [];
+  for (const t of missingTests) {
+    if (!t.pattern) continue;
+    // Phase A: sub-page already carries the main-page label.
+    const mMain = subpageText.match(t.pattern);
+    if (mMain && mMain[0]) {
+      additions.push(mMain[0]);
+      continue;
+    }
+    // Phase B: catalog `subpage` config — orderName-gated translation
+    // (e.g. Aluminum sub-page only has "Result: N", no "Al鋁:").
+    const sp = t.subpage;
+    if (!sp || !sp.resultPattern) continue;
+    if (sp.orderNameMatch && !sp.orderNameMatch.test(order.orderName || '')) continue;
+    const mSub = subpageText.match(sp.resultPattern);
+    if (mSub && mSub[1]) {
+      additions.push(`${sp.synthLabel || t.id}: ${String(mSub[1]).trim()}`);
+    }
+  }
+  if (!additions.length) return false;
+  order.reportText = (order.reportText ? order.reportText + ' ; ' : '')
+                   + additions.join(' ; ');
+  return true;
+}
+
+// Per-test chase semantics:
+//   - Tests WITHOUT a `subpage` config: chased only when the value is
+//     entirely missing across every order's reportText (single-value style).
+//   - Tests WITH a `subpage` config (e.g. Aluminum): chased per-order even
+//     when one main-page value already exists. Annual lab tracking needs
+//     ALL historical "請 Click" entries to fill the dialysis CSV column,
+//     not just the most-recent visible value.
+async function enrichMissingValues(labOrders, chartno, manifest, opts) {
+  opts = opts || {};
+  const onProgress = opts.onProgress;
+  const maxFetches = opts.maxFetches != null ? opts.maxFetches : 15;
+
+  const settings = loadSettings();
+  if (!settings.baseUrl || !settings.opsid) return;
+
+  const tests = (manifest || []).filter(t => t && t.pattern instanceof RegExp);
+  if (!tests.length) return;
+
+  // Pass 1: which testIds appear at least once in any order's reportText?
+  const presentIds = new Set();
+  for (const o of labOrders) {
+    if (!o.reportText) continue;
+    for (const t of tests) {
+      if (presentIds.has(t.id)) continue;
+      if (t.pattern.test(o.reportText)) presentIds.add(t.id);
+    }
+  }
+
+  // Only chase tests that explicitly opt in via catalog `subpage.orderNameMatch`.
+  // Without an orderName signal we'd brute-fetch every "missing" candidate
+  // (verified blow-up 2026-05-07: queue=132 for a patient missing AntiHCV/AFP,
+  // all CORS-blocked under file:// origin anyway). Tests opt in by adding
+  // subpage.orderNameMatch (and optionally subpage.resultPattern for
+  // sub-page label translation, e.g. Aluminum's "Result: N" → "Al鋁: N").
+  const chaseTests = tests.filter(t => t.subpage && t.subpage.orderNameMatch);
+  if (!chaseTests.length) return;
+
+  function relevantTestsForOrder(o) {
+    const out = [];
+    for (const t of chaseTests) {
+      if (t.pattern.test(o.reportText || '')) continue; // already on main page for this order
+      if (t.subpage.orderNameMatch.test(o.orderName || '')) out.push(t);
+    }
+    return out;
+  }
+
+  const queue = [];
+  for (const o of labOrders) {
+    if (!o.ordapno) continue;
+    const rel = relevantTestsForOrder(o);
+    if (rel.length) queue.push({ order: o, tests: rel });
+  }
+  if (!queue.length) return;
+
+  let fetched = 0;
+  for (let i = 0; i < queue.length && fetched < maxFetches; i++) {
+    const { order, tests: relTests } = queue[i];
+    const url = buildSubpageUrl(order.ordapno, chartno, settings.baseUrl, settings.opsid);
+    if (!url) continue;
+
+    let text = enrichCacheGet(order.ordapno);
+    if (!text) {
+      if (onProgress) onProgress(`補抓子頁面 ${fetched + 1}/${maxFetches}（candidate ${i + 1}/${queue.length}）`);
+      try {
+        text = await fetchSubpageText(url);
+        if (text) enrichCachePut(order.ordapno, text);
+      } catch { continue; }
+      fetched++;
+    }
+    if (!text) continue;
+
+    applySubpageText(order, text, relTests);
+  }
+}
+
+
+// ─── core/lab-extract.js ──────────────────────────────────────────────
+// ─── lab-extract.js ───────────────────────────────────────────────
+// extractLabValues + BUN A/B post-processing.
+// computeDerivedValues was split out into core/compute.js (Phase 1 restructure).
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAB VALUE EXTRACTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Extract lab values from fetched orders.
+ * Returns { testId: [{date, value, dateObj, reportDateTime, orderName}, ...], ... }
+ *
+ * Step 2: BUN pre/post is no longer pre-classified at the parser layer. Both
+ * BUN_pre and BUN_post testIds match every BUN occurrence; the dialysis
+ * group's resolveBUN() re-derives pre/post from reportDateTime per cluster.
+ * The legacy `composite` / `standalone_bun` filter strings (which never
+ * matched the catalog's actual orderNameFilter regex anyway) have been
+ * removed.
+ */
+function extractLabValues(orders) {
+  const results = {};
+  LAB_TESTS.forEach(t => { results[t.id] = []; });
+
+  // Filter to LAB orders within last 12 months (except hepatitis/HIV/RPR: all-time)
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 12);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const ALL_TIME_IDS = new Set(['HBsAg', 'AntiHBs', 'AntiHCV', 'HIV', 'RPR']);
+  // Tests with sub-page enrichment chase historical values (e.g. annual
+  // Aluminum). Give them all-time treatment too so the enriched older
+  // entries don't get dropped by the 12-month cutoff downstream.
+  LAB_TESTS.forEach(t => { if (t && t.subpage) ALL_TIME_IDS.add(t.id); });
+
+  for (const order of orders) {
+    if (order.ordType && order.ordType !== 'LAB') continue;
+    if (!order.reportText) continue;
+
+    const dateObj = parseDateResdttm(order.resdttm) || parseDateTaiwan(order.orderDate);
+    if (!dateObj) continue;
+
+    const text = order.reportText;
+    const dateStr = toSortableDate(dateObj);
+    const reportDateTime = dateObj.toISOString(); // full timestamp persisted for resolveBUN (legacy)
+    const orderName     = order.orderName    || '';
+    // Revision 1: persist explicit cluster anchor + BUN-sort key per entry.
+    // effectiveTime = 生效時間 (monthly cluster key); signOffTime = 簽收時間 (BUN pre/post sort).
+    const effectiveTime = order.effectiveTime || null;
+    const signOffTime   = order.signOffTime   || null;
+
+    for (const test of LAB_TESTS) {
+      // Date filter: all-time for hepatitis/HIV/RPR, 12 months for everything else
+      if (!ALL_TIME_IDS.has(test.id) && dateObj < cutoff) continue;
+
+      const match = text.match(test.pattern);
+      if (!match) continue;
+
+      let value = match[1];
+      if (!test.qualitative) {
+        // Detection-limit markers: keep "<N" / ">N" as a normalised string
+        // (e.g. "Al鋁: <2"). Downstream consumers naturally degrade — table
+        // rendering parseFloat → NaN → renders as plain text without alarm
+        // colour; URR/Ca×P guard with isFinite; CSV stringifies as-is.
+        // Skipping normalize() for these is safe — the `<` / `>` markers
+        // historically come from manual lab annotations, not unit-conversion
+        // candidates (no test today applies normalize to such values).
+        const trimmed = String(value).replace(/\s+/g, '');
+        if (/^[<>]/.test(trimmed)) {
+          value = trimmed;
+        } else {
+          value = parseFloat(value);
+          if (isNaN(value)) continue;
+          if (test.normalize) {
+            // catalog references normalizers by string name (so it stays
+            // JSON-serialisable); look up the function from the bundled
+            // NORMALIZERS table. Tolerate function references too for
+            // forward/backward compat.
+            const fn = typeof test.normalize === 'function'
+              ? test.normalize
+              : (typeof NORMALIZERS !== 'undefined' && NORMALIZERS[test.normalize]);
+            if (typeof fn === 'function') value = fn(value);
+          }
+        }
+      }
+
+      // Dedupe: prefer signOffTime as the discriminator (it's the most
+      // unique per-draw timestamp), then reportDateTime, finally fall back
+      // to date+value when neither timestamp is present.
+      const existing = results[test.id];
+      const dup = existing.find(e =>
+        e.value === value &&
+        ((e.signOffTime   && e.signOffTime   === signOffTime)   ||
+         (e.reportDateTime && e.reportDateTime === reportDateTime) ||
+         (!e.signOffTime && !e.reportDateTime && e.date === dateStr))
+      );
+      if (!dup) {
+        existing.push({
+          date: dateStr,
+          value,
+          dateObj,
+          reportDateTime,
+          effectiveTime,
+          signOffTime,
+          orderName,
+        });
+      }
+    }
+  }
+
+  // Sort each test's results by date (newest first)
+  for (const id in results) {
+    results[id].sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  // Revision 1 hotfix (2026-05-05): rebuild BUN_pre[] / BUN_post[].
+  // Both regexes match every BUN occurrence, so each entry was being stored
+  // in BOTH arrays — leaving BUN(AD) effectively empty downstream.
+  classifyBUNPrePost(results);
+
+  return results;
+}
+
+/**
+ * Post-processing pass for BUN_pre / BUN_post (revision 1 hotfix).
+ *
+ * Both BUN_pre and BUN_post share the same /BUN:\s*([\d.]+)/ regex, so every
+ * BUN draw lands in BOTH arrays. This pass rebuilds the two arrays so each
+ * physical draw appears exactly once in the correct bucket.
+ *
+ * Method A (primary, cross-hospital safe): sort same-date entries by
+ * signOffTime / dateObj — earliest = pre (洗前), latest = post (洗後).
+ * Method B (fallback): when A is ambiguous (missing timestamps or ties),
+ * match orderName for 洗前 / 洗後 markers.
+ */
+function classifyBUNPrePost(results) {
+  const pre  = results.BUN_pre  || [];
+  const post = results.BUN_post || [];
+  const all  = [...pre, ...post];
+  if (all.length === 0) return results;
+
+  // Dedupe: same physical draw in BUN_pre[] and BUN_post[].
+  const seen = new Set();
+  const dedup = [];
+  for (const e of all) {
+    const tsKey = e.signOffTime
+      || (e.dateObj instanceof Date ? e.dateObj.toISOString() : '')
+      || e.reportDateTime
+      || e.date
+      || '';
+    const key = String(e.value) + '|' + tsKey + '|' + (e.orderName || '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dedup.push(e);
+  }
+
+  // Group by date (YYYY-MM-DD)
+  const byDate = {};
+  for (const e of dedup) {
+    if (!e.date) continue;
+    if (!byDate[e.date]) byDate[e.date] = [];
+    byDate[e.date].push(e);
+  }
+
+  const newPre = [];
+  const newPost = [];
+  for (const date in byDate) {
+    const { pre: p, post: q } = classifyBUNForDate(byDate[date], date);
+    if (p) newPre.push(p);
+    if (q) newPost.push(q);
+  }
+
+  newPre.sort((a, b) => b.date.localeCompare(a.date));
+  newPost.sort((a, b) => b.date.localeCompare(a.date));
+  results.BUN_pre  = newPre;
+  results.BUN_post = newPost;
+  return results;
+}
+
+function _bunEntryTime(e) {
+  if (e.signOffTime) {
+    const t = new Date(e.signOffTime).getTime();
+    if (Number.isFinite(t)) return t;
+  }
+  if (e.dateObj instanceof Date) {
+    const t = e.dateObj.getTime();
+    if (Number.isFinite(t)) return t;
+  }
+  if (e.reportDateTime) {
+    const t = new Date(e.reportDateTime).getTime();
+    if (Number.isFinite(t)) return t;
+  }
+  return null;
+}
+
+function classifyBUNForDate(entries, date) {
+  if (entries.length === 1) return { pre: entries[0], post: null };
+
+  const times = entries.map(_bunEntryTime);
+  const hasMissing = times.some(t => t == null);
+  const present    = times.filter(t => t != null);
+  const hasTie     = present.length !== new Set(present).size;
+
+  // Method A — sort by timestamp; earliest = pre, latest = post.
+  if (!hasMissing && !hasTie) {
+    const sorted = [...entries].sort((a, b) => _bunEntryTime(a) - _bunEntryTime(b));
+    if (sorted.length > 2) {
+      try { console.warn(`[BUN] 3+ entries on date ${date} — taking earliest as pre, latest as post`, entries); } catch (_) {}
+    }
+    return { pre: sorted[0], post: sorted[sorted.length - 1] };
+  }
+
+  // Method B — fallback by orderName text.
+  try { console.warn(`[BUN] classification fell back to orderName for date ${date}`, entries); } catch (_) {}
+  let pre = null, post = null;
+  const unmarked = [];
+  for (const e of entries) {
+    const name = e.orderName || '';
+    if (name.includes('洗後')) {
+      if (!post) post = e;
+    } else if (name.includes('洗前')) {
+      if (!pre) pre = e;
+    } else {
+      unmarked.push(e);
+    }
+  }
+  if (!pre  && unmarked.length > 0) pre  = unmarked.shift();
+  if (!post && unmarked.length > 0) post = unmarked.shift();
+  if (unmarked.length > 0) {
+    try { console.warn(`[BUN] ambiguous on date ${date} — extra unmarked entries dropped`, entries); } catch (_) {}
+  }
+  return { pre, post };
+}
+
+// computeDerivedValues lives in core/compute.js
+
+
+// ─── core/compute.js ──────────────────────────────────────────────────
+// ─── compute.js ───────────────────────────────────────────────
+// computeDerivedValues — pairs BUN_pre/BUN_post (URR) and Ca/P (CaxP) by
+// date and stores the derived series under each COMPUTED_TESTS id.
+//
+// Extracted from hospital-lab-data.html (Phase 1 restructure, 2026-05-08).
+// Companion to lab-extract.js — runs immediately after extractLabValues in
+// the fetchAndStore pipeline.
+
+/**
+ * Compute derived values (URR, Ca*P) from extracted lab data.
+ * Adds entries to the results object under computed test IDs.
+ */
+function computeDerivedValues(results) {
+  for (const ct of COMPUTED_TESTS) {
+    results[ct.id] = [];
+
+    if (ct.id === 'URR') {
+      // Pair BUN_pre and BUN_post by same date
+      const preMap = {};
+      for (const e of (results['BUN_pre'] || [])) {
+        if (!preMap[e.date]) preMap[e.date] = e.value;
+      }
+      for (const e of (results['BUN_post'] || [])) {
+        const pre = preMap[e.date];
+        if (pre != null) {
+          const v = ct.compute(pre, e.value);
+          if (v != null) {
+            results[ct.id].push({ date: e.date, value: v, dateObj: e.dateObj });
+          }
+        }
+      }
+    } else if (ct.id === 'CaxP') {
+      // Pair Ca and P by same date
+      const caMap = {};
+      for (const e of (results['Ca'] || [])) {
+        if (!caMap[e.date]) caMap[e.date] = e.value;
+      }
+      for (const e of (results['P'] || [])) {
+        const ca = caMap[e.date];
+        if (ca != null) {
+          const v = ct.compute(ca, e.value);
+          if (v != null) {
+            results[ct.id].push({ date: e.date, value: v, dateObj: e.dateObj });
+          }
+        }
+      }
+    }
+
+    results[ct.id].sort((a, b) => b.date.localeCompare(a.date));
+  }
+  return results;
+}
+
+
+// ─── core/ui-tabs.js ──────────────────────────────────────────────────
+// ─── ui-tabs.js ───────────────────────────────────────────────
+// switchTab + showToast (toast container declared in body markup)
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - TABS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function showToast(msg, type = 'info', duration = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+
+// ─── core/ui-patient-list.js ──────────────────────────────────────────
+// ─── ui-patient-list.js ───────────────────────────────────────────────
+// Patient list table: columns, sort/filter, render, selection (Phase 1.5)
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - PATIENT LIST  (hotfix v2: sortable + filterable, per-row actions)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Patient selection (Phase 1.5) ───────────────────────────────────────────
+// In-memory Set of chartnos the user has ticked. Intentionally NOT persisted
+// to localStorage — refresh = clear is the documented expected behavior.
+// Export functions consult getSelectedChartNos() to decide scope; null means
+// "all visible patients" (i.e. nothing ticked → export everyone).
+
+const selectedPatients = new Set();
+
+function toggleSelectAll(checked) {
+  // Only flip what's currently visible (after sort/filter), per brief §1.3.
+  document.querySelectorAll('.patient-select').forEach(cb => {
+    cb.checked = checked;
+    if (checked) selectedPatients.add(cb.value);
+    else         selectedPatients.delete(cb.value);
+  });
+  // Also repaint the row backgrounds without a full re-render.
+  document.querySelectorAll('#patientBody tr').forEach(tr => {
+    const cb = tr.querySelector('.patient-select');
+    if (!cb) return;
+    if (cb.checked) { tr.classList.add('row-selected'); tr.style.background = '#eaf4fd'; }
+    else            { tr.classList.remove('row-selected'); tr.style.background = ''; }
+  });
+  updateSelectUI();
+}
+
+function togglePatientSelect(chartno, checked) {
+  if (checked) selectedPatients.add(chartno);
+  else         selectedPatients.delete(chartno);
+  // Lightweight row repaint without a full re-render.
+  const cb = document.querySelector(`.patient-select[value="${CSS.escape(chartno)}"]`);
+  const tr = cb ? cb.closest('tr') : null;
+  if (tr) {
+    if (checked) { tr.classList.add('row-selected'); tr.style.background = '#eaf4fd'; }
+    else         { tr.classList.remove('row-selected'); tr.style.background = ''; }
+  }
+  updateSelectState();
+}
+
+// Sync the header's master checkbox (checked / indeterminate / clear) and
+// refresh the export-button labels. Called after every patient render and
+// after every individual toggle.
+function updateSelectState() {
+  const all     = document.querySelectorAll('.patient-select');
+  const checked = document.querySelectorAll('.patient-select:checked');
+  const master  = document.getElementById('selectAll');
+  if (master) {
+    master.checked       = all.length > 0 && checked.length === all.length;
+    master.indeterminate = checked.length > 0 && checked.length < all.length;
+  }
+  updateSelectUI();
+}
+
+function updateSelectUI() {
+  // Append `(N)` to export button labels when the user has narrowed scope.
+  // Empty selection → revert to plain label (= 全部).
+  const n = selectedPatients.size;
+  const setLabel = (id, base) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.textContent = n > 0 ? `${base} (${n})` : base;
+  };
+  setLabel('btnExportKiDiTi', '匯出KiDiTi資料');
+  setLabel('btnExportCSV',    '匯出csv');
+}
+
+// null = export all tracked patients; array = only those.
+function getSelectedChartNos() {
+  return selectedPatients.size > 0 ? Array.from(selectedPatients) : null;
+}
+
+
+// Column config drives header rendering, sort, and filter widgets.
+// Built once per render so dynamic patientFields (dialysisDays/shift) stay
+// in sync with whatever the active group declares.
+function buildPatientColumns() {
+  const cols = [
+    // Phase 1.5: leftmost selection checkbox column. Width-fixed,
+    // no sort, no filter — renderPatientHead/Body special-case `_select`.
+    { key: '_select',     label: '',         filter: null, sort: null },
+    { key: 'chartno',     label: '病歷號',   filter: 'text', sort: 'localeZh' },
+    { key: 'name',        label: '姓名',     filter: 'text', sort: 'localeZh' },
+    { key: 'sex',         label: '性別',     filter: 'enum', enumOptions: ['M', 'F'], sort: 'string' },
+    { key: 'age',         label: '年齡',     filter: 'text', sort: 'numeric' },
+  ];
+  for (const f of (GROUP.patientFields || [])) {
+    cols.push({
+      key: f.key, label: f.label,
+      filter: 'enum',
+      enumOptions: (f.options || []).slice(),
+      sort: 'enumUnsetLast',
+    });
+  }
+  cols.push({ key: '_lastUpdate', label: '最後更新', filter: null, sort: 'numeric' });
+  cols.push({ key: '_actions',    label: '動作',     filter: null, sort: null });
+  return cols;
+}
+
+function loadSortState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.patientSort)) || null; }
+  catch { return null; }
+}
+function saveSortState(s) {
+  if (s) localStorage.setItem(STORAGE_KEYS.patientSort, JSON.stringify(s));
+  else   localStorage.removeItem(STORAGE_KEYS.patientSort);
+}
+function loadFilterState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.patientFilters)) || {}; }
+  catch { return {}; }
+}
+function saveFilterState(f) {
+  localStorage.setItem(STORAGE_KEYS.patientFilters, JSON.stringify(f || {}));
+}
+
+// Read the value used for sort/filter (handles synthetic _lastUpdate +
+// sex fallback for legacy genderCode-only records).
+function patientCellValue(p, key, labData) {
+  if (key === '_lastUpdate') return labData[p.chartno]?._lastUpdate || 0;
+  if (key === 'sex')         return p.sex || p.genderCode || '';
+  return p[key] != null ? p[key] : '';
+}
+
+function compareForColumn(va, vb, sortType, dir) {
+  const sign = dir === 'desc' ? -1 : 1;
+  if (sortType === 'numeric') {
+    const na = Number(va), nb = Number(vb);
+    const aNan = !Number.isFinite(na), bNan = !Number.isFinite(nb);
+    if (aNan && bNan) return 0;
+    if (aNan) return 1;          // missing values always last
+    if (bNan) return -1;
+    return (na - nb) * sign;
+  }
+  if (sortType === 'enumUnsetLast') {
+    const aUnset = !va || va === '未設定';
+    const bUnset = !vb || vb === '未設定';
+    if (aUnset && !bUnset) return 1;   // 未設定 always at the bottom
+    if (!aUnset && bUnset) return -1;
+    return String(va).localeCompare(String(vb), 'zh-TW') * sign;
+  }
+  if (sortType === 'localeZh') {
+    return String(va || '').localeCompare(String(vb || ''), 'zh-TW') * sign;
+  }
+  return String(va || '').localeCompare(String(vb || '')) * sign;
+}
+
+function applyPatientFilters(list, filters, labData, cols) {
+  const colByKey = new Map(cols.map(c => [c.key, c]));
+  const active = Object.entries(filters).filter(([, v]) => v != null && String(v).trim() !== '' && v !== '(全部)');
+  if (active.length === 0) return list;
+  return list.filter(p => active.every(([key, val]) => {
+    const col = colByKey.get(key);
+    if (!col) return true;
+    const cell = patientCellValue(p, key, labData);
+    if (col.filter === 'enum') return String(cell) === String(val);
+    return String(cell).toLowerCase().includes(String(val).toLowerCase());
+  }));
+}
+
+function applyPatientSort(list, sort, labData) {
+  if (!sort || !sort.column) return list;
+  const cols = buildPatientColumns();
+  const col = cols.find(c => c.key === sort.column);
+  if (!col || !col.sort) return list;
+  return [...list].sort((a, b) => compareForColumn(
+    patientCellValue(a, sort.column, labData),
+    patientCellValue(b, sort.column, labData),
+    col.sort, sort.dir
+  ));
+}
+
+function renderPatientHead(cols, sort, filters) {
+  const head = document.getElementById('patientHead');
+  if (!head) return;
+  const sortInd = (key) => {
+    if (!sort || sort.column !== key) return '';
+    return `<span class="sort-ind">${sort.dir === 'asc' ? '▲' : '▼'}</span>`;
+  };
+  const headerCells = cols.map(c => {
+    if (c.key === '_select') {
+      return `<th style="width:36px;text-align:center"><input type="checkbox" id="selectAll" title="全選/全不選 (僅作用於目前可見列)" onchange="toggleSelectAll(this.checked)"></th>`;
+    }
+    const sortable = !!c.sort;
+    const cls = sortable ? 'sortable' : '';
+    const onClick = sortable ? ` onclick="cyclePatientSort('${c.key}')"` : '';
+    return `<th class="${cls}"${onClick}>${escHtml(c.label)}${sortInd(c.key)}</th>`;
+  }).join('');
+  const filterCells = cols.map(c => {
+    if (!c.filter) return '<th></th>';
+    const cur = filters[c.key] != null ? filters[c.key] : '';
+    if (c.filter === 'enum') {
+      const opts = ['(全部)', ...(c.enumOptions || [])].map(o => {
+        const val = o === '(全部)' ? '' : o;
+        return `<option value="${escAttr(val)}"${String(cur) === String(val) ? ' selected' : ''}>${escHtml(o)}</option>`;
+      }).join('');
+      return `<th><select data-col="${escAttr(c.key)}" onchange="setPatientFilter('${c.key}', this.value)">${opts}</select></th>`;
+    }
+    return `<th><input type="text" data-col="${escAttr(c.key)}" value="${escAttr(cur)}" placeholder="篩選..." oninput="setPatientFilter('${c.key}', this.value)"></th>`;
+  }).join('');
+  head.innerHTML = `<tr>${headerCells}</tr><tr class="filter-row">${filterCells}</tr>`;
+}
+
+function renderPatientBody(visible, cols, labData, totalCount) {
+  const tbody = document.getElementById('patientBody');
+  if (!tbody) return;
+  const colspan = cols.length;
+  if (totalCount === 0) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted" style="padding:24px">尚未追蹤任何病患。請在上方輸入病歷號後按「新增清單」。</td></tr>`;
+    return;
+  }
+  if (visible.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted" style="padding:24px">沒有符合目前篩選條件的病患。</td></tr>`;
+    return;
+  }
+  const fields = (GROUP.patientFields || []);
+  const fieldKeys = new Set(fields.map(f => f.key));
+
+  tbody.innerHTML = visible.map(p => {
+    const isSelected = selectedPatients.has(p.chartno);
+    const rowAttrs = isSelected ? ' class="row-selected" style="background:#eaf4fd"' : '';
+    const cells = cols.map(c => {
+      if (c.key === '_select') {
+        return `<td style="text-align:center"><input type="checkbox" class="patient-select" value="${escAttr(p.chartno)}"${isSelected ? ' checked' : ''} onchange="togglePatientSelect('${p.chartno}', this.checked)"></td>`;
+      }
+      if (c.key === 'chartno') {
+        return `<td><a href="#" onclick="viewPatientLab('${p.chartno}'); return false;" style="color:#2980b9;font-weight:600">${escHtml(p.chartno)}</a></td>`;
+      }
+      if (c.key === 'name') return `<td>${escHtml(p.name || '')}</td>`;
+      if (c.key === 'sex')  return `<td>${escHtml(p.sex || p.genderCode || '')}</td>`;
+      if (c.key === 'age')  return `<td>${escHtml(p.age != null ? String(p.age) : '')}</td>`;
+      if (fieldKeys.has(c.key)) {
+        const f = fields.find(x => x.key === c.key);
+        const cur = p[c.key] != null && p[c.key] !== '' ? p[c.key] : (f.default || '');
+        const opts = (f.options || []).map(o =>
+          `<option value="${escAttr(o)}"${o === cur ? ' selected' : ''}>${escHtml(o)}</option>`
+        ).join('');
+        return `<td><select onchange="updatePatientField('${p.chartno}','${f.key}',this.value)" style="padding:4px 6px;font-size:12px">${opts}</select></td>`;
+      }
+      if (c.key === '_lastUpdate') {
+        const ts = labData[p.chartno]?._lastUpdate;
+        const text = ts ? new Date(ts).toLocaleString('zh-TW') : '<span class="text-muted">未更新</span>';
+        return `<td style="font-size:11px">${text}</td>`;
+      }
+      if (c.key === '_actions') {
+        return `<td class="actions"><span class="row-actions">
+          <button class="btn btn-primary" title="重新抓取此病患資料" data-row-refresh="${escAttr(p.chartno)}" onclick="refreshOnePatient('${p.chartno}', this)">↻</button>
+          <button class="btn btn-danger" title="移除此病患" onclick="confirmRemovePatient('${p.chartno}')">✕</button>
+        </span></td>`;
+      }
+      return '<td></td>';
+    }).join('');
+    return `<tr${rowAttrs}>${cells}</tr>`;
+  }).join('');
+}
+
+function renderPatientList() {
+  const cols     = buildPatientColumns();
+  const patients = loadPatients();
+  const labData  = loadLabData();
+  const sort     = loadSortState();
+  const filters  = loadFilterState();
+  const filtered = applyPatientFilters(patients, filters, labData, cols);
+  const sorted   = applyPatientSort(filtered, sort, labData);
+  renderPatientHead(cols, sort, filters);
+  renderPatientBody(sorted, cols, labData, patients.length);
+  // Master checkbox + export-button labels reflect the surviving Set state.
+  updateSelectState();
+}
+
+// Header click handler — cycles unsorted → asc → desc → unsorted.
+function cyclePatientSort(column) {
+  const cur = loadSortState();
+  let next;
+  if (!cur || cur.column !== column)      next = { column, dir: 'asc' };
+  else if (cur.dir === 'asc')             next = { column, dir: 'desc' };
+  else                                    next = null;
+  saveSortState(next);
+  renderPatientList();
+}
+
+// Filter input handler — text inputs call this on every keystroke. With
+// ≤ ~50 patients the re-render cost is negligible, so no debounce needed.
+// Re-rendering the whole table would steal focus from the input being
+// typed into; we restore focus + caret position after the rebuild.
+function setPatientFilter(column, value) {
+  const filters = loadFilterState();
+  if (value == null || String(value).trim() === '') delete filters[column];
+  else                                              filters[column] = value;
+  saveFilterState(filters);
+
+  const active  = document.activeElement;
+  const wasInput = active && active.tagName === 'INPUT' && active.dataset.col === column;
+  const caret   = wasInput ? active.selectionStart : null;
+
+  renderPatientList();
+
+  if (wasInput) {
+    const next = document.querySelector(`#patientHead input[data-col="${CSS.escape(column)}"]`);
+    if (next) {
+      next.focus();
+      if (caret != null) try { next.setSelectionRange(caret, caret); } catch (_) {}
+    }
+  }
+}
+
+/**
+ * Per-row refresh handler (hotfix v2). Re-fetches labs + demographics for
+ * a single chartNo using the same pipeline as the top-level 更新資料.
+ * The clicked button is disabled with a spinner glyph during the fetch.
+ */
+async function refreshOnePatient(chartno, btn) {
+  const settings = loadSettings();
+  if (!settings.opsid) {
+    showToast('請先到「設定」填寫操作人員代號 (OPSID)', 'error');
+    switchTab('settings');
+    return;
+  }
+  const originalText = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⟳'; }
+  setStatus(`更新 ${chartno} 中...`, true);
+  try {
+    await fetchAndStore(chartno);
+    renderPatientList();
+    setStatus(`已更新: ${chartno}`);
+    showToast(`已更新 ${chartno}`, 'success');
+  } catch (err) {
+    console.warn(`Failed to refresh ${chartno}:`, err);
+    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+    setStatus(`更新失敗: ${chartno}`);
+    showToast(`更新 ${chartno} 失敗`, 'error');
+  }
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : s;
+  return d.innerHTML;
+}
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/** Persist a user-editable field on a patient (dialysisDays / shift selects). */
+function updatePatientField(chartno, key, value) {
+  const patients = loadPatients();
+  const idx = patients.findIndex(p => p.chartno === chartno);
+  if (idx < 0) return;
+  patients[idx][key] = value;
+  savePatients(patients);
+}
+
+
+// ─── core/ui-remove-patient.js ────────────────────────────────────────
+// ─── ui-remove-patient.js ───────────────────────────────────────────────
+// Confirm-modal patient removal (also clears IDB + selection Set)
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UI - REMOVE PATIENT FROM TRACKED LIST
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function confirmRemovePatient(chartno) {
+  const p = loadPatients().find(x => x.chartno === chartno);
+  if (!p) return;
+  document.getElementById('confirmMsg').textContent =
+    `確定要從追蹤清單移除 ${p.name || ''} (${chartno}) 嗎？此病患的檢驗資料也會一併刪除。`;
+  document.getElementById('confirmOkBtn').onclick = async () => {
+    const patients = loadPatients().filter(x => x.chartno !== chartno);
+    savePatients(patients);
+    const labData = loadLabData();
+    delete labData[chartno];
+    saveLabData(labData);
+    try { await ordersCacheDelete(chartno); } catch (e) { console.warn('[ordersCache] delete failed:', e); }
+    selectedPatients.delete(chartno);
+    closeConfirm();
+    renderPatientList();
+    showToast('已移除', 'info');
+  };
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.add('hidden');
+}
+
+
+// ─── core/ui-patient-crud.js ──────────────────────────────────────────
+// ─── ui-patient-crud.js ───────────────────────────────────────────────
+// Patient CRUD pipeline: add / refresh-all / refresh-one + setStatus + parser
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA FETCHING — ID-LIST INPUT + BATCH UPDATE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function setStatus(msg, loading = false) {
+  const bar = document.getElementById('statusBar');
+  bar.innerHTML = (loading ? '<span class="spinner"></span>' : '') + escHtml(msg);
+}
+
+/**
+ * Split a textarea blob into normalized chartNos.
+ * Accepts newlines, commas, semicolons, pipes, or whitespace as separators.
+ * Returns { chartnos: [...unique, normalized], errors: [...rejected raw tokens with reason] }.
+ */
+function parseChartNoList(text) {
+  const result = { chartnos: [], errors: [] };
+  if (!text) return result;
+  const tokens = text.split(/[,;|\s]+/).map(s => s.trim()).filter(Boolean);
+  const seen = new Set();
+  for (const t of tokens) {
+    try {
+      const cn = formatChartNo(t);
+      if (seen.has(cn)) continue;
+      seen.add(cn);
+      result.chartnos.push(cn);
+    } catch (err) {
+      result.errors.push(`${t}: ${err.message}`);
+    }
+  }
+  return result;
+}
+
+/**
+ * Fetch one chartNo end-to-end: hit the API, extract labs, persist to
+ * storage, refresh demographics. Throws on network / parse error.
+ *
+ * Incremental path: if the raw-orders IndexedDB cache already has orders
+ * for this chartno, we run fetchIncremental — typically 1 API call per
+ * patient instead of 5–15. First fetch (or empty cache) falls back to
+ * fetchAllOrders.
+ */
+async function fetchAndStore(chartno) {
+  const cached = await ordersCacheGet(chartno);
+
+  let orders, patientInfo;
+  if (cached && Array.isArray(cached.orders) && cached.orders.length > 0) {
+    // Clone cached orders so the in-place status overwrites in
+    // fetchIncremental don't mutate the IndexedDB-derived array before
+    // the final put writes the merged result.
+    const baseline = cached.orders.map(o => ({ ...o }));
+    const result = await fetchIncremental(chartno, baseline, (n, t) => {
+      setStatus(`${chartno}: 增量更新 ${n} / ${t} 筆`, true);
+    });
+    orders = result.orders;
+    patientInfo = result.patientInfo;
+    console.log(`[incremental] ${chartno}: ${result.pagesChecked} page(s) checked, total ${orders.length}`);
+  } else {
+    const result = await fetchAllOrders(chartno, (n, t) => {
+      setStatus(`${chartno}: 已擷取 ${n} / ${t} 筆`, true);
+    });
+    orders = result.orders;
+    patientInfo = result.patientInfo;
+  }
+
+  // Sub-page enrichment: any manifest testId still missing → selectively
+  // fetch the "請 Click「正式報告」" sub-pages within cutoff (cache-first).
+  // LAB_TESTS = resolved REPORTER_MANIFEST, so adding a new sub-page-only
+  // test now only requires a catalog/manifest change. enrichMissingValues
+  // skips orders whose pattern already matches reportText, so previously
+  // enriched cached orders aren't re-enriched.
+  try {
+    await enrichMissingValues(orders, chartno, LAB_TESTS, {
+      onProgress: msg => setStatus(`${chartno}: ${msg}`, true),
+    });
+  } catch (e) {
+    console.warn('[enrichMissingValues] failed:', e);
+  }
+
+  // Persist raw orders cache (post-enrichment so cached reportText already
+  // includes any sub-page splices).
+  try {
+    await ordersCachePut(chartno, orders);
+  } catch (e) {
+    console.warn('[ordersCache] put failed:', e);
+  }
+
+  let labValues = extractLabValues(orders);
+  labValues = computeDerivedValues(labValues);
+  const allLabData = loadLabData();
+  allLabData[chartno] = { ...labValues, _lastUpdate: Date.now() };
+  saveLabData(allLabData);
+
+  // Demographics refresh on every fetch (revision 1: not user-editable).
+  if (patientInfo) {
+    const patients = loadPatients();
+    const idx = patients.findIndex(p => p.chartno === chartno);
+    if (idx >= 0) {
+      if (patientInfo.name)       patients[idx].name = patientInfo.name;
+      if (patientInfo.genderCode) patients[idx].sex  = patientInfo.genderCode;
+      if (patientInfo.age)        patients[idx].age  = patientInfo.age;
+      savePatients(patients);
+    }
+  }
+}
+
+/**
+ * Handler for the 新增清單 button: parses the textarea, adds any new chartNos
+ * to the tracked list (with default field values), then batch-fetches each.
+ * On completion the textarea is cleared (per revision 1 hotfix).
+ */
+async function addAndUpdateFromInput() {
+  const ta  = document.getElementById('chartnoInput');
+  const raw = ta ? ta.value : '';
+  const { chartnos, errors } = parseChartNoList(raw);
+
+  if (errors.length) {
+    const head = errors.slice(0, 3).join('； ');
+    showToast(`${errors.length} 筆無效病歷號已忽略：${head}${errors.length > 3 ? '…' : ''}`, 'error', 5000);
+  }
+  if (chartnos.length === 0) {
+    if (!errors.length) showToast('請輸入至少一筆病歷號', 'error');
+    return;
+  }
+
+  const settings = loadSettings();
+  if (!settings.opsid) {
+    showToast('請先到「設定」填寫操作人員代號 (OPSID)', 'error');
+    switchTab('settings');
+    return;
+  }
+
+  // Add any new chartNos to the tracked list with default field values.
+  const patients = loadPatients();
+  const fields = (GROUP.patientFields || []);
+  let added = 0;
+  for (const cn of chartnos) {
+    if (!patients.find(p => p.chartno === cn)) {
+      const fresh = { chartno: cn };
+      for (const f of fields) fresh[f.key] = f.default || '';
+      patients.push(fresh);
+      added++;
+    }
+  }
+  if (added > 0) {
+    savePatients(patients);
+    renderPatientList();
+  }
+
+  const btnAdd = document.getElementById('btnAddToList');
+  const btnRef = document.getElementById('btnRefreshList');
+  if (btnAdd) btnAdd.disabled = true;
+  if (btnRef) btnRef.disabled = true;
+  let success = 0, fail = 0;
+  for (let i = 0; i < chartnos.length; i++) {
+    const cn = chartnos[i];
+    setStatus(`新增清單中 (${i + 1}/${chartnos.length}): ${cn}...`, true);
+    try {
+      await fetchAndStore(cn);
+      success++;
+    } catch (err) {
+      fail++;
+      console.warn(`Failed to fetch ${cn}:`, err);
+    }
+  }
+  renderPatientList();
+  if (btnAdd) btnAdd.disabled = false;
+  if (btnRef) btnRef.disabled = false;
+  if (ta && success > 0 && fail === 0) ta.value = '';
+  setStatus(`新增完成: ${success} 成功${fail ? `, ${fail} 失敗` : ''}`);
+  showToast(`新增完成: ${success} 成功${fail ? `, ${fail} 失敗` : ''}`, fail ? 'error' : 'success');
+}
+
+/**
+ * Handler for the 更新資料 button: re-fetch labs + demographics for every
+ * chartNo currently in the patient list (ignores the textarea contents).
+ */
+async function refreshExistingPatients() {
+  const patients = loadPatients();
+  if (patients.length === 0) {
+    showToast('清單為空，請先用「新增清單」加入病人', 'error');
+    return;
+  }
+  const settings = loadSettings();
+  if (!settings.opsid) {
+    showToast('請先到「設定」填寫操作人員代號 (OPSID)', 'error');
+    switchTab('settings');
+    return;
+  }
+
+  const btnAdd = document.getElementById('btnAddToList');
+  const btnRef = document.getElementById('btnRefreshList');
+  if (btnAdd) btnAdd.disabled = true;
+  if (btnRef) btnRef.disabled = true;
+
+  const total = patients.length;
+  let success = 0, fail = 0;
+  for (let i = 0; i < total; i++) {
+    const cn = patients[i].chartno;
+    setStatus(`更新中... ${i + 1} / ${total} (${cn})`, true);
+    try {
+      await fetchAndStore(cn);
+      success++;
+    } catch (err) {
+      fail++;
+      console.warn(`Failed to refresh ${cn}:`, err);
+    }
+  }
+  renderPatientList();
+  if (btnAdd) btnAdd.disabled = false;
+  if (btnRef) btnRef.disabled = false;
+  setStatus(`更新完成: ${success} 成功${fail ? `, ${fail} 失敗` : ''}`);
+  showToast(`更新完成: ${success} 成功${fail ? `, ${fail} 失敗` : ''}`, fail ? 'error' : 'success');
+}
+
+
+// ─── core/ui-lab-view.js ──────────────────────────────────────────────
+// ─── ui-lab-view.js ───────────────────────────────────────────────
+// Per-patient lab history table renderer
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAB DATA TABLE RENDERING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * View lab data for a specific patient.
+ * Switches to the labview tab and renders the full history table.
+ */
+function viewPatientLab(chartno) {
+  const patients = loadPatients();
+  const patient = patients.find(p => p.chartno === chartno);
+  const labData = loadLabData()[chartno];
+
+  // Update header — sex/age come from auto-filled demographics; revision 1
+  // dropped the schedule/frequency text in favor of the patient-row selects.
+  document.getElementById('labPatientName').textContent = patient
+    ? `${patient.name || ''} (${chartno})`
+    : chartno;
+  const sex = patient ? (patient.sex || patient.genderCode || '') : '';
+  const age = patient && patient.age != null ? patient.age + '歲' : '';
+  const dd  = patient ? (patient.dialysisDays || '') : '';
+  const sh  = patient ? (patient.shift || '') : '';
+  document.getElementById('labPatientMeta').textContent =
+    [sex, age, dd, sh].filter(Boolean).join(' ｜ ');
+
+  const wrapper = document.getElementById('labTableWrapper');
+
+  if (!labData) {
+    wrapper.innerHTML = '<p class="text-center text-muted" style="padding:24px">尚無檢驗資料，請先點選「新增清單」或「全部更新」按鈕擷取資料</p>';
+    switchTab('labview');
+    return;
+  }
+
+  // Restrict the table to the active group's manifest so dialysis-specific
+  // form items render in form order; pick up any displayLabel overrides.
+  const manifestEntries = (GROUP.labManifest || []).map(resolveManifestEntry);
+  const manifestIds     = new Set(manifestEntries.map(e => e.id));
+  const labelOverride   = new Map(
+    manifestEntries.filter(e => e.displayLabel).map(e => [e.id, e.displayLabel])
+  );
+  const computedIds = new Set(GROUP.computed || []);
+  const allTests = [
+    ...LAB_TESTS.filter(t => manifestIds.has(t.id)),
+    ...COMPUTED_TESTS.filter(t => computedIds.has(t.id)),
+  ];
+
+  // Step 2: BUN_pre / BUN_post / URR are now resolved per cluster via the
+  // dialysis group's resolveBunClustersFromStored() — same source of truth
+  // as the CSV exporter. The stored BUN_pre / BUN_post arrays now contain
+  // every BUN occurrence twice (one per testId), so per-date dateMap reads
+  // are no longer meaningful for those rows; we override them below.
+  const bunSlots = (typeof GROUP.resolveBunClustersFromStored === 'function')
+    ? GROUP.resolveBunClustersFromStored(labData) : {};
+  const bunPreByDate  = {};
+  const bunPostByDate = {};
+  const urrByDate     = {};
+  for (const startDate in bunSlots) {
+    const slot = bunSlots[startDate];
+    if (slot.pre  && slot.preDate)  bunPreByDate[slot.preDate]   = slot.pre.value;
+    if (slot.post && slot.postDate) bunPostByDate[slot.postDate] = slot.post.value;
+    if (slot.urr != null)           urrByDate[startDate]         = slot.urr;
+  }
+  const overrideMap = {
+    BUN_pre:  bunPreByDate,
+    BUN_post: bunPostByDate,
+    URR:      urrByDate,
+  };
+
+  const dateSet = new Set();
+  for (const test of allTests) {
+    const entries = labData[test.id];
+    if (!entries) continue;
+    for (const e of entries) {
+      dateSet.add(e.date);
+    }
+  }
+  // Make sure every cluster start / pre date / post date appears as a column,
+  // even if no other test was drawn on that exact date.
+  for (const startDate in bunSlots) {
+    dateSet.add(startDate);
+    const slot = bunSlots[startDate];
+    if (slot.preDate)  dateSet.add(slot.preDate);
+    if (slot.postDate) dateSet.add(slot.postDate);
+  }
+
+  const dates = Array.from(dateSet).sort((a, b) => b.localeCompare(a)); // newest first
+
+  if (dates.length === 0) {
+    wrapper.innerHTML = '<p class="text-center text-muted" style="padding:24px">未找到任何檢驗數據</p>';
+    switchTab('labview');
+    return;
+  }
+
+  // Convert dates to Taiwan calendar for header display
+  const dateHeaders = dates.map(d => {
+    const parts = d.split('-');
+    const twYear = +parts[0] - 1911;
+    return `${twYear}/${parts[1]}/${parts[2]}`;
+  });
+
+  // Build table HTML
+  let html = '<table class="lab-table">';
+
+  // Header row with dates
+  html += '<thead><tr>';
+  html += '<th style="min-width:120px;position:sticky;left:0;z-index:3;background:#1a5276">檢驗項目</th>';
+  html += '<th style="min-width:90px;position:sticky;left:120px;z-index:3;background:#1a5276">參考值</th>';
+  dates.forEach((d, i) => {
+    const cls = i === 0 ? ' class="latest-col"' : '';
+    html += `<th${cls}>${dateHeaders[i]}</th>`;
+  });
+  html += '</tr></thead>';
+
+  html += '<tbody>';
+
+  const hasAny = id => {
+    if (overrideMap[id] && Object.keys(overrideMap[id]).length > 0) return true;
+    return labData[id] && labData[id].length > 0;
+  };
+
+  // Group tests by category — restricted to allTests (already manifest-filtered)
+  for (const cat of LAB_CATEGORIES) {
+    const testsInCat = allTests.filter(t => t.cat === cat.id);
+    if (testsInCat.length === 0) continue;
+    // Check if category has any data (includes Step 2 BUN/URR overrides)
+    const hasData = testsInCat.some(t => hasAny(t.id));
+    if (!hasData) continue;
+
+    // Category header row
+    html += `<tr class="row-category"><td colspan="${dates.length + 2}">${cat.label}</td></tr>`;
+
+    for (const test of testsInCat) {
+      if (!hasAny(test.id)) continue;
+      const entries = labData[test.id] || [];
+
+      // Build a date -> value map. For BUN_pre / BUN_post / URR (Step 2),
+      // the override map IS the source of truth (resolveBUN per cluster);
+      // ignore raw stored entries which now contain duplicates.
+      const dateMap = overrideMap[test.id]
+        ? Object.assign({}, overrideMap[test.id])
+        : (() => {
+            const m = {};
+            for (const e of entries) {
+              if (!(e.date in m)) m[e.date] = e.value; // first wins (newest if pre-sorted)
+            }
+            return m;
+          })();
+
+      const lbl = labelOverride.get(test.id) || test.label;
+      html += '<tr class="row-item">';
+      html += `<td>${lbl}</td>`;
+      html += `<td>${test.ref || ''} ${test.unit ? '(' + test.unit + ')' : ''}</td>`;
+
+      dates.forEach((d, i) => {
+        const val = dateMap[d];
+        const cls = i === 0 ? ' latest-col' : '';
+
+        if (val == null) {
+          html += `<td class="${cls}"></td>`;
+          return;
+        }
+
+        // Determine color class
+        let valCls = '';
+        if (test.qualitative) {
+          // Qualitative: Reactive/positive = red, Non-Reactive/negative = green
+          const lower = String(val).toLowerCase();
+          if (lower.includes('reactive') && !lower.includes('non')) {
+            valCls = 'val-q-pos';
+          } else if (lower.includes('non-reactive') || lower.includes('negative') || lower.includes('nonreactive')) {
+            valCls = 'val-q-neg';
+          }
+        } else {
+          const numVal = typeof val === 'number' ? val : parseFloat(val);
+          if (!isNaN(numVal)) {
+            // Gender-aware threshold: pick loM/hiM or loF/hiF when the
+            // catalog entry provides them and patient sex is known
+            // ('M'/'F' from genderCode). Falls back to lo/hi (wide envelope)
+            // for unknown sex or non-gendered tests.
+            const sex = patient && (patient.sex || patient.genderCode);
+            let hi = test.hi, lo = test.lo;
+            if (sex === 'M' && (test.hiM != null || test.loM != null)) {
+              if (test.hiM != null) hi = test.hiM;
+              if (test.loM != null) lo = test.loM;
+            } else if (sex === 'F' && (test.hiF != null || test.loF != null)) {
+              if (test.hiF != null) hi = test.hiF;
+              if (test.loF != null) lo = test.loF;
+            }
+            if (hi != null && numVal > hi) valCls = 'val-hi';
+            else if (lo != null && numVal < lo) valCls = 'val-lo';
+          }
+        }
+
+        html += `<td class="${valCls}${cls}">${val}</td>`;
+      });
+
+      html += '</tr>';
+    }
+  }
+
+  html += '</tbody></table>';
+  wrapper.innerHTML = html;
+  switchTab('labview');
+}
+
+
+// ─── core/ui-settings.js ──────────────────────────────────────────────
+// ─── ui-settings.js ───────────────────────────────────────────────
+// Settings tab: load / save base URL + OPSID
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function loadSettingsUI() {
+  const s = loadSettings();
+  document.getElementById('settingBaseUrl').value = s.baseUrl || '';
+  document.getElementById('settingOpsid').value = s.opsid || '';
+}
+
+function saveSettings() {
+  const baseUrl = document.getElementById('settingBaseUrl').value.trim().replace(/\/+$/, '');
+  const opsid = document.getElementById('settingOpsid').value.trim();
+  saveSettingsData({ baseUrl: baseUrl || 'http://ernode.vghb12.vhtt.gov.tw:8000', opsid });
+  showToast('設定已儲存', 'success');
+}
+
+
+// ─── core/export-utils.js ─────────────────────────────────────────────
+// ─── export-utils.js ───────────────────────────────────────────────
+// downloadBlob + exportCombinedCSV (group exporter delegate)
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPORT — combined long-format CSV
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Export all tracked patients × YYYYMM as a single long-format CSV.
+ * Layout (header, rows) lives in GROUP.exporter.formatAll (groups/dialysis.js).
+ */
+function exportCombinedCSV() {
+  if (!GROUP.exporter || typeof GROUP.exporter.formatAll !== 'function') {
+    showToast('此疾病模組尚未提供 CSV 匯出', 'error'); return;
+  }
+  let patients = loadPatients();
+  if (patients.length === 0) { showToast('尚無病患可匯出', 'error'); return; }
+
+  // Phase 1.5: respect ticked subset; null = export everyone.
+  const selected = getSelectedChartNos();
+  if (selected) {
+    const wanted = new Set(selected);
+    patients = patients.filter(p => wanted.has(p.chartno || p.chartNo));
+    if (!patients.length) {
+      showToast('勾選的病患都不在清單中', 'error'); return;
+    }
+  }
+
+  const labData  = loadLabData();
+  const csv      = GROUP.exporter.formatAll(patients, labData);
+  // BOM so Excel opens UTF-8 without garbling Chinese display labels.
+  const blob     = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const filename = GROUP.exporter.filename
+    ? GROUP.exporter.filename()
+    : `dialysis_export_${todayStr()}.csv`;
+  downloadBlob(blob, filename);
+  const scope = selected ? `${patients.length} 位勾選` : `${patients.length} 位全部`;
+  showToast(`CSV 已匯出（${scope}）`, 'success');
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+// ─── core/init.js ─────────────────────────────────────────────────────
+// ─── init.js ───────────────────────────────────────────────
+// DOMContentLoaded — load settings into UI, render patient list
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettingsUI();
+  renderPatientList();
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// EXPORT FORMATS (built by build.js, source: export-formats/*.js)
+//   Loaded: kiditi-csv
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── export-formats/kiditi-csv.js ────────────────────────────────────────
+// ─── kiditi-csv.js ───────────────────────────────────────────────
+// KiDiTi 檢驗記錄 CSV — 58 positional fields, no header, BOM + CRLF
+//
+// Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
+// 2026-05-08). Functions stay top-level; the build concatenates every
+// core/*.js into a single <script> block, so cross-module calls Just Work
+// the way they did in the monolith.
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPORT — KiDiTi 檢驗記錄 (58-field positional CSV)
+// ═══════════════════════════════════════════════════════════════════════════════
+// KiDiTi 平台規格：
+//   - UTF-8 with BOM, comma-delimited, NO header row.
+//   - 58 fields by position; missing values MUST be empty (not 0 — 0 會被算進
+//     統計). Numeric fields use toFixed(N) per `N x.y` spec; string fields are
+//     emitted as-is (quoted only if they contain a comma or quote).
+//   - 日期：民國年 7 碼 RRRMMDD（114→2025）。
+//   - HBsAg / Anti-HCV: Reactive→Y、Non-Reactive→N、缺值→O（未做）。
+// One row per (patient × monthly check). Reuses the same monthly draw detection
+// as 匯出csv (生效時間叢集 + 月初優先) so both exports stay date-aligned.
+
+function _kdtToMinguoDate(isoDate) {
+  if (!isoDate) return '';
+  const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const y = (parseInt(m[1], 10) - 1911);
+  return `${y}${m[2]}${m[3]}`;
+}
+
+function _kdtFmtNum(value, decimals) {
+  if (value == null || value === '') return '';
+  const n = parseFloat(value);
+  if (!isFinite(n)) return '';   // covers '<2' / 'N/A' / etc. — KiDiTi wants blank
+  return n.toFixed(decimals != null ? decimals : 2);
+}
+
+function _kdtMapHepYNO(value) {
+  if (value == null || value === '') return 'O';
+  const s = String(value).trim().toLowerCase();
+  if (s === 'reactive' || s === 'positive' || s === '+' || s === 'pos') return 'Y';
+  if (s === 'non-reactive' || s === 'nonreactive' || s === 'negative' || s === '-' || s === 'neg') return 'N';
+  return 'O';
+}
+
+function _kdtCsvCell(v) {
+  if (v == null) return '';
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+// One value per (testId, draw): the lab entry stored at the draw cluster.
+function _kdtVal(draw, id) {
+  const e = draw && draw.labs && draw.labs[id];
+  return e && e.value != null ? e.value : '';
+}
+
+/**
+ * Export every tracked patient × monthly draw as a KiDiTi 檢驗記錄 CSV.
+ * Field order and decimals follow TASK_BRIEF_phase2_dialysis_kiditi §3.5.
+ */
+function exportKiDiTiCSV() {
+  let patients = loadPatients();
+  if (!patients.length) { showToast('尚無病患可匯出', 'error'); return; }
+
+  // Phase 1.5: respect ticked subset; null = export everyone.
+  const selected = getSelectedChartNos();
+  if (selected) {
+    const wanted = new Set(selected);
+    patients = patients.filter(p => wanted.has(p.chartno || p.chartNo));
+    if (!patients.length) {
+      showToast('勾選的病患都不在清單中', 'error'); return;
+    }
+  }
+
+  const allLabData = loadLabData();
+  const rows = [];
+  for (const p of patients) {
+    const cn = p.chartno || p.chartNo || '';
+    if (!cn) continue;
+    const labData = allLabData[cn];
+    if (!labData) continue;
+    const draws   = DIALYSIS_GROUP.detectMonthlyDrawsFromStored(labData);
+    const byMonth = DIALYSIS_GROUP.pickEarliestPerMonth(draws);
+    const months  = Object.keys(byMonth).sort();
+    if (!months.length) continue;
+
+    const idno    = (p.idno || p.idNo || '').toString().trim();
+    const chartno = String(cn).padStart(10, '0');
+
+    for (const yyyymm of months) {
+      const draw = byMonth[yyyymm];
+
+      // Inline computed: UIBC = TIBC − Fe, CaxP = Ca × P (per draw, by date).
+      const tibc = parseFloat(_kdtVal(draw, 'TIBC'));
+      const fe   = parseFloat(_kdtVal(draw, 'Fe'));
+      const uibc = (isFinite(tibc) && isFinite(fe)) ? (tibc - fe) : '';
+      const ca   = parseFloat(_kdtVal(draw, 'Ca'));
+      const ph   = parseFloat(_kdtVal(draw, 'P'));
+      const caxp = (isFinite(ca) && isFinite(ph)) ? (ca * ph) : '';
+
+      const row = [
+        idno,                                                  // 01 身份證號 (S 10)
+        chartno,                                               // 02 病歷號 (S 10)
+        _kdtToMinguoDate(draw.drawDate),                       // 03 日期 (S 7) RRRMMDD
+        _kdtFmtNum(_kdtVal(draw, 'WBC')),                      // 04 W.B.C.
+        _kdtFmtNum(_kdtVal(draw, 'RBC')),                      // 05 R.B.C.
+        _kdtFmtNum(_kdtVal(draw, 'Hb')),                       // 06 Hb
+        _kdtFmtNum(_kdtVal(draw, 'HCT')),                      // 07 Hct
+        _kdtFmtNum(_kdtVal(draw, 'MCV')),                      // 08 MCV
+        _kdtFmtNum(_kdtVal(draw, 'Platelet')),                 // 09 Platelet
+        _kdtFmtNum(_kdtVal(draw, 'TP')),                       // 10 Total protein
+        _kdtFmtNum(_kdtVal(draw, 'Albumin')),                  // 11 Albumin
+        _kdtFmtNum(_kdtVal(draw, 'GOT')),                      // 12 AST/GOT
+        _kdtFmtNum(_kdtVal(draw, 'GPT')),                      // 13 ALT/GPT
+        _kdtFmtNum(_kdtVal(draw, 'ALP')),                      // 14 Alkaline-P
+        _kdtFmtNum(_kdtVal(draw, 'TBIL')),                     // 15 Total Bilirubin
+        _kdtFmtNum(_kdtVal(draw, 'CHOL')),                     // 16 Cholesterol
+        _kdtFmtNum(_kdtVal(draw, 'TG')),                       // 17 Triglyceride
+        _kdtFmtNum(_kdtVal(draw, 'GluAC')),                    // 18 Glucose AC
+        '', '', '', '', '',                                    // 19–23 透析前/後 BP / 體重 / 透析時間 (空)
+        _kdtFmtNum(_kdtVal(draw, 'BUN_pre')),                  // 24 透析前BUN
+        _kdtFmtNum(_kdtVal(draw, 'BUN_post')),                 // 25 透析後BUN
+        '', '',                                                // 26–27 下次透析前BUN / 兩次透析間隔 (空)
+        _kdtFmtNum(_kdtVal(draw, 'CREAT')),                    // 28 Creatinine
+        _kdtFmtNum(_kdtVal(draw, 'UA')),                       // 29 Uric acid
+        _kdtFmtNum(_kdtVal(draw, 'Na')),                       // 30 Na
+        _kdtFmtNum(_kdtVal(draw, 'K')),                        // 31 K
+        _kdtFmtNum(_kdtVal(draw, 'Cl')),                       // 32 Cl
+        _kdtFmtNum(_kdtVal(draw, 'Ca')),                       // 33 全鈣 Ca
+        _kdtFmtNum(_kdtVal(draw, 'FreeCa')),                   // 34 離子鈣
+        _kdtFmtNum(_kdtVal(draw, 'P')),                        // 35 P
+        _kdtFmtNum(_kdtVal(draw, 'Fe')),                       // 36 Fe
+        _kdtFmtNum(uibc),                                      // 37 UIBC = TIBC − Fe
+        _kdtFmtNum(_kdtVal(draw, 'TIBC')),                     // 38 TIBC
+        _kdtFmtNum(_kdtVal(draw, 'Ferritin')),                 // 39 Ferritin
+        _kdtFmtNum(_kdtVal(draw, 'Aluminum')),                 // 40 Al
+        _kdtFmtNum(_kdtVal(draw, 'Mg')),                       // 41 Mg
+        _kdtFmtNum(_kdtVal(draw, 'iPTH')),                     // 42 intact-PTH
+        '',                                                    // 43 CTR (N 7.3, 空)
+        _kdtMapHepYNO(_kdtVal(draw, 'HBsAg')),                 // 44 HBsAg → Y/N/O
+        _kdtMapHepYNO(_kdtVal(draw, 'AntiHCV')),               // 45 Anti-HCV → Y/N/O
+        '',                                                    // 46 EKG (S 40, 空)
+        '',                                                    // 47 身高 (N 7.3, 空)
+        '', '', '', '', '', '',                                // 48–53 自訂一~六 (N 7.2, 空)
+        '', '',                                                // 54–55 自訂七、八 (S 30, 空)
+        _kdtFmtNum(caxp),                                      // 56 鈣磷乘積 = Ca × P
+        '',                                                    // 57 HCV-RNA (IU/ML) (空 — ernode 無)
+        '',                                                    // 58 HCV-RNA 定性 (空 — ernode 無)
+      ];
+      rows.push(row.map(_kdtCsvCell).join(','));
+    }
+  }
+
+  if (!rows.length) {
+    showToast('沒有可匯出的月檢資料（請先「全部更新」）', 'error');
+    return;
+  }
+
+  // CRLF line endings — Windows-friendly and what the KiDiTi importer expects.
+  const csv = rows.join('\r\n') + '\r\n';
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, `KiDiTi_檢驗記錄_${todayStr()}.csv`);
+  const scope = selected ? `${patients.length} 位勾選` : `${patients.length} 位全部`;
+  showToast(`KiDiTi CSV 已匯出（${scope}，${rows.length} 列）`, 'success');
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// DISEASE INIT — disease: dialysis
+// ════════════════════════════════════════════════════════════════════════════
+</script>
+</body>
+</html>
