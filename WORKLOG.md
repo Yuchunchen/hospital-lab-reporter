@@ -1,5 +1,52 @@
 # WORKLOG
 
+## 2026-05-08 — Phase 2: 匯出KiDiTi資料 + button bar 改版
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（button bar UI + 新 exportKiDiTiCSV + sync 拉新 manifest）
+- 變更：新增 + 修改
+- 檔案：`hospital-lab-data.html`（button bar、新 export 函式、stale 提示
+  文案同步）+ patterns 區塊由 sync 重產（FreeCa / Mg / UIBC manifest entries）
+- 原因：
+  1. KiDiTi 平台「檢驗記錄」需固定 58 欄 positional CSV、無 header、
+     民國年 7 碼日期、Reactive→Y/Non-Reactive→N/缺值→O；reporter 之前
+     只有「匯出csv」是 long-format（含 header），無法直接灌 KiDiTi。
+  2. button bar 三顆按鈕改視覺層級：把「更新資料」改名「全部更新」並
+     放大到與匯出按鈕同 size（primary 主動作）；新增「匯出KiDiTi資料」
+     橘色大按鈕跟「匯出csv」並列。
+- 具體變更：
+  - § Button bar：`<button class="btn btn-primary btn-sm">更新資料</button>` →
+    `<button class="btn btn-primary" style="padding:12px 32px;font-size:1.15em;
+    font-weight:600;box-shadow:0 2px 6px rgba(52,152,219,0.35);margin-right:16px;">
+    全部更新</button>`；其後加 `匯出KiDiTi資料` 按鈕（btn-warning，同 size）；
+    既有「匯出 CSV」改文案為「匯出csv」。
+  - § exportKiDiTiCSV()：依 TASK_BRIEF §3.5 完整對應 58 欄。helpers
+    `_kdtToMinguoDate`（YYYY-MM-DD → RRRMMDD）、`_kdtFmtNum`（toFixed
+    + 缺值留空，**不**填 0；`<2` 等非數值字串自動 → 空）、
+    `_kdtMapHepYNO`（Reactive/Positive→Y、Non-Reactive/Negative→N、
+    其他→O）、`_kdtCsvCell`（含 `,` 或 `"` 的字串才包引號）。
+  - 月檢辨識重用 `DIALYSIS_GROUP.detectMonthlyDrawsFromStored` +
+    `pickEarliestPerMonth` —— 兩個 export 用同一條 pipeline 確保日期對齊。
+  - UIBC / CaxP 在 export 函式裡 inline 計算（`TIBC - Fe` / `Ca * P`），
+    沒污染 `computeDerivedValues`，避免影響 viewer 端。
+  - CSV 輸出：UTF-8 + BOM、CRLF line endings、無 header row、檔名
+    `KiDiTi_檢驗記錄_YYYYMMDD.csv`、空值留空字串（不填 0，符合 KiDiTi
+    「填 0 會列入統計」規定）。
+  - patterns 區塊：跑 `node sync-patterns.js` 拉新版 LAB_TESTS（FreeCa /
+    Mg / UIBC 加進 reporter manifest，dialysis 端 `extractLabValues` 才會
+    store）。
+  - 同步把「請先點選『新增清單』或『更新資料』」hint 改為「全部更新」。
+- 測試：YC 在實機驗收 — (1) button bar 視覺：左組「新增清單」、右組
+  「全部更新（藍）→ 匯出KiDiTi資料 → 匯出csv（兩顆橘）」三顆同 size；
+  (2) 至少一筆透析病人有月檢資料 → 點「匯出KiDiTi資料」 → 下載
+  `KiDiTi_檢驗記錄_YYYYMMDD.csv`，用 Notepad 開：UTF-8 BOM、無 header、
+  每列 58 個逗號分隔欄位、日期欄位 7 碼民國年（如 `1140507`）、HBsAg /
+  Anti-HCV 欄位是 Y/N/O 單字、空欄真的空（不是 0 也不是 null）；(3)
+  「匯出csv」仍能正常匯出 long-format CSV（與改版前一致）；(4) 灌進
+  KiDiTi 平台驗證通過。
+- 相依：依賴 `hospital-lab-patterns` 同日 commit（reporter manifest 加
+  FreeCa/Mg/UIBC）。本 repo 已跑 `node sync-patterns.js`。
+
 ## 2026-05-08 — ordersCache 從 localStorage 搬到 IndexedDB
 
 - 作者：claude（與 YC 共同）
