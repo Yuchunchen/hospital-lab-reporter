@@ -1,5 +1,41 @@
 # WORKLOG
 
+## 2026-05-07 — incremental fetch（stable-frontier、ordersCache_dialysis）
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（fetchAndStore + 新 fetchIncremental + raw-orders cache）
+- 變更：新增 + 修改
+- 檔案：`hospital-lab-data.html`
+- 原因：`更新資料` 對 30 位透析病人重抓 = 150–450 個 ernode API call，
+  但 signed-off 報告 immutable，>95% 重抓資料一模一樣。改用 stable-frontier
+  增量演算法：ernode 回傳 newest-first，逐頁掃 cached orders，遇到第
+  一頁 ALL ordseq 都 known + status 不變 → 之後頁也都不變 → STOP。
+  每位病人常見 1 個 API call（30 位 × 1 = 30 個 call，從 150–450 降到
+  ~30）。具體變更：
+  - 新增 `fetchIncremental(chartno, cachedOrders, onProgress)`：用
+    `Map(ordseq → {idx,status})` 比對，新醫囑 prepend、status 變動的
+    in-place overwrite cached entry，allKnown 旗標決定是否提早收手。
+  - 新增 `ORDERS_CACHE_KEY = 'ordersCache_dialysis'` + `loadOrdersCache`
+    / `saveOrdersCache`，結構 `{ chartno: { orders, ts } }`。30 位 ×
+    ~100KB ≈ 3MB（localStorage 5–10MB 限制內）。`saveOrdersCache` catch
+    quota error → 該病人下次 fall back 到 full fetch（graceful degradation）。
+  - `fetchAndStore()` 改為：有 cache → 跑 `fetchIncremental` 並顯示
+    `增量更新 N / T 筆`；沒 cache → 跑原本的 `fetchAllOrders` 顯示
+    `已擷取 N / T 筆`。enrichment + extractLabValues + computeDerivedValues
+    + demographics 流程不變。Cache 存放點在 enrichment 之後，所以
+    cached reportText 已含 sub-page splice。
+  - `confirmRemovePatient()`：刪 `patients_dialysis` + `labs_dialysis`
+    時順手刪 `ordersCache_dialysis[chartno]`。
+- 測試：YC 在實機驗收 — (1) 新加入一位病人 → console 應只看到原本的
+  `已擷取 N / T 筆` 訊息；(2) 立刻按 `更新資料` → console 應看到
+  `[incremental] xxxx: 1 page(s) checked, total N` 且 DevTools Network
+  每位病人只有 1 個 ernode request；(3) CSV 匯出與 incremental 前一致；
+  (4) 移除一位病人後 `localStorage.getItem('ordersCache_dialysis')`
+  不應再有該 chartno key。
+- 相依：本 repo 內部修改，**不需** patterns repo 改動。Viewer 端在
+  另一個 commit 已先實作（v3→v4 cache key bump + fetchIncremental 同
+  演算法）。
+
 ## 2026-05-07 — sync 拉新版 catalog（49 條 numeric capture 加 `[<>]?\s*`）
 
 - 作者：claude（與 YC 共同）

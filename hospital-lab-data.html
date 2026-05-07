@@ -2063,6 +2063,93 @@ async function fetchAllOrders(chartno, onProgress) {
   return { orders: all, patientInfo };
 }
 
+/**
+ * Stable-frontier incremental fetch. ernode returns orders newest-first;
+ * signed-off reports (正式報告/更正報告) are immutable, only 未執行 orders
+ * can change (later get a report). So once we hit a page where every order
+ * is known AND its status is unchanged, every page beyond is also unchanged.
+ *
+ * Common case (no new orders) = 1 API call instead of 5–15.
+ *
+ * @param {string} chartno
+ * @param {Array}  cachedOrders - prior orders (will have status updates
+ *                                applied in-place; clone before passing if
+ *                                the caller needs to keep the original).
+ * @param {Function} onProgress - (fetched, total) => void
+ */
+async function fetchIncremental(chartno, cachedOrders, onProgress) {
+  const settings = loadSettings();
+  const baseUrl = settings.baseUrl;
+
+  const knownMap = new Map();
+  cachedOrders.forEach((o, i) => knownMap.set(o.ordseq, { idx: i, status: o.status }));
+
+  const newOrders = [];
+  let url = `${baseUrl}/order/get_lab_orders?chartno=${chartno}&opsid=${settings.opsid}`;
+  let page = 0, total = 0, patientInfo = null;
+
+  while (url) {
+    page++;
+    if (page > 50) break;
+
+    const resp = await fetch(url, { credentials: 'omit' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const html = await resp.text();
+    const result = parseOrdersPage(html, chartno, baseUrl);
+    if (page === 1) {
+      if (result.total) total = result.total;
+      if (result.patientInfo) patientInfo = result.patientInfo;
+    }
+
+    let allKnown = true;
+    for (const order of result.orders) {
+      const known = knownMap.get(order.ordseq);
+      if (!known) {
+        newOrders.push(order);
+        allKnown = false;
+      } else if (known.status !== order.status) {
+        // Typically 未執行 → 正式報告 — overwrite cached entry with new data.
+        cachedOrders[known.idx] = order;
+        allKnown = false;
+      }
+      // else: known + unchanged → stable hit
+    }
+
+    if (onProgress) onProgress(cachedOrders.length + newOrders.length, total || '?');
+    if (allKnown || !result.nextUrl) break;
+    url = result.nextUrl;
+  }
+
+  // newOrders are newer (came from earlier pages) → prepend to keep newest-first.
+  const merged = newOrders.concat(cachedOrders);
+  return { orders: merged, patientInfo, pagesChecked: page };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RAW ORDERS CACHE (for incremental fetch, 2026-05-07)
+// ═══════════════════════════════════════════════════════════════════════════════
+// localStorage `ordersCache_dialysis`: { chartno: { orders, ts } }
+// Used as the baseline for fetchIncremental. ~3MB for 30 patients (well within
+// 5–10MB localStorage budget). Quota errors are caught and logged — patient
+// just falls back to a full fetch next time. Cache is invalidated by quota,
+// not TTL; signed-off orders are immutable.
+
+const ORDERS_CACHE_KEY = 'ordersCache_dialysis';
+
+function loadOrdersCache() {
+  try { return JSON.parse(localStorage.getItem(ORDERS_CACHE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveOrdersCache(cache) {
+  try { localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify(cache)); }
+  catch (e) {
+    // Most likely QuotaExceededError. Log; the affected patient(s) will
+    // just do a full fetch next round — graceful degradation.
+    console.warn('[ordersCache] save failed:', e);
+  }
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUB-PAGE ENRICHMENT (manifest-driven, two-pass)
@@ -2813,6 +2900,11 @@ function confirmRemovePatient(chartno) {
     const labData = loadLabData();
     delete labData[chartno];
     saveLabData(labData);
+    const ordersCache = loadOrdersCache();
+    if (ordersCache[chartno]) {
+      delete ordersCache[chartno];
+      saveOrdersCache(ordersCache);
+    }
     closeConfirm();
     renderPatientList();
     showToast('已移除', 'info');
@@ -2860,16 +2952,41 @@ function parseChartNoList(text) {
 /**
  * Fetch one chartNo end-to-end: hit the API, extract labs, persist to
  * localStorage, refresh demographics. Throws on network / parse error.
+ *
+ * Incremental path (2026-05-07): if `ordersCache_dialysis` already has raw
+ * orders for this chartno, we run fetchIncremental — typically 1 API call
+ * per patient instead of 5–15. First fetch (or empty cache) falls back to
+ * fetchAllOrders.
  */
 async function fetchAndStore(chartno) {
-  const { orders, patientInfo } = await fetchAllOrders(chartno, (n, t) => {
-    setStatus(`${chartno}: 已擷取 ${n} / ${t} 筆`, true);
-  });
+  const ordersCache = loadOrdersCache();
+  const cached = ordersCache[chartno];
+
+  let orders, patientInfo;
+  if (cached && Array.isArray(cached.orders) && cached.orders.length > 0) {
+    // Clone cached orders so the in-place status overwrites in
+    // fetchIncremental don't poison the in-memory cache object before save.
+    const baseline = cached.orders.map(o => ({ ...o }));
+    const result = await fetchIncremental(chartno, baseline, (n, t) => {
+      setStatus(`${chartno}: 增量更新 ${n} / ${t} 筆`, true);
+    });
+    orders = result.orders;
+    patientInfo = result.patientInfo;
+    console.log(`[incremental] ${chartno}: ${result.pagesChecked} page(s) checked, total ${orders.length}`);
+  } else {
+    const result = await fetchAllOrders(chartno, (n, t) => {
+      setStatus(`${chartno}: 已擷取 ${n} / ${t} 筆`, true);
+    });
+    orders = result.orders;
+    patientInfo = result.patientInfo;
+  }
 
   // Sub-page enrichment: any manifest testId still missing → selectively
   // fetch the "請 Click「正式報告」" sub-pages within cutoff (cache-first).
   // LAB_TESTS = resolved REPORTER_MANIFEST, so adding a new sub-page-only
-  // test now only requires a catalog/manifest change.
+  // test now only requires a catalog/manifest change. enrichMissingValues
+  // skips orders whose pattern already matches reportText, so previously
+  // enriched cached orders aren't re-enriched.
   try {
     await enrichMissingValues(orders, chartno, LAB_TESTS, {
       onProgress: msg => setStatus(`${chartno}: ${msg}`, true),
@@ -2877,6 +2994,11 @@ async function fetchAndStore(chartno) {
   } catch (e) {
     console.warn('[enrichMissingValues] failed:', e);
   }
+
+  // Persist raw orders cache (post-enrichment so cached reportText already
+  // includes any sub-page splices). Quota-exceeded is caught in saveOrdersCache.
+  ordersCache[chartno] = { orders, ts: Date.now() };
+  saveOrdersCache(ordersCache);
 
   let labValues = extractLabValues(orders);
   labValues = computeDerivedValues(labValues);
