@@ -158,4 +158,21 @@ if (!fs.existsSync(GROUPS_DIR)) {
 fs.writeFileSync(HTML_FILE, html, 'utf8');
 console.log('  ↳ ' + HTML_FILE);
 console.log('');
+
+// ─── 3. Phase 1 build pipeline ───────────────────────────────────────────
+// build.js produces the new hospital-lab-<disease>.html files. Run it from
+// the same sync entry-point so a single command keeps both legacy and new
+// outputs current. Skip silently if build.js is absent (older checkouts).
+const BUILD_SCRIPT = path.join(__dirname, 'build.js');
+if (fs.existsSync(BUILD_SCRIPT)) {
+  try {
+    const { buildOne, DISEASES } = require(BUILD_SCRIPT);
+    for (const id of Object.keys(DISEASES)) buildOne(id);
+  } catch (e) {
+    console.error('! build.js failed:', e && e.message ? e.message : e);
+    process.exitCode = 1;
+  }
+}
+
+console.log('');
 console.log('✓ Sync complete. Refresh the HTML in your browser to load new patterns / groups.');
