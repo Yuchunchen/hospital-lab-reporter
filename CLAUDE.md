@@ -37,6 +37,8 @@
 
 37 項檢驗，定義集中於 [hospital-lab-patterns](https://github.com/Yuchunchen/hospital-lab-patterns) repo (`patterns/reporter.js`)，由 `sync-patterns.js` 同步進 HTML。每項定義包含：`id`, `cat`, `label`, `pattern` (regex), `unit`, `ref`, `hi`, `lo`, `filter`（可選）。
 
+**Note:** 下表為 2026-05-05 快照；2026-05-07 後所有 numeric capture group 已改成 `([<>]?\s*[\d.]+)` 支援偵測下限值。以 catalog.js 為準。
+
 主要項目與 regex pattern：
 
 | 分類 | 項目 | Pattern | 備註 |
@@ -104,8 +106,8 @@ if (test.filter === 'standalone_bun' && order.orderName.includes(',')) continue;
 `fetchAndStore()` 在 `extractLabValues()` 之前跑通用 `enrichMissingValues()`：
 對 catalog 帶 `subpage.orderNameMatch` opt-in 的 test，若該 order 主
 reportText 抓不到主 regex，就 fetch opdweb `OpdOrderReport.aspx` 子頁面
-補值。子頁面文字以 `ordapno` 為 key 持久化進 localStorage
-`enrichCache_dialysis`（lab 報告簽收後不變動，無 TTL）。Strict opt-in：
+補值。子頁面文字以 `ordapno` 為 key 持久化進 localStorage `enrichCache_dialysis`
+（lab 報告簽收後不變動，無 TTL；體積小，保留 localStorage 不遷 IndexedDB）。Strict opt-in：
 non-subpage missing 的 test **不會** brute-fetch（避免一個 globally-missing
 test 拖累全 order 被 fetch）。機制細節見
 `hospital-lab-patterns/PROJECT_CONTEXT.md` §4。
@@ -128,8 +130,18 @@ table 渲染走 `parseFloat → NaN → 跳 alarm color → 顯示原字串`、C
 
 ### 資料儲存
 
-- **localStorage** — 病患清單 (`dialysis_patients`)、檢驗資料 (`dialysis_lab_data`)、設定 (`dialysis_settings`)。
+- **localStorage** — 病患清單 (`dialysis_patients`)、檢驗資料 (`dialysis_lab_data`)、設定 (`dialysis_settings`)、sub-page enrichment cache (`enrichCache_dialysis`)。
+- **IndexedDB** `LabReporterOrdersCache` (DB_VER=1, store `orders`, keyPath=chartno) — incremental fetch 用的 raw orders cache。每位病患存完整 orders 陣列 + timestamp，不受 localStorage 5MB 限制。移除病人時 `ordersCacheDelete(chartno)` 清除對應 entry。
 - **JSON 匯出/匯入** — 供團隊成員間分享資料。匯出產生 `.json` 檔案下載，匯入從檔案讀入並合併。
+
+### Incremental fetch (stable-frontier, 2026-05-07)
+
+`fetchAndStore()` 對有 IndexedDB raw-orders cache 的病患走增量更新：
+ernode API 回傳 newest-first，用 `Map(ordseq → status)` 比對 cached
+orders，新醫囑 prepend、status 變動（未執行→正式報告）in-place overwrite、
+整頁 ALL ordseq known + status 不變 → STOP。常見情況（無新醫囑）= 每位
+病患 1 個 API call。30 位病患批次更新從 150–450 call 降到 ~30 call。
+無 cache 或 IndexedDB 錯誤 → graceful fall back 到 full fetch。
 
 ### Key Functions
 
