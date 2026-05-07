@@ -1,5 +1,40 @@
 # WORKLOG
 
+## 2026-05-08 — ordersCache 從 localStorage 搬到 IndexedDB
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（fetchAndStore + confirmRemovePatient + 新 IndexedDB infra）
+- 變更：修改 + 新增
+- 檔案：`hospital-lab-data.html`
+- 原因：incremental fetch 上線後 `ordersCache_dialysis` 在 localStorage 約
+  3MB / 30 患者，逼近 5MB 上限；viewer 端用的是 IndexedDB，reporter 也跟
+  上。IndexedDB 每個 origin 額度幾百 MB，quota 顧慮消失。`enrichCache_
+  dialysis`（sub-page text by ordapno）體積小、成長慢，本次保留 localStorage
+  不動。具體變更：
+  - 新增 IndexedDB 基礎建設：`ORDERS_DB_NAME='LabReporterOrdersCache'`、
+    `ORDERS_DB_VER=1`、store `orders`（keyPath=chartno）、`openOrdersDB`
+    + `ordersCacheGet/Put/Delete`（pattern 對齊 viewer popup.js openDB）。
+  - 移除 `ORDERS_CACHE_KEY` / `loadOrdersCache` / `saveOrdersCache`
+    （localStorage helpers）。
+  - `fetchAndStore`：`loadOrdersCache()[chartno]` → `await ordersCacheGet(chartno)`；
+    最後的 `saveOrdersCache(...)` → `await ordersCachePut(chartno, orders)`，
+    put 失敗 catch + console.warn（極少見）。
+  - `confirmRemovePatient` 的 onclick 改 async → `await ordersCacheDelete(chartno)`。
+  - One-time migration：top-level IIFE `dropLegacyOrdersCache` 在載入時
+    `localStorage.removeItem('ordersCache_dialysis')`，舊 baseline 丟棄
+    （第一次 fetch 自動重建到 IndexedDB）。
+  - 同步更新 `fetchAndStore` 上方 docstring 把 "localStorage" → "storage"
+    + "ordersCache_dialysis" → "raw-orders IndexedDB cache"。
+- 測試：YC 在實機驗收 — (1) 新加入病人 → DevTools → Application →
+  IndexedDB → `LabReporterOrdersCache` → store `orders` 應有該 chartno
+  entry；(2) 立刻按 `更新資料` → console 印 `[incremental] xxxx: 1
+  page(s) checked, total N`，每位病人 1 個 ernode request；(3) 移除病
+  人後 IndexedDB 該 entry 消失；(4) 載入頁面後 `localStorage.getItem
+  ('ordersCache_dialysis')` 應回 `null`；(5) `localStorage.getItem
+  ('enrichCache_dialysis')` 不受影響（本次不動）。
+- 相依：本 repo 內部修改，**不需** patterns repo 改動。Viewer 端不受
+  影響（各自的 IndexedDB DB name 不同）。
+
 ## 2026-05-07 — incremental fetch（stable-frontier、ordersCache_dialysis）
 
 - 作者：claude（與 YC 共同）
