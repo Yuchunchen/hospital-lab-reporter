@@ -332,7 +332,7 @@ body {
 //   3. cd hospital-lab-reporter && node sync-patterns.js
 //   4. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-07T04:06:56.367Z
+// Synced at: 2026-05-07T04:46:29.056Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -361,7 +361,7 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'WBC',
-    pattern: /WBC:\s*([\d.]+)(?!\s*[-–]\s*\d)/,
+    pattern: /WBC:\s*([<>]?\s*[\d.]+)(?!\s*[-–]\s*\d)/,
     displayName:'白血球 (WBC)', shortLabel:'WBC',
     unit:'×10³/µL', category:'血液',
     ref:'4.0–11.0 ×10³/µL',
@@ -370,7 +370,7 @@ const CATALOG = [
     notes:'Negative lookahead in pattern rejects urine routine "WBC: 0-5". Normalize handles /µL (e.g. 6700) → ×10³/µL (6.7).' },
 
   { id:'RBC',
-    pattern: /\bRBC:\s*([\d.]+)/,
+    pattern: /\bRBC:\s*([<>]?\s*[\d.]+)/,
     displayName:'紅血球 (RBC)', shortLabel:'RBC',
     unit:'×10⁶/µL', category:'血液',
     ref:'男 4.2–6.2，女 3.7–5.5 ×10⁶/µL',
@@ -379,7 +379,7 @@ const CATALOG = [
     lo:3.7, hi:6.2 },
 
   { id:'Hb',
-    pattern: /(?:Hb|HGB):\s*([\d.]+)/,
+    pattern: /(?:Hb|HGB):\s*([<>]?\s*[\d.]+)/,
     displayName:'血色素 (Hemoglobin)', shortLabel:'Hb',
     unit:'g/dL', category:'血液',
     ref:'男 14–18，女 12–16 g/dL',
@@ -389,7 +389,7 @@ const CATALOG = [
     notes:'Pattern matches both "Hb:" and "HGB:" labels.' },
 
   { id:'HCT',
-    pattern: /HCT:\s*([\d.]+)/,
+    pattern: /HCT:\s*([<>]?\s*[\d.]+)/,
     displayName:'血比容 (HCT)', shortLabel:'HCT',
     unit:'%', category:'血液',
     ref:'男 39–53，女 33–47 %',
@@ -398,14 +398,14 @@ const CATALOG = [
     lo:33, hi:53 },
 
   { id:'MCV',
-    pattern: /MCV:\s*([\d.]+)/,
+    pattern: /MCV:\s*([<>]?\s*[\d.]+)/,
     displayName:'平均紅血球容積 (MCV)', shortLabel:'MCV',
     unit:'fL', category:'血液',
     ref:'79–99 fL',
     refLo:79, refHi:99, hi:99, lo:79 },
 
   { id:'Platelet',
-    pattern: /Platelet:\s*([\d.]+)/,
+    pattern: /Platelet:\s*([<>]?\s*[\d.]+)/,
     displayName:'血小板 (Platelet)', shortLabel:'PLT',
     unit:'×10³/µL', category:'血液',
     ref:'150–400 ×10³/µL',
@@ -418,14 +418,14 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'TP',
-    pattern: /Total protein\(serum\):\s*([\d.]+)/i,
+    pattern: /Total protein\(serum\):\s*([<>]?\s*[\d.]+)/i,
     displayName:'總蛋白 (Total Protein)', shortLabel:'TP',
     unit:'g/dL', category:'蛋白質',
     ref:'6.0–8.3 g/dL',
     refLo:6.0, refHi:8.3, hi:8.3, lo:6.0 },
 
   { id:'Albumin',
-    pattern: /(?:^|[\s;])Albumin(?:\([^)]*\))?:\s*([\d.]+)/i,
+    pattern: /(?:^|[\s;])Albumin(?:\([^)]*\))?:\s*([<>]?\s*[\d.]+)/i,
     displayName:'白蛋白 (Albumin)', shortLabel:'Alb',
     unit:'g/dL', category:'蛋白質',
     ref:'3.5–5.0 g/dL',
@@ -438,14 +438,14 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'GOT',
-    pattern: /GOT:\s*([\d.]+)/,
+    pattern: /GOT:\s*([<>]?\s*[\d.]+)/,
     displayName:'天門冬胺酸轉氨酶 (GOT / AST)', shortLabel:'GOT/AST',
     unit:'U/L', category:'肝功能',
     ref:'5–34 U/L',
     refLo:5, refHi:34, hi:34, lo:null },
 
   { id:'GPT',
-    pattern: /GPT:\s*([\d.]+)/,
+    pattern: /GPT:\s*([<>]?\s*[\d.]+)/,
     displayName:'丙胺酸轉氨酶 (GPT / ALT)', shortLabel:'GPT/ALT',
     unit:'U/L', category:'肝功能',
     ref:'男<45，女<34 U/L',
@@ -454,7 +454,7 @@ const CATALOG = [
     hi:45, lo:null },
 
   { id:'RGT',
-    pattern: /(?:r-?GT|R-?GT|γ-?GT|GGT|RGT):\s*([\d.]+)/i,
+    pattern: /(?:r-?GT|R-?GT|γ-?GT|GGT|RGT):\s*([<>]?\s*[\d.]+)/i,
     displayName:'γ-麩胺醯轉移酶 (r-GT / GGT)', shortLabel:'r-GT',
     unit:'U/L', category:'肝功能',
     ref:'男 < 55，女 < 38 U/L',
@@ -464,21 +464,21 @@ const CATALOG = [
     notes:'Pattern matches r-GT, R-GT, γ-GT, GGT, RGT — hospitals use various labels.' },
 
   { id:'ALP',
-    pattern: /(?:Alk[\s.\-]*P|ALP|Alkaline\s*Phosphatase):\s*([\d.]+)/i,
+    pattern: /(?:Alk[\s.\-]*P|ALP|Alkaline\s*Phosphatase):\s*([<>]?\s*[\d.]+)/i,
     displayName:'鹼性磷酸酶 (Alk-P / ALP)', shortLabel:'Alk-P',
     unit:'U/L', category:'肝功能',
     ref:'40–130 U/L',
     refLo:34, refHi:130, hi:130, lo:34 },
 
   { id:'TBIL',
-    pattern: /T-BIL:\s*([\d.]+)/,
+    pattern: /T-BIL:\s*([<>]?\s*[\d.]+)/,
     displayName:'總膽紅素 (T-BIL)', shortLabel:'T-BIL',
     unit:'mg/dL', category:'肝功能',
     ref:'0.3–1.0 mg/dL',
     refLo:0.3, refHi:1.0, hi:1.0, lo:null },
 
   { id:'DBIL',
-    pattern: /D-BIL:\s*([\d.]+)/,
+    pattern: /D-BIL:\s*([<>]?\s*[\d.]+)/,
     displayName:'直接膽紅素 (D-BIL)', shortLabel:'D-BIL',
     unit:'mg/dL', category:'肝功能',
     ref:'0.03–0.18 mg/dL',
@@ -489,14 +489,14 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'CHOL',
-    pattern: /CHOL:\s*([\d.]+)/,
+    pattern: /CHOL:\s*([<>]?\s*[\d.]+)/,
     displayName:'總膽固醇 (Cholesterol)', shortLabel:'CHOL',
     unit:'mg/dL', category:'血脂',
     ref:'< 200 mg/dL',
     refLo:null, refHi:200, hi:200, lo:null },
 
   { id:'HDLC',
-    pattern: /HDLC:\s*([\d.]+)/,
+    pattern: /HDLC:\s*([<>]?\s*[\d.]+)/,
     displayName:'高密度膽固醇 (HDL)', shortLabel:'HDL',
     unit:'mg/dL', category:'血脂',
     ref:'男 >40 mg/dL',
@@ -504,7 +504,7 @@ const CATALOG = [
     meaning:'俗稱「好膽固醇」' },
 
   { id:'LDL',
-    pattern: /LDL-C:\s*([\d.]+)/,
+    pattern: /LDL-C:\s*([<>]?\s*[\d.]+)/,
     displayName:'低密度膽固醇 (LDL)', shortLabel:'LDL-C',
     unit:'mg/dL', category:'血脂',
     ref:'< 130 mg/dL',
@@ -512,7 +512,7 @@ const CATALOG = [
     meaning:'俗稱「壞膽固醇」' },
 
   { id:'TG',
-    pattern: /Triglyceride:\s*([\d.]+)/,
+    pattern: /Triglyceride:\s*([<>]?\s*[\d.]+)/,
     displayName:'三酸甘油脂 (Triglyceride)', shortLabel:'TG',
     unit:'mg/dL', category:'血脂',
     ref:'< 150 mg/dL',
@@ -523,7 +523,7 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'GluAC',
-    pattern: /(?:Glucose(?:\([^)]*\))?|GLU[\s-]*(?:AC)?|Sugar(?:\([^)]*\))?|AC[\s-]*Sugar|飯前血糖):\s*([\d.]+)/i,
+    pattern: /(?:Glucose(?:\([^)]*\))?|GLU[\s-]*(?:AC)?|Sugar(?:\([^)]*\))?|AC[\s-]*Sugar|飯前血糖):\s*([<>]?\s*[\d.]+)/i,
     displayName:'空腹血糖 (AC Sugar)', shortLabel:'空腹血糖',
     unit:'mg/dL', category:'血糖',
     ref:'74–100 mg/dL',
@@ -531,7 +531,7 @@ const CATALOG = [
     notes:'Matches Glucose(...), GLU, GLU-AC, Sugar(...), AC Sugar, 飯前血糖 — many hospital label variants.' },
 
   { id:'HbA1c',
-    pattern: /HBA[I1]C%?:\s*([\d.]+)/i,
+    pattern: /HBA[I1]C%?:\s*([<>]?\s*[\d.]+)/i,
     displayName:'糖化血色素 (HbA1c)', shortLabel:'HbA1c',
     unit:'%', category:'血糖',
     ref:'4–6 %',
@@ -543,7 +543,7 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'BUN',
-    pattern: /BUN:\s*([\d.]+)/,
+    pattern: /BUN:\s*([<>]?\s*[\d.]+)/,
     displayName:'血尿素氮 (BUN)', shortLabel:'BUN',
     unit:'mg/dL', category:'腎功能',
     ref:'男 8.9–20.6，女 7.0–18.7 mg/dL',
@@ -556,7 +556,7 @@ const CATALOG = [
   // The orderNameFilter discriminates pre-dialysis (composite panel
   // containing comma in orderName) from post-dialysis (standalone "BUN" order).
   { id:'BUN_pre',
-    pattern: /BUN:\s*([\d.]+)/,
+    pattern: /BUN:\s*([<>]?\s*[\d.]+)/,
     orderNameFilter: /,/,
     displayName:'BUN（洗前）', shortLabel:'BUN(洗前)',
     unit:'mg/dL', category:'腎功能',
@@ -566,7 +566,7 @@ const CATALOG = [
     notes:'Filter selects orders whose orderName contains a comma (composite dialysis panel).' },
 
   { id:'BUN_post',
-    pattern: /BUN:\s*([\d.]+)/,
+    pattern: /BUN:\s*([<>]?\s*[\d.]+)/,
     orderNameFilter: /^BUN$/i,
     displayName:'BUN（洗後）', shortLabel:'BUN(洗後)',
     unit:'mg/dL', category:'腎功能',
@@ -576,7 +576,7 @@ const CATALOG = [
     notes:'Filter selects orders where orderName is exactly "BUN" (standalone post-dialysis draw).' },
 
   { id:'CREAT',
-    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([\d.]+)/i,
+    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([<>]?\s*[\d.]+)/i,
     displayName:'肌酸酐 (Creatinine, Cr)', shortLabel:'Cr',
     unit:'mg/dL', category:'腎功能',
     ref:'男 0.6–1.2，女 0.5–1.0 mg/dL',
@@ -586,7 +586,7 @@ const CATALOG = [
     notes:'Pattern matches "Creatinine(serum):" and "CREAT:" but NOT "Creatinine(24hrs Urine):".' },
 
   { id:'UA',
-    pattern: /(?:UA|Uric\s*acid):\s*([\d.]+)/i,
+    pattern: /(?:UA|Uric\s*acid):\s*([<>]?\s*[\d.]+)/i,
     displayName:'尿酸 (Uric acid, UA)', shortLabel:'UA',
     unit:'mg/dL', category:'腎功能',
     ref:'男 3.3–7.7，女 2.5–6.2 mg/dL',
@@ -595,7 +595,7 @@ const CATALOG = [
     hi:7.7, lo:null },
 
   { id:'eGFR',
-    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([\d.]+)/i,
+    pattern: /(?:Creatinine\(serum\)|CREAT):\s*([<>]?\s*[\d.]+)/i,
     computed:'eGFR',
     displayName:'腎絲球過濾率 (eGFR)', shortLabel:'eGFR',
     unit:'mL/min/1.73m²', category:'腎功能',
@@ -605,7 +605,7 @@ const CATALOG = [
     notes:'Computed from Creatinine via CKD-EPI 2021 (race-free). Pattern shares Creatinine capture so the same regex works.' },
 
   { id:'UACR',
-    pattern: /(?:U-?ACR|UACR|Alb(?:umin)?\/Cr(?:eatinine)?|Urine\s*Alb\/Cr):\s*([\d.]+)/i,
+    pattern: /(?:U-?ACR|UACR|Alb(?:umin)?\/Cr(?:eatinine)?|Urine\s*Alb\/Cr):\s*([<>]?\s*[\d.]+)/i,
     displayName:'尿白蛋白／肌酸酐比 (UACR)', shortLabel:'UACR',
     unit:'mg/g', category:'腎功能',
     ref:'< 30 mg/g',
@@ -621,7 +621,7 @@ const CATALOG = [
     notes:'Viewer fetches sub-pages from opdweb (1-year window) when UACR not in main reportText. Sub-page chase opt-in via subpage.orderNameMatch (broad urine regex).' },
 
   { id:'UPCR',
-    pattern: /(?:U-?PCR|UPCR|RATTC|TP\/Cr|Pr(?:otein)?\/Cr(?:eatinine)?|Urine\s*TP\/Cr):\s*([\d.]+)/i,
+    pattern: /(?:U-?PCR|UPCR|RATTC|TP\/Cr|Pr(?:otein)?\/Cr(?:eatinine)?|Urine\s*TP\/Cr):\s*([<>]?\s*[\d.]+)/i,
     displayName:'尿蛋白／肌酸酐比 (UPCR)', shortLabel:'UPCR',
     unit:'mg/g', category:'腎功能',
     ref:'< 150 mg/g',
@@ -655,49 +655,49 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'Na',
-    pattern: /NA\(Serum\):\s*([\d.]+)/,
+    pattern: /NA\(Serum\):\s*([<>]?\s*[\d.]+)/,
     displayName:'鈉 (Na)', shortLabel:'Na',
     unit:'mmol/L', category:'電解質',
     ref:'136–145 mmol/L',
     refLo:136, refHi:145, hi:145, lo:136 },
 
   { id:'K',
-    pattern: /K \(Serum\):\s*([\d.]+)/,
+    pattern: /K \(Serum\):\s*([<>]?\s*[\d.]+)/,
     displayName:'鉀 (K)', shortLabel:'K',
     unit:'mmol/L', category:'電解質',
     ref:'3.5–5.1 mmol/L',
     refLo:3.5, refHi:5.1, hi:5.1, lo:3.5 },
 
   { id:'Cl',
-    pattern: /Cl\(Serum\):\s*([\d.]+)/,
+    pattern: /Cl\(Serum\):\s*([<>]?\s*[\d.]+)/,
     displayName:'氯 (Cl)', shortLabel:'Cl',
     unit:'mmol/L', category:'電解質',
     ref:'98–107 mmol/L',
     refLo:98, refHi:107, hi:107, lo:98 },
 
   { id:'Ca',
-    pattern: /Calcium\(Serum\):\s*([\d.]+)/,
+    pattern: /Calcium\(Serum\):\s*([<>]?\s*[\d.]+)/,
     displayName:'鈣 (Ca)', shortLabel:'Ca',
     unit:'mg/dL', category:'電解質',
     ref:'8.6–10.3 mg/dL',
     refLo:8.6, refHi:10.3, hi:10.3, lo:8.6 },
 
   { id:'FreeCa',
-    pattern: /Free Ca\+\+:\s*([\d.]+)/,
+    pattern: /Free Ca\+\+:\s*([<>]?\s*[\d.]+)/,
     displayName:'游離鈣 (Free Ca)', shortLabel:'Free Ca',
     unit:'mmol/L', category:'電解質',
     ref:'1.15–1.32 mmol/L',
     refLo:1.15, refHi:1.32, hi:1.32, lo:1.15 },
 
   { id:'P',
-    pattern: /Phosphorus:\s*([\d.]+)/,
+    pattern: /Phosphorus:\s*([<>]?\s*[\d.]+)/,
     displayName:'磷 (P)', shortLabel:'P',
     unit:'mg/dL', category:'電解質',
     ref:'2.5–5.0 mg/dL',
     refLo:2.5, refHi:5.0, hi:5.0, lo:2.5 },
 
   { id:'Mg',
-    pattern: /MG:\s*([\d.]+)/,
+    pattern: /MG:\s*([<>]?\s*[\d.]+)/,
     displayName:'鎂 (Magnesium, Mg)', shortLabel:'Mg',
     unit:'mg/dL', category:'電解質',
     ref:'1.6–2.6 mg/dL',
@@ -709,7 +709,7 @@ const CATALOG = [
 
   // vhyl sample (2026-05-05): "更正報告 FE: 58TIBC: 267.00TS: 22"
   { id:'Fe',
-    pattern: /(?:Fe|Iron)\s*(?:\((?:TT|YL)\))?:\s*([\d.]+)/i,
+    pattern: /(?:Fe|Iron)\s*(?:\((?:TT|YL)\))?:\s*([<>]?\s*[\d.]+)/i,
     displayName:'血清鐵 (Fe)', shortLabel:'Fe',
     unit:'µg/dL', category:'鐵代謝',
     ref:'男 65–175，女 50–170 µg/dL',
@@ -718,7 +718,7 @@ const CATALOG = [
     lo:50, hi:175 },
 
   { id:'TIBC',
-    pattern: /TIBC:\s*([\d.]+)/,
+    pattern: /TIBC:\s*([<>]?\s*[\d.]+)/,
     displayName:'總鐵結合力 (TIBC)', shortLabel:'TIBC',
     unit:'µg/dL', category:'鐵代謝',
     ref:'男 134–415，女 120–480 µg/dL',
@@ -728,7 +728,7 @@ const CATALOG = [
 
   // vhyl sample (2026-05-05): "更正報告 FE: 58TIBC: 267.00TS: 22"
   { id:'TSAT',
-    pattern: /(?<![A-Za-z])(?:TSAT|TS|SAT):\s*([\d.]+)/,
+    pattern: /(?<![A-Za-z])(?:TSAT|TS|SAT):\s*([<>]?\s*[\d.]+)/,
     displayName:'鐵飽和度 (TSAT)', shortLabel:'TSAT',
     unit:'%', category:'鐵代謝',
     ref:'20–45 %',
@@ -749,14 +749,14 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'iPTH',
-    pattern: /i-PTH:\s*([\d.]+)/,
+    pattern: /i-PTH:\s*([<>]?\s*[\d.]+)/,
     displayName:'副甲狀腺素 (iPTH)', shortLabel:'i-PTH',
     unit:'pg/mL', category:'副甲狀腺',
     ref:'15–68.3 pg/mL',
     refLo:15, refHi:68.3, hi:68.3, lo:15 },
 
   { id:'VitB12',
-    pattern: /(?:Vit(?:amin)?\.?\s*B12|VIT\.?\s*B12|B12):\s*([\d.]+)/i,
+    pattern: /(?:Vit(?:amin)?\.?\s*B12|VIT\.?\s*B12|B12):\s*([<>]?\s*[\d.]+)/i,
     displayName:'維生素 B12 (Vit. B12)', shortLabel:'Vit B12',
     unit:'pg/mL', category:'維生素',
     ref:'187–883 pg/mL',
@@ -764,7 +764,7 @@ const CATALOG = [
     notes:'Matches "Vit. B12:", "Vitamin B12:", "VIT.B12:", "B12:".' },
 
   { id:'FolicAcid',
-    pattern: /(?:Folic\s+acid|Folate):\s*([\d.]+)/i,
+    pattern: /(?:Folic\s+acid|Folate):\s*([<>]?\s*[\d.]+)/i,
     displayName:'葉酸 (Folic Acid)', shortLabel:'Folate',
     unit:'ng/mL', category:'維生素',
     ref:'3.1–20.5 ng/mL',
@@ -800,7 +800,7 @@ const CATALOG = [
       resultPattern:  /Result:\s*([<>]?\s*[\d.]+)/,
       synthLabel:     'Al鋁',
     },
-    notes:'Annual test. vhtt confirmed 2026-05-07 (18-patient survey, 12 with data). Main pattern matches both "Al鋁: N" (in-house) and "BALR0101: N" (out-sourced lab code). Capture allows leading <> operator (handles "<2" below detection limit — but extractLabValues currently parseFloats it, so "<2" is silently dropped; pre-existing limitation, not fixed in this task). Ref <20 µg/L per KDOQI guidelines.' },
+    notes:'Annual test. vhtt confirmed 2026-05-07 (18-patient survey, 12 with data). Main pattern matches both "Al鋁: N" (in-house) and "BALR0101: N" (out-sourced lab code). Capture allows leading <> operator (handles "<2" below detection limit; reporter extractLabValues preserves "<N" as string since 2026-05-07). Ref <20 µg/L per KDOQI guidelines.' },
 
   // ═══════════════════════════════════════════════════════════════════════
   // TUMOR MARKERS
@@ -829,7 +829,7 @@ const CATALOG = [
     refLo:null, refHi:37, hi:37, lo:null },
 
   { id:'PSA',
-    pattern: /\bPSA:\s*([\d.]+)/,
+    pattern: /\bPSA:\s*([<>]?\s*[\d.]+)/,
     displayName:'攝護腺特異抗原 (PSA)', shortLabel:'PSA',
     unit:'ng/mL', category:'癌症指數',
     ref:'< 4 ng/mL（男性／攝護腺）',
@@ -837,7 +837,7 @@ const CATALOG = [
     gender:'M' },
 
   { id:'FreePSA',
-    pattern: /(?:Free PSA|RATIO):\s*([\d.]+)/,
+    pattern: /(?:Free PSA|RATIO):\s*([<>]?\s*[\d.]+)/,
     displayName:'游離 PSA (Free PSA)', shortLabel:'Free PSA',
     unit:'ng/mL', category:'癌症指數',
     gender:'M' },
@@ -862,14 +862,14 @@ const CATALOG = [
   // ═══════════════════════════════════════════════════════════════════════
 
   { id:'TSH',
-    pattern: /TSH:\s*([\d.]+)/,
+    pattern: /TSH:\s*([<>]?\s*[\d.]+)/,
     displayName:'促甲狀腺刺激素 (TSH)', shortLabel:'TSH',
     unit:'µIU/mL', category:'甲狀腺',
     ref:'0.35–4.94 µIU/mL',
     refLo:0.35, refHi:4.94, hi:4.94, lo:0.35 },
 
   { id:'FreeT4',
-    pattern: /Free T4:\s*([\d.]+)/,
+    pattern: /Free T4:\s*([<>]?\s*[\d.]+)/,
     displayName:'游離甲狀腺素 (Free T4)', shortLabel:'fT4',
     unit:'ng/dL', category:'甲狀腺',
     ref:'0.7–1.48 ng/dL',
@@ -914,19 +914,19 @@ const CATALOG = [
   // "HBsAg: 0.21HBsAg (YL): Non-Reactive" — \[\d.\]+ stops at the next "H"
   // so we get the numeric without the qualitative text bleeding in.
   { id:'HBsAgTiter',
-    pattern: /HBsAg:\s*([\d.]+)/i,
+    pattern: /HBsAg:\s*([<>]?\s*[\d.]+)/i,
     displayName:'HBsAg 滴度', shortLabel:'HBsAg titer',
     unit:'', category:'肝炎 / 感染',
     notes:'Numeric titer for HBsAg. Consumed by HBsAgDisplay computed wrapper.' },
 
   { id:'AntiHBsTiter',
-    pattern: /Anti-HBs:\s*([\d.]+)/i,
+    pattern: /Anti-HBs:\s*([<>]?\s*[\d.]+)/i,
     displayName:'Anti-HBs 滴度', shortLabel:'Anti-HBs titer',
     unit:'', category:'肝炎 / 感染',
     notes:'Numeric titer for Anti-HBs. Consumed by AntiHBsDisplay computed wrapper.' },
 
   { id:'AntiHCVTiter',
-    pattern: /(?:HCV Ab|Anti-HCV):\s*([\d.]+)/i,
+    pattern: /(?:HCV Ab|Anti-HCV):\s*([<>]?\s*[\d.]+)/i,
     displayName:'Anti-HCV 滴度', shortLabel:'Anti-HCV titer',
     unit:'', category:'肝炎 / 感染',
     notes:'Numeric titer for Anti-HCV. Consumed by HCV computed wrapper.' },
@@ -988,7 +988,7 @@ const CATALOG = [
     notes:'Capture allows commas (thousands separator).' },
 
   { id:'CD4',
-    pattern: /LEU3AN:\s*([\d.]+)/,
+    pattern: /LEU3AN:\s*([<>]?\s*[\d.]+)/,
     displayName:'CD4 淋巴球 (LEU3AN)', shortLabel:'CD4',
     category:'HIV' },
 
@@ -1265,7 +1265,7 @@ var COMPUTED_TESTS = REPORTER_COMPUTED;
 //   2. node sync-patterns.js
 //   3. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-07T04:06:56.377Z
+// Synced at: 2026-05-07T04:46:29.066Z
 // Files:    dialysis.js
 // ════════════════════════════════════════════════════════════════════════════
 

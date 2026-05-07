@@ -1,5 +1,22 @@
 # WORKLOG
 
+## 2026-05-07 — sync 拉新版 catalog（49 條 numeric capture 加 `[<>]?\s*`）
+
+- 作者：claude（與 YC 共同）
+- 範圍：dialysis（sync 拉新版 patterns 區塊）— 本 repo 端無 JS 邏輯改動
+- 變更：自動產生
+- 檔案：`hospital-lab-data.html`（patterns 區塊由 sync 更新）
+- 原因：patterns repo 同日把 49 條沒加 `[<>]?` 的 numeric capture group
+  全改成 `([<>]?\s*[\d.]+)`，讓 `<N` / `>N` 這類偵測下限值能進 pipeline。
+  reporter 的 `extractLabValues()` 自 2026-05-07 起對 `<` / `>` 開頭
+  capture group 已保留為 string 不 parseFloat（CLAUDE.md「Detection-limit
+  values」段落），下游 alarm color / CSV / URR / Ca×P 全部既有兼容。
+  本輪純粹是 regex 入口開放，本 repo JS 0 改動。
+- 測試：sync 完用瀏覽器開 `hospital-lab-data.html` 既有 dialysis 病人
+  清單仍正常；待真實病例 chartNo 抓到 `<N` 值的 lab（如某些 TSH /
+  Ferritin 樣本）時驗收 table 顯示 literal、不再 missing。
+- 相依：patterns repo 同日 commit（catalog detection-limit regex）。
+
 ## 2026-05-07 — sync 拉新版 catalog（肝炎 6 條 regex 加 i flag）
 
 - 作者：claude（與 YC 共同）
