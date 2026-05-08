@@ -335,7 +335,7 @@ body {
 //   3. cd hospital-lab-reporter && node sync-patterns.js
 //   4. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-08T00:23:50.947Z
+// Synced at: 2026-05-08T06:46:21.708Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -851,7 +851,16 @@ const CATALOG = [
     gender:'M' },
 
   { id:'FreePSA',
-    pattern: /(?:Free PSA|RATIO):\s*([<>]?\s*[\d.]+)/,
+    // 2026-05-08: removed `|RATIO` alternation. vhtt Free PSA(TT) reports
+    // only emit `RATIO: 0.152` (the Free/Total fraction, not the ng/mL
+    // concentration); the alternation was capturing that ratio as a
+    // FreePSA value. Verified bad cases: vhtt 000017679E (PSA 0.631,
+    // RATIO 0.152 → FreePSA was being stored as 0.152) and 000043524F
+    // (PSA 0.113, RATIO 0.093). With this change, vhtt reports correctly
+    // leave FreePSA null; PSARatio computed entry then doesn't fire,
+    // which matches what those reports actually convey. Other sites that
+    // emit "Free PSA: N" verbatim are unaffected.
+    pattern: /Free PSA:\s*([<>]?\s*[\d.]+)/,
     displayName:'游離 PSA (Free PSA)', shortLabel:'Free PSA',
     unit:'ng/mL', category:'癌症指數',
     gender:'M' },
@@ -1328,7 +1337,7 @@ var COMPUTED_TESTS = REPORTER_COMPUTED;
 //   2. node sync-patterns.js
 //   3. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-08T00:23:50.995Z
+// Synced at: 2026-05-08T06:46:21.746Z
 // Files:    dialysis.js, early-ckd.js
 // ════════════════════════════════════════════════════════════════════════════
 

@@ -1,5 +1,23 @@
 # WORKLOG
 
+## 2026-05-08 — sync 拉新版 catalog（FreePSA 移除 RATIO alternation）
+
+- 作者：claude（與 YC 共同）
+- 範圍：core / dialysis / early-ckd（sync 拉新版 patterns 區塊 + 重 build）
+- 變更：自動產生
+- 檔案：`hospital-lab-data.html`（patterns 區塊由 sync 更新）、
+  `hospital-lab-dialysis.html` + `hospital-lab-ckd.html`（build 重產）
+- 原因：patterns repo 同日修 FreePSA regex 移除 `RATIO` alternation。
+  vhtt `Free PSA(TT)` 報告只輸出 `RATIO: 0.152` 比值（不輸出絕對濃度），
+  原 alternation 把比值當成 FreePSA 濃度抓進去 → 全部被存進 labData。
+  Reporter 雖然沒 highlight FreePSA 在 lab 表，但 `LAB_TESTS` 全 catalog
+  resolve 進來，extractLabValues 會把 FreePSA 寫進
+  `labData[chartno].FreePSA[]`。修後 vhtt 報告 FreePSA 正確留 null。
+- 測試：YC 載入新版 HTML 後，vhtt 既有病人若有 PSA 紀錄，
+  `localStorage.getItem('labs_dialysis')` 裡 `FreePSA` 應為空 array 或
+  缺漏（除非該院區真的輸出 `Free PSA: N`）。
+- 相依：patterns repo 同日 commit（catalog FreePSA pattern 修正）。
+
 ## 2026-05-08 — Phase 3: Early CKD（hospital-lab-ckd.html + 腎平台 xlsx）
 
 - 作者：claude（與 YC 共同）
