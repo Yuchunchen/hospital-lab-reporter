@@ -10,15 +10,27 @@
 // STATE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Active disease group — Step 1 hardcodes 'dialysis'; the disease-tab UI
-// (Step 3) will switch this at runtime. Storage keys for patients/labs come
-// from the active group module; settings stays shell-global.
-const ACTIVE_GROUP_ID = 'dialysis';
+// Active disease group — selected at build time. build.js writes one of:
+//   window.ACTIVE_GROUP_ID = 'dialysis';
+//   window.ACTIVE_GROUP_ID = 'early-ckd';
+// into the {{DISEASE_INIT}} placeholder, which runs BEFORE this script
+// because it is appended at the end of the same <script> tag... wait —
+// actually init.js appends DOMContentLoaded later, but ACTIVE_GROUP_ID is
+// resolved at the top of `<script>` (this module), so the disease-init
+// block must be inlined ABOVE storage.js. build.js places the disease-init
+// in {{DISEASE_INIT}} which the shell.html template positions BEFORE
+// {{CORE_JS}}. Phase 3 made that ordering explicit; the legacy monolith
+// inlined a hardcoded 'dialysis' before this module so the fallback
+// preserves byte-identical behavior when the legacy HTML loads.
+const ACTIVE_GROUP_ID = (typeof window !== 'undefined' && window.ACTIVE_GROUP_ID) || 'dialysis';
 const GROUP = (window.GROUPS || {})[ACTIVE_GROUP_ID];
 if (!GROUP) {
-  throw new Error('[hospital-lab-data] active group "' + ACTIVE_GROUP_ID +
-    '" not loaded — run `node sync-patterns.js`');
+  throw new Error('[hospital-lab] active group "' + ACTIVE_GROUP_ID +
+    '" not loaded — check build.js DISEASES config or sync-patterns.js');
 }
+// Expose for cross-module ad-hoc reference (export-formats/renal-platform
+// reads window.ACTIVE_GROUP).
+if (typeof window !== 'undefined') window.ACTIVE_GROUP = GROUP;
 
 const STORAGE_KEYS = {
   patients: GROUP.storageKey.patients,   // 'patients_dialysis'

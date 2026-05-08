@@ -1,5 +1,90 @@
 # WORKLOG
 
+## 2026-05-08 — Phase 3: Early CKD（hospital-lab-ckd.html + 腎平台 xlsx）
+
+- 作者：claude（與 YC 共同）
+- 範圍：core / early-ckd / build / export-formats / lib
+- 變更：新增 + 修改
+- 檔案：
+  - 新：`groups/early-ckd.js`（CKD group 模組：storageKey、空 patientFields、
+    16 條 labManifest、寬鬆 detectDrawsFromStored、long-format CSV
+    exporter）、`export-formats/renal-platform-xlsx.js`（23 欄 xlsx +
+    `normalizeQualitative` 把 `-`/`+/-`/`1+`/`2+`/... 轉中括號 [-]/[+]/
+    [++]/...）、`lib/xlsx.mini.min.js`（SheetJS 0.18.5，250 KB，從
+    cdnjs 下載）、`hospital-lab-ckd.html`（build 產出，412 KB 含 SheetJS）
+  - 改：`build.js`（新增 `ckd` disease config、`buildLibBlock` 注入
+    SheetJS、新 `buildDiseaseInit` 寫 `window.ACTIVE_GROUP_ID`、body 多
+    了 `{{HEADER_TITLE}}` / `{{ACTION_BUTTONS}}` placeholder）、
+    `core/shell.html`（重排：DISEASE_INIT 移到 CORE_JS 之前；新增
+    `{{LIB}}` placeholder 在 EXPORT_FORMATS 前）、`core/body.html`（h1
+    與右組三按鈕改 placeholder）、`core/storage.js`（`ACTIVE_GROUP_ID`
+    從 `window.ACTIVE_GROUP_ID` 讀，預設 `'dialysis'` 保 legacy 相容；
+    順手 export `window.ACTIVE_GROUP`）
+- 原因：reporter 第二個 disease 上線：腎臟病平台需要「檢驗數據」xlsx
+  匯出（23 欄、3 行 header [key/label/unit]、yyyy/mm/dd 西元年、定性值
+  中括號格式），與 KiDiTi（透析）不同格式不同欄位數。Phase 1 的 build
+  pipeline 第一次實戰 — 加新 disease 只動 `groups/`、`export-formats/`、
+  `build.js` config，core/* 完全沒動（patternsstorage/fetch/incremental/
+  enrichment 全 reuse）。
+- 具體變更：
+  - **`groups/early-ckd.js`**：寫 16 條 manifest（CREAT/BUN/UA/HCT/
+    GluAC/HbA1c/CHOL/TG/LDL/Albumin + 4 個尿液 + UPCR + UACR），
+    `drawDetection.requiredAnyOf = ['CREAT', 'BUN']`（CKD 門診 panel
+    比透析寬鬆，沒 BUN pre/post），`pickEarliestPerMonth` 跟透析一樣，
+    long-format CSV exporter 對齊 dialysis 格式但無 URR/CaxP（CKD
+    `computed: []`）
+  - **`export-formats/renal-platform-xlsx.js`**：用 SheetJS 寫 .xlsx
+    （單一工作表「工作表1」），3 行 header（key/label/unit），4 行起
+    每筆 (patient × draw cluster) 一列。日期 `yyyy/mm/dd` 西元年（不是
+    KiDiTi 的民國年）。OB/尿糖過 `normalizeQualitative` 轉中括號
+    （`+/-` 視同陰性 `[-]`、`1+` → `[+]`、`2+` → `[++]`...，缺值留空
+    不填 `[-]` — 平台會區分「未做」）。Col 15 (Urine Total Protein
+    24hr) 一律留空（門診不做，brief 84 病患驗證）。Phase 1.5 勾選
+    機制全自動 reuse — `getSelectedChartNos()` 控制 scope。
+    檔名 `腎平台檢驗數據_YYYYMMDD.xlsx`。
+  - **`build.js` 改寫**：每個 disease 配置增加 `headerTitle`、
+    `libs` array（注入 `lib/<file>` 前置）、`actionButtons` HTML 字串
+    （右組 3 顆按鈕標籤 + onclick）。`buildDiseaseInit` 產出
+    `window.ACTIVE_GROUP_ID = "<id>";`。新 `buildLibBlock(libs)` 把
+    SheetJS inline 到 `{{LIB}}`（CKD only，dialysis 不會動 += 250 KB）。
+  - **`core/storage.js` 參數化**：`const ACTIVE_GROUP_ID = (typeof
+    window !== 'undefined' && window.ACTIVE_GROUP_ID) || 'dialysis';`
+    fallback 保 legacy `hospital-lab-data.html` 行為（legacy 沒 init
+    block，自動回 'dialysis'）。
+  - **`core/shell.html` 重排**：`{{DISEASE_INIT}}` 從尾巴搬到
+    `{{CORE_JS}}` 之前（storage.js 在 top-level 跑 `const
+    ACTIVE_GROUP_ID = window.ACTIVE_GROUP_ID || ...`，所以 init 必須
+    更早執行）。新增 `{{LIB}}` placeholder 在 `{{EXPORT_FORMATS}}` 前。
+  - **`core/body.html` placeholder 化**：h1 與右組三按鈕 markup 改
+    `{{HEADER_TITLE}}` 與 `{{ACTION_BUTTONS}}`，build.js 各 disease 自
+    填。Legacy `hospital-lab-data.html` 仍是字面文字（sync 不動 body
+    markup），保留 byte-identical 行為。
+- 驗證：
+  - `npm run release`（patterns）— catalog 80（+4 urine） / viewer 60 /
+    reporter 41 / computed 14 全綠
+  - `node sync-patterns.js`（reporter）— 兩個 group 區塊（dialysis +
+    early-ckd）注入 legacy + 重產 dialysis + ckd 兩個 built HTML
+  - `node -c` syntax check 過兩個 built HTML 的 `<script>`
+  - 自動驗證腳本確認：(1) 兩 HTML 各自 7 個 inline handler 全對應到
+    top-level function；(2) 兩 HTML title / h1 正確（dialysis: 洗腎室
+    檢驗資料管理 / ckd: 初期慢性腎臟病檢驗資料管理）；(3) `window.
+    ACTIVE_GROUP_ID` 正確（dialysis / early-ckd）；(4) SheetJS 只 inline
+    到 ckd HTML，不在 dialysis；(5) 4 個新 urine catalog id 都在 ckd
+    HTML 找得到；(6) UPCR `T.PROT/CREAT` alternation 兩 HTML 都有
+- YC 在實機驗收要點：
+  - 開 `hospital-lab-ckd.html` → 加病患 → fetch → console 應印
+    `[incremental]` 訊息；lab 表渲染（即使 CKD computed 空）
+  - 點「匯出腎平台資料」→ 下載 `.xlsx`，Excel 開啟確認 23 欄、3 行
+    header、4 行起資料、日期 `yyyy/mm/dd` 西元年、OB/尿糖中括號
+  - 勾選 3 位匯出 → xlsx 只有 3 位
+  - 「匯出csv」也正常（long-format）
+  - 開 `hospital-lab-dialysis.html` → 行為與 Phase 2 / Phase 1.5
+    完全一致（KiDiTi 匯出、勾選、incremental、enrichCache）
+  - localStorage：`patients_dialysis` / `labs_dialysis` 與
+    `patients_ckd` / `labs_ckd` 完全分離；`enrichCache`（共用）
+- 相依：依賴 `hospital-lab-patterns` 同日 commit `d23d079`（catalog 加
+  4 條尿液 + UPCR alternation）。本 repo 已跑 `node sync-patterns.js`。
+
 ## 2026-05-08 — Phase 1 fix: enrichCache key 改成 disease-neutral 共用
 
 - 作者：claude（與 YC 共同）

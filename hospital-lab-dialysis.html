@@ -323,7 +323,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-05-07T18:14:25.016Z
+//   Synced at: 2026-05-08T00:23:51.037Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -612,12 +612,16 @@ const CATALOG = [
     notes:'Viewer fetches sub-pages from opdweb (1-year window) when UACR not in main reportText. Sub-page chase opt-in via subpage.orderNameMatch (broad urine regex).' },
 
   { id:'UPCR',
-    pattern: /(?:U-?PCR|UPCR|RATTC|TP\/Cr|Pr(?:otein)?\/Cr(?:eatinine)?|Urine\s*TP\/Cr):\s*([<>]?\s*[\d.]+)/i,
+    // T.PROT/CREAT alternation added 2026-05-08 (Phase 3 CKD): vhtt's
+    // Urine total protein(TT) inline reportText uses "T.PROT/CREAT: <值>"
+    // (verified across 45+ vhtt patients); RATTC was vhyl-only / legacy.
+    // The optional period in T\.? handles both `T.PROT/CREAT` and `TPROT/CREAT`.
+    pattern: /(?:U-?PCR|UPCR|RATTC|T\.?PROT\/CREAT|TP\/Cr|Pr(?:otein)?\/Cr(?:eatinine)?|Urine\s*TP\/Cr):\s*([<>]?\s*[\d.]+)/i,
     displayName:'尿蛋白／肌酸酐比 (UPCR)', shortLabel:'UPCR',
     unit:'mg/g', category:'腎功能',
     ref:'< 150 mg/g',
     refLo:null, refHi:150, hi:150, lo:null,
-    notes:'RATTC label is also used at some sites for total-protein/creatinine ratio.' },
+    notes:'RATTC = vhyl/legacy; T.PROT/CREAT = vhtt (Urine total protein inline). Both produce the same numeric ratio.' },
 
   // ═══════════════════════════════════════════════════════════════════════
   // KIDNEY DISEASE STAGING (computed)
@@ -991,6 +995,52 @@ const CATALOG = [
     category:'HIV' },
 
   // ═══════════════════════════════════════════════════════════════════════
+  // URINE — qualitative + quantitative (Phase 3 Early CKD, 2026-05-08)
+  // ═══════════════════════════════════════════════════════════════════════
+  // CHEM EXAM(TT) reportText comes in two formats verified across 84 vhtt
+  // CKD patients:
+  //   Format A (long): "Bilirubin: -  Glucose: -  Ketone: -  OB: -  ..."
+  //   Format B (short+ref): "BILI: - (-)  GLU: - (-)  KETO: - (-)  OCCL: 1+ (-) ..."
+  // The patterns below accept both labels (long + short) and the reference
+  // suffix in format B. Capture stops before whitespace so " (-)" is dropped.
+  // Catalog only captures the raw qualitative string ('-', '+/-', '1+', '4+',
+  // '++', etc.); export-formats/renal-platform-xlsx.js normalises it to
+  // bracket notation ([-], [+], [++], ...).
+
+  { id:'UrineOB',
+    pattern: /(?:\bOB|\bOCCL):\s*([+\-]+(?:\/[+\-])?|\d+\+)/,
+    displayName:'尿潛血 (Occult Blood)', shortLabel:'尿OB',
+    category:'尿液', qualitative:true,
+    orderNameFilter: /CHEM\s*EXAM|尿液|Urine\s*protein/i,
+    notes:'Two label formats: long "OB: -" (vhyl/older) and short "OCCL: 1+ (-)" (vhtt/newer). Capture stops before whitespace so the reference range is dropped.' },
+
+  { id:'UrineGlucose',
+    pattern: /(?:\bGlucose|\bGLU):\s*([+\-]+(?:\/[+\-])?|\d+\+)/,
+    displayName:'尿糖 (Urine Glucose)', shortLabel:'尿糖',
+    category:'尿液', qualitative:true,
+    orderNameFilter: /CHEM\s*EXAM|尿液|Urine\s*protein/i,
+    notes:'orderNameFilter required to distinguish from serum GluAC; long "Glucose: -" / short "GLU: 4+ (-)". Same capture rule as UrineOB.' },
+
+  { id:'UrineCr',
+    pattern: /Creatinine\s*\((?:24hrs?\s*)?Urine\):\s*([<>]?\s*[\d.]+)/i,
+    displayName:'尿肌酸酐 (Urine Creatinine)', shortLabel:'尿Cr',
+    unit:'mg/dL', category:'尿液',
+    notes:'From Urine Microalbumin(TT)+Creatinine(TT) inline. Distinct label from serum CREAT — does not match Creatinine(serum):.' },
+
+  { id:'UrineProtein',
+    pattern: /尿蛋白\s+([<>]?\s*[\d.]+)\s*mg\/dL/i,
+    displayName:'尿蛋白定量 (Urine Total Protein)', shortLabel:'尿蛋白',
+    unit:'mg/dL', category:'尿液',
+    subpage: {
+      // Inline reportText only carries UPCR (T.PROT/CREAT); the actual
+      // protein concentration in mg/dL lives behind the opdweb sub-page.
+      orderNameMatch: /Urine\s*total\s*protein|尿蛋白定量/i,
+      // No resultPattern: sub-page already prints "尿蛋白 <值> mg/dL" so
+      // the main pattern matches it directly after enrichment.
+    },
+    notes:'Random urine protein concentration. Inline reportText only has UPCR; mg/dL value requires sub-page enrichment via opdweb OpdOrderReport.aspx.' },
+
+  // ═══════════════════════════════════════════════════════════════════════
   // IMAGING / TEXT-BLOCK ENTRIES (page 2 of viewer — fillable text forms)
   // ═══════════════════════════════════════════════════════════════════════
 
@@ -1257,7 +1307,7 @@ var COMPUTED_TESTS = REPORTER_COMPUTED;
 
 // ════════════════════════════════════════════════════════════════════════════
 // GROUPS BLOCK (built by build.js, source: groups/*.js)
-//   Files: dialysis.js
+//   Files: dialysis.js, early-ckd.js
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── groups/dialysis.js ─────────────────────────────────────────────────
@@ -1791,6 +1841,285 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 
+// ─── groups/early-ckd.js ────────────────────────────────────────────────
+'use strict';
+
+/**
+ * groups/early-ckd.js — 初期慢性腎臟病（Early CKD）疾病群組模組
+ *
+ * Phase 3 (2026-05-08): first additional disease after dialysis. CKD draws
+ * are simpler than dialysis — no BUN pre/post split, no exact monthly
+ * cadence (門診 1–3 個月不等). One cluster per 生效時間, qualified when
+ * it carries Creatinine OR BUN; same `pickEarliestPerMonth` rule when a
+ * patient has multiple clusters in one calendar month.
+ *
+ * The renal-platform xlsx export lives in export-formats/renal-platform-
+ * xlsx.js — this module just wires the manifest + draw detection + a
+ * long-format CSV exporter (parallel to dialysis 匯出csv).
+ *
+ * Browser registry: window.GROUPS['early-ckd'].
+ */
+
+// ─── Helper: normalise labManifest entries ──────────────────────────────────
+function resolveCkdManifestEntry(entry) {
+  if (typeof entry === 'string') return { id: entry };
+  return Object.assign({}, entry);
+}
+
+const EARLY_CKD_GROUP = {
+  id: 'early-ckd',
+  label: '初期慢性腎臟病',
+
+  storageKey: {
+    patients: 'patients_ckd',
+    labs:     'labs_ckd',
+  },
+
+  // No CKD-specific user-editable fields (Phase 3). Demographics fill from
+  // the API on every fetch; CKD stage will be a computed value once the
+  // lab-view renders eGFR.
+  patientFields: [],
+
+  // Lab manifest — order roughly mirrors the renal-platform xlsx columns
+  // (§3.2 of TASK_BRIEF_phase3_early_ckd.md). Catalog ids; the export
+  // formatter looks each one up at write time.
+  labManifest: [
+    // ── 腎功能 ──
+    'CREAT',
+    'BUN',                                // generic BUN (not BUN_pre/post)
+    'UA',
+    // ── 血液 ──
+    'HCT',
+    // ── 血糖 ──
+    'GluAC',
+    'HbA1c',
+    // ── 血脂 ──
+    'CHOL',
+    'TG',
+    'LDL',
+    // ── 蛋白質 ──
+    'Albumin',
+    // ── 尿液 (Phase 3 新加) ──
+    { id: 'UrineProtein', displayLabel: 'Urine Protein' },   // mg/dL, sub-page
+    { id: 'UrineOB',      displayLabel: 'OB' },              // qualitative
+    { id: 'UrineGlucose', displayLabel: '尿糖' },            // qualitative
+    { id: 'UrineCr',      displayLabel: 'Urine creatinine' },
+    'UPCR',
+    'UACR',
+  ],
+
+  // No CKD-specific derived values yet. eGFR / GFRStage / TaiwanCKD etc
+  // already exist in patterns/computed.js — wiring them to the lab table
+  // is a Phase 3.x follow-up, out of scope for this commit.
+  computed: [],
+
+  // CKD draw detection — much looser than dialysis:
+  // any cluster carrying Creatinine OR BUN counts as a check.
+  drawDetection: {
+    requiredAnyOf: ['CREAT', 'BUN'],
+  },
+
+  // Bucket every stored entry by its effectiveTime (= cluster anchor).
+  _flattenEntriesByCluster(labDataForPatient) {
+    const buckets = new Map();
+    let warned = false;
+    for (const id in labDataForPatient) {
+      if (id.startsWith('_')) continue;
+      const arr = labDataForPatient[id];
+      if (!Array.isArray(arr)) continue;
+      for (const e of arr) {
+        let key;
+        if (e.effectiveTime) {
+          key = e.effectiveTime;
+        } else {
+          key = 'date:' + (e.date || '');
+          if (!warned) {
+            try { console.warn('[early-ckd] entries missing effectiveTime — bucketing by date as fallback. Refetch to populate.'); } catch (_) {}
+            warned = true;
+          }
+        }
+        if (!buckets.has(key)) buckets.set(key, { effectiveTime: e.effectiveTime || null, byTestId: {} });
+        const slot = buckets.get(key).byTestId;
+        if (!slot[id]) slot[id] = [];
+        slot[id].push(e);
+      }
+    }
+    return buckets;
+  },
+
+  // Returns [{ effectiveTime, drawDate, yyyymm, labs:{testId: entry} }]
+  // sorted ascending by effectiveTime / drawDate.
+  detectDrawsFromStored(labDataForPatient) {
+    if (!labDataForPatient) return [];
+    const buckets = this._flattenEntriesByCluster(labDataForPatient);
+    const required = (this.drawDetection && this.drawDetection.requiredAnyOf) || [];
+
+    const draws = [];
+    for (const [, bucket] of buckets) {
+      const ids = new Set(Object.keys(bucket.byTestId));
+
+      // Qualifying check: at least one of the required test ids must be
+      // present (CREAT or BUN). Loose on purpose — CKD 門診 panels vary.
+      if (required.length && !required.some(id => ids.has(id))) continue;
+
+      // drawDate from effectiveTime via local-time accessors so the
+      // YYYY-MM-DD slice matches entry.date keys (same UTC-vs-TPE caveat
+      // that bit dialysis groups during refactor).
+      let drawDateIso = null;
+      if (bucket.effectiveTime) {
+        const d = new Date(bucket.effectiveTime);
+        if (!isNaN(d.getTime())) {
+          drawDateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        } else {
+          drawDateIso = bucket.effectiveTime.slice(0, 10);
+        }
+      } else {
+        for (const id in bucket.byTestId) {
+          const e0 = bucket.byTestId[id][0];
+          if (e0 && e0.date) { drawDateIso = e0.date; break; }
+        }
+        drawDateIso = drawDateIso || '';
+      }
+
+      // One entry per testId per cluster; the group uses `date` key for
+      // any cross-cluster pairing (none yet, but keeps shape consistent
+      // with dialysis exporter).
+      const labs = {};
+      for (const id in bucket.byTestId) {
+        labs[id] = bucket.byTestId[id][0];
+      }
+
+      const yyyymm = drawDateIso ? drawDateIso.slice(0, 4) + drawDateIso.slice(5, 7) : '';
+      draws.push({
+        effectiveTime: bucket.effectiveTime,
+        drawDate: drawDateIso,
+        yyyymm,
+        labs,
+      });
+    }
+
+    draws.sort((a, b) => {
+      const ka = a.effectiveTime || a.drawDate || '';
+      const kb = b.effectiveTime || b.drawDate || '';
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+    return draws;
+  },
+
+  // Reuses the same "earliest of the month wins" rule as dialysis so
+  // multi-cluster months (e.g. patient drew labs twice in a month) export
+  // as one row.
+  pickEarliestPerMonth(draws) {
+    const out = {};
+    for (const d of (draws || [])) {
+      if (!d.yyyymm) continue;
+      const cur = out[d.yyyymm];
+      if (!cur) { out[d.yyyymm] = d; continue; }
+      const ka = cur.effectiveTime || cur.drawDate || '';
+      const kb = d.effectiveTime   || d.drawDate   || '';
+      if (kb < ka) out[d.yyyymm] = d;
+    }
+    return out;
+  },
+
+  // ─── Long-format CSV exporter (匯出csv 按鈕) ────────────────────────────
+  // One row per (chartNo × YYYYMM). 4 cols per test (value/unit/lower/higher).
+  // No URR/CaxP for CKD; the group's `computed` array is empty so the
+  // computed-loop simply emits nothing.
+  exporter: {
+    interval: 'monthly',
+
+    filename(today) {
+      const t = today instanceof Date ? today : new Date();
+      const yyyymmdd = `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`;
+      return `early-ckd_export_${yyyymmdd}.csv`;
+    },
+
+    formatAll(patients, allLabData, opts) {
+      opts = opts || {};
+      const catalog = opts.catalog || (typeof CATALOG !== 'undefined' ? CATALOG : []);
+      const catById = new Map(catalog.map(e => [e.id, e]));
+      const manifest = EARLY_CKD_GROUP.labManifest.map(resolveCkdManifestEntry);
+
+      const labelOf = entry => entry.displayLabel
+        || (catById.get(entry.id) && (catById.get(entry.id).shortLabel || catById.get(entry.id).displayName))
+        || entry.id;
+      const unitOf = id => {
+        const c = catById.get(id);
+        return c && c.unit ? c.unit : '';
+      };
+      const refLoOf = id => {
+        const c = catById.get(id);
+        if (!c) return '';
+        if (c.lo != null) return c.lo;
+        if (c.refLo != null) return c.refLo;
+        return '';
+      };
+      const refHiOf = id => {
+        const c = catById.get(id);
+        if (!c) return '';
+        if (c.hi != null) return c.hi;
+        if (c.refHi != null) return c.refHi;
+        return '';
+      };
+      const csvCell = v => {
+        if (v == null) return '';
+        const s = String(v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+
+      const header = ['id', 'YYYYMM'];
+      for (const entry of manifest) {
+        const lbl = labelOf(entry);
+        header.push(`${lbl} value`, `${lbl} unit`, `${lbl} lower`, `${lbl} higher`);
+      }
+      const lines = [header.map(csvCell).join(',')];
+
+      const patientList = [...(patients || [])].sort((a, b) => {
+        const ca = String(a.chartno || a.chartNo || '');
+        const cb = String(b.chartno || b.chartNo || '');
+        return ca.localeCompare(cb);
+      });
+
+      for (const p of patientList) {
+        const cn = p.chartno || p.chartNo || '';
+        if (!cn) continue;
+        const labData = (allLabData && allLabData[cn]) || null;
+        if (!labData) continue;
+        const draws  = EARLY_CKD_GROUP.detectDrawsFromStored(labData);
+        const byMonth = EARLY_CKD_GROUP.pickEarliestPerMonth(draws);
+        const months = Object.keys(byMonth).sort();
+        for (const yyyymm of months) {
+          const draw = byMonth[yyyymm];
+          const row = [cn, yyyymm];
+          for (const entry of manifest) {
+            const cell = draw.labs && draw.labs[entry.id];
+            const val  = cell && cell.value != null ? cell.value : '';
+            const unit = (cell && cell.unit) || unitOf(entry.id);
+            row.push(val, unit, refLoOf(entry.id), refHiOf(entry.id));
+          }
+          lines.push(row.map(csvCell).join(','));
+        }
+      }
+      return lines.join('\n');
+    },
+  },
+};
+
+// Browser registry (preferred): window.GROUPS['early-ckd']
+// This file is concatenated by sync-patterns.js into the legacy
+// hospital-lab-data.html and by build.js into the new built HTMLs.
+if (typeof window !== 'undefined') {
+  window.GROUPS = window.GROUPS || {};
+  window.GROUPS['early-ckd'] = EARLY_CKD_GROUP;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// DISEASE INIT — disease: dialysis
+// ════════════════════════════════════════════════════════════════════════════
+window.ACTIVE_GROUP_ID = "dialysis";
+
 // ════════════════════════════════════════════════════════════════════════════
 // CORE JS (built by build.js, source: core/*.js, load order fixed)
 // ════════════════════════════════════════════════════════════════════════════
@@ -1808,15 +2137,27 @@ if (typeof module !== 'undefined' && module.exports) {
 // STATE MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Active disease group — Step 1 hardcodes 'dialysis'; the disease-tab UI
-// (Step 3) will switch this at runtime. Storage keys for patients/labs come
-// from the active group module; settings stays shell-global.
-const ACTIVE_GROUP_ID = 'dialysis';
+// Active disease group — selected at build time. build.js writes one of:
+//   window.ACTIVE_GROUP_ID = 'dialysis';
+//   window.ACTIVE_GROUP_ID = 'early-ckd';
+// into the {{DISEASE_INIT}} placeholder, which runs BEFORE this script
+// because it is appended at the end of the same <script> tag... wait —
+// actually init.js appends DOMContentLoaded later, but ACTIVE_GROUP_ID is
+// resolved at the top of `<script>` (this module), so the disease-init
+// block must be inlined ABOVE storage.js. build.js places the disease-init
+// in {{DISEASE_INIT}} which the shell.html template positions BEFORE
+// {{CORE_JS}}. Phase 3 made that ordering explicit; the legacy monolith
+// inlined a hardcoded 'dialysis' before this module so the fallback
+// preserves byte-identical behavior when the legacy HTML loads.
+const ACTIVE_GROUP_ID = (typeof window !== 'undefined' && window.ACTIVE_GROUP_ID) || 'dialysis';
 const GROUP = (window.GROUPS || {})[ACTIVE_GROUP_ID];
 if (!GROUP) {
-  throw new Error('[hospital-lab-data] active group "' + ACTIVE_GROUP_ID +
-    '" not loaded — run `node sync-patterns.js`');
+  throw new Error('[hospital-lab] active group "' + ACTIVE_GROUP_ID +
+    '" not loaded — check build.js DISEASES config or sync-patterns.js');
 }
+// Expose for cross-module ad-hoc reference (export-formats/renal-platform
+// reads window.ACTIVE_GROUP).
+if (typeof window !== 'undefined') window.ACTIVE_GROUP = GROUP;
 
 const STORAGE_KEYS = {
   patients: GROUP.storageKey.patients,   // 'patients_dialysis'
@@ -3732,6 +4073,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+
+
 // ════════════════════════════════════════════════════════════════════════════
 // EXPORT FORMATS (built by build.js, source: export-formats/*.js)
 //   Loaded: kiditi-csv
@@ -3904,10 +4247,6 @@ function exportKiDiTiCSV() {
   showToast(`KiDiTi CSV 已匯出（${scope}，${rows.length} 列）`, 'success');
 }
 
-
-// ════════════════════════════════════════════════════════════════════════════
-// DISEASE INIT — disease: dialysis
-// ════════════════════════════════════════════════════════════════════════════
 </script>
 </body>
 </html>
