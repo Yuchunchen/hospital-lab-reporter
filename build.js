@@ -3,14 +3,25 @@
 
 /**
  * build.js — Assemble core/ + groups/<disease>.js + patterns + export-formats
- * into a single standalone hospital-lab-<disease>.html file.
+ * (+ optional lib/) into a single standalone hospital-lab-<disease>.html file.
  *
  *   node build.js dialysis        → hospital-lab-dialysis.html
+ *   node build.js ckd             → hospital-lab-ckd.html
  *   node build.js                 → builds every disease in DISEASES
  *
+ * Phase 3 (2026-05-08) introduced:
+ *   - body.html placeholders {{HEADER_TITLE}} + {{ACTION_BUTTONS}} so each
+ *     disease swaps its own header text + export buttons without touching
+ *     the shared body markup.
+ *   - {{DISEASE_INIT}} now runs BEFORE {{CORE_JS}} so storage.js can read
+ *     window.ACTIVE_GROUP_ID; storage.js falls back to 'dialysis' if unset
+ *     (preserves legacy hospital-lab-data.html behavior).
+ *   - {{LIB}} placeholder so a disease can pull in third-party JS (SheetJS
+ *     for the renal-platform xlsx export).
+ *
  * The output is a throwaway artifact (no markers, no in-place editing) — the
- * build re-reads from sibling repo + core/ + groups/ + export-formats/ each
- * time. Legacy hospital-lab-data.html stays as a reference until users
+ * build re-reads from sibling repo + core/ + groups/ + export-formats/ + lib/
+ * each time. Legacy hospital-lab-data.html stays as a reference until users
  * migrate.
  */
 
@@ -21,25 +32,57 @@ const ROOT          = __dirname;
 const CORE_DIR      = path.join(ROOT, 'core');
 const GROUPS_DIR    = path.join(ROOT, 'groups');
 const FORMATS_DIR   = path.join(ROOT, 'export-formats');
+const LIB_DIR       = path.join(ROOT, 'lib');
 const PATTERNS_DIR  = path.resolve(ROOT, '..', 'hospital-lab-patterns', 'patterns');
 
 // ─── Disease catalogue ───────────────────────────────────────────────────────
-// Phase 1 ships dialysis only; future phases (ckd / dm / esrd) add entries
-// here and any disease-specific export-formats they need.
+// Each entry owns its title, group module id, the right-side action-button
+// markup, an optional list of third-party libs to inline, and the disease-
+// init JS that sets window.ACTIVE_GROUP_ID.
+
 const DISEASES = {
   dialysis: {
     title: '洗腎室檢驗資料管理',
+    headerTitle: '洗腎室檢驗資料管理',
     groupId: 'dialysis',
+    libs: [],
     exportFormats: ['kiditi-csv'],
+    actionButtons: [
+      '            <button class="btn btn-primary" id="btnRefreshList" onclick="refreshExistingPatients()"',
+      '              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(52,152,219,0.35); margin-right:16px;">全部更新</button>',
+      '            <button class="btn btn-warning" id="btnExportKiDiTi" onclick="exportKiDiTiCSV()"',
+      '              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出KiDiTi資料</button>',
+      '            <button class="btn btn-warning" id="btnExportCSV" onclick="exportCombinedCSV()"',
+      '              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出csv</button>',
+    ].join('\n'),
+  },
+
+  ckd: {
+    title: '初期慢性腎臟病檢驗資料管理',
+    headerTitle: '初期慢性腎臟病檢驗資料管理',
+    groupId: 'early-ckd',
+    libs: ['xlsx.mini.min.js'],
+    exportFormats: ['renal-platform-xlsx'],
+    actionButtons: [
+      '            <button class="btn btn-primary" id="btnRefreshList" onclick="refreshExistingPatients()"',
+      '              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(52,152,219,0.35); margin-right:16px;">全部更新</button>',
+      '            <button class="btn btn-warning" id="btnExportRenalPlatform" onclick="exportRenalPlatformXlsx()"',
+      '              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出腎平台資料</button>',
+      '            <button class="btn btn-warning" id="btnExportCSV" onclick="exportCombinedCSV()"',
+      '              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出csv</button>',
+    ].join('\n'),
   },
 };
 
 // ─── core/ load order ────────────────────────────────────────────────────────
-// Top-level fn declarations hoist so order is mostly cosmetic — but module
+// Top-level fn declarations hoist so order is mostly cosmetic, but module
 // IIFEs (the dropLegacyOrdersCache one in indexeddb-cache.js, the
-// migrateLegacyStorage one in storage.js) must run BEFORE anything that
-// touches their state. init.js MUST be last so the DOMContentLoaded handler
-// sees every helper.
+// migrateLegacyStorage one in storage.js) and the storage.js
+// `const ACTIVE_GROUP_ID = ...` expression must run AFTER the disease-init
+// block writes window.ACTIVE_GROUP_ID. shell.html positions
+// {{DISEASE_INIT}} above {{CORE_JS}} to satisfy that.
+//
+// init.js MUST be last so the DOMContentLoaded handler sees every helper.
 const CORE_ORDER = [
   'storage.js',
   'chart-format.js',
@@ -149,6 +192,29 @@ function buildCoreBlock() {
   return banner + body;
 }
 
+// ─── Library block (per-disease vendor JS, e.g. SheetJS) ─────────────────────
+function buildLibBlock(libs) {
+  if (!libs || !libs.length) return '';
+  const banner = [
+    '// ════════════════════════════════════════════════════════════════════════════',
+    '// VENDOR LIBS (built by build.js, source: lib/*)',
+    '//   Loaded: ' + libs.join(', '),
+    '// ════════════════════════════════════════════════════════════════════════════',
+    '',
+  ].join('\n');
+  const body = libs
+    .map(name => {
+      const file = path.join(LIB_DIR, name);
+      if (!fs.existsSync(file)) {
+        throw new Error('[build] missing lib: ' + name + ' — expected at ' + file);
+      }
+      return '\n// ─── lib/' + name + ' ' + '─'.repeat(Math.max(2, 50 - name.length)) + '\n' +
+             fs.readFileSync(file, 'utf8');
+    })
+    .join('\n');
+  return banner + body;
+}
+
 // ─── Export-formats block (per disease) ─────────────────────────────────────
 function buildExportFormats(formats) {
   if (!formats || !formats.length) return '';
@@ -172,15 +238,15 @@ function buildExportFormats(formats) {
   return banner + body;
 }
 
-// ─── Disease init — placeholder for Phase 3 ─────────────────────────────────
-// Phase 1 keeps storage.js's hardcoded ACTIVE_GROUP_ID = 'dialysis', so the
-// init block is a no-op marker. Phase 3 will switch storage.js to read from
-// window.ACTIVE_GROUP_ID and this block will set it.
+// ─── Disease init block ─────────────────────────────────────────────────────
+// Sets window.ACTIVE_GROUP_ID before storage.js runs. Must execute as
+// top-level JS inside the same <script> tag, BEFORE the core block.
 function buildDiseaseInit(disease) {
   return [
     '// ════════════════════════════════════════════════════════════════════════════',
     '// DISEASE INIT — disease: ' + disease.groupId,
     '// ════════════════════════════════════════════════════════════════════════════',
+    'window.ACTIVE_GROUP_ID = ' + JSON.stringify(disease.groupId) + ';',
   ].join('\n');
 }
 
@@ -191,17 +257,23 @@ function buildOne(diseaseId) {
 
   const shell  = fs.readFileSync(path.join(CORE_DIR, 'shell.html'), 'utf8');
   const styles = fs.readFileSync(path.join(CORE_DIR, 'styles.css'), 'utf8');
-  const body   = fs.readFileSync(path.join(CORE_DIR, 'body.html'), 'utf8');
+  let bodyHtml = fs.readFileSync(path.join(CORE_DIR, 'body.html'), 'utf8');
+
+  // Body-level placeholders (header text + per-disease action buttons).
+  bodyHtml = bodyHtml
+    .replace('{{HEADER_TITLE}}',   disease.headerTitle || disease.title)
+    .replace('{{ACTION_BUTTONS}}', disease.actionButtons || '');
 
   const out = shell
     .replace('{{TITLE}}',          disease.title)
     .replace('{{STYLES}}',         styles)
-    .replace('{{BODY_HTML}}',      body)
+    .replace('{{BODY_HTML}}',      bodyHtml)
     .replace('{{PATTERNS}}',       buildPatternsBlock())
     .replace('{{GROUPS}}',         buildGroupsBlock())
+    .replace('{{DISEASE_INIT}}',   buildDiseaseInit(disease))
     .replace('{{CORE_JS}}',        buildCoreBlock())
-    .replace('{{EXPORT_FORMATS}}', buildExportFormats(disease.exportFormats))
-    .replace('{{DISEASE_INIT}}',   buildDiseaseInit(disease));
+    .replace('{{LIB}}',            buildLibBlock(disease.libs))
+    .replace('{{EXPORT_FORMATS}}', buildExportFormats(disease.exportFormats));
 
   const target = path.join(ROOT, 'hospital-lab-' + diseaseId + '.html');
   fs.writeFileSync(target, out, 'utf8');

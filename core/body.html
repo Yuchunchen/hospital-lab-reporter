@@ -2,7 +2,7 @@
 
 <!-- ═══ Header ════════════════════════════════════════════════════════════════ -->
 <header class="app-header">
-  <h1>洗腎室檢驗資料管理</h1>
+  <h1>{{HEADER_TITLE}}</h1>
   <div class="header-actions">
     <button class="btn-icon" onclick="switchTab('patients')" title="病患清單">&#128100;</button>
     <button class="btn-icon" onclick="switchTab('settings')" title="設定">&#9881;</button>
@@ -40,12 +40,7 @@
             <button class="btn btn-success btn-sm" id="btnAddToList" onclick="addAndUpdateFromInput()">新增清單</button>
           </div>
           <div style="display:flex; gap:8px; align-items:center">
-            <button class="btn btn-primary" id="btnRefreshList" onclick="refreshExistingPatients()"
-              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(52,152,219,0.35); margin-right:16px;">全部更新</button>
-            <button class="btn btn-warning" id="btnExportKiDiTi" onclick="exportKiDiTiCSV()"
-              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出KiDiTi資料</button>
-            <button class="btn btn-warning" id="btnExportCSV" onclick="exportCombinedCSV()"
-              style="padding:12px 32px; font-size:1.15em; font-weight:600; box-shadow:0 2px 6px rgba(230,126,34,0.35);">匯出csv</button>
+{{ACTION_BUTTONS}}
           </div>
         </div>
       </div>
