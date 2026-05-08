@@ -1,5 +1,22 @@
 # WORKLOG
 
+## 2026-05-08 — sync 拉新版 catalog（GluAC 收緊 bare-Glucose）
+
+- 作者：claude（與 YC 共同）
+- 範圍：core / dialysis / early-ckd（sync 拉新版 patterns 區塊 + 重 build）
+- 變更：自動產生
+- 檔案：`hospital-lab-data.html`（patterns 區塊由 sync 更新）、
+  `hospital-lab-dialysis.html` + `hospital-lab-ckd.html`（build 重產）
+- 原因：patterns repo 同日修 GluAC regex — bare `Glucose:` alternation
+  改成必須帶括號（site qualifier）。原 pattern 會被尿液 CHEM EXAM(TT)
+  的 `Glucose: 4+` 誤匹配、把 `4` 抓成空腹血糖 mg/dL，存進
+  `labs_dialysis[chartno].GluAC[]`，污染 lab 表 + URR/CaxP 旁的血糖欄。
+- 測試：YC 載入新版 HTML 後，vhtt 同日有尿液常規 + 血糖的病人（如
+  000026353G 115/02/26），`localStorage.getItem('labs_dialysis')` 裡
+  該日期 GluAC 應為實際血糖值或缺漏，不再有尿糖 `4+` 衍生的 4。
+  CKD HTML 也會走新 pattern（CKD manifest 也有 GluAC）。
+- 相依：patterns repo 同日 commit（catalog GluAC pattern 收緊）。
+
 ## 2026-05-08 — sync 拉新版 catalog（FreePSA 移除 RATIO alternation）
 
 - 作者：claude（與 YC 共同）
