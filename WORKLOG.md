@@ -1,5 +1,18 @@
 # WORKLOG
 
+## 2026-05-12 — sync 拉新版 catalog(RBC + GluAC negative lookahead)
+
+- 作者:claude(與 YC 共同,在 vhyl 動手)
+- 範圍:patterns 區塊 sync(無 reporter own-code 改動)
+- 檔案:`hospital-lab-data.html`(legacy markers 重 sync)、
+  `hospital-lab-dialysis.html`(build 重產)、`hospital-lab-ckd.html`(build 重產)
+- 原因:patterns repo 同日修 RBC + GluAC regex,加 negative lookahead 擋
+  vhyl URINE ROUTINE(YL) `RBC: 0-2` 和 `GLU: 4+` 誤匹配。詳見 patterns
+  WORKLOG 2026-05-12 entry。
+- 觸發 case:vhyl/000012148C(RBC=0)+ vhyl/000124693B(Sugar=4)。
+- 測試:re-extract 後兩例都還原為正常血液 RBC 4.76–5.07 和血糖 125–137。
+- 相依:patterns repo 同日 commit。
+
 ## 2026-05-12 — dialysis groups：BUN_post 加入 cluster-local fallback（vhyl 配對修補）
 
 - 作者：claude（與 YC 共同，在 vhyl 動手）
