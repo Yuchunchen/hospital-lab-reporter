@@ -1,0 +1,26 @@
+# Default: let git auto-detect text and normalize line endings.
+# Files stored as LF in the repo; Windows checkout converts to CRLF.
+# Added 2026-05-12 to resolve longstanding CRLF/LF mismatch.
+*               text=auto
+
+# Force LF for files that downstream tooling expects to be LF.
+*.sh            text eol=lf
+*.json          text eol=lf
+*.md            text eol=lf
+
+# Explicit binary — never normalize.
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.svg           binary
+*.zip           binary
+*.pdf           binary
+*.xlsx          binary
+*.xls           binary
+*.docx          binary
+*.doc           binary
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
