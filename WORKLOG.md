@@ -1,5 +1,38 @@
 # WORKLOG
 
+## 2026-05-12 — dialysis groups：BUN_post 加入 cluster-local fallback（vhyl 配對修補）
+
+- 作者：claude（與 YC 共同，在 vhyl 動手）
+- 範圍：reporter / dialysis（單檔 + 重 build）
+- 檔案：`groups/dialysis.js`（line 276 一行→五行）、
+  `hospital-lab-dialysis.html`（build 重產 167.3→171.7 KB）、
+  `hospital-lab-data.html`（legacy sync 跟著動）
+- 原因：vhyl 50-ID validation（`patterns/docs/validation_vhyl_2026-05-12.md`）發現
+  `detectMonthlyDrawsFromStored` 內的 BUN_post 配對失敗率 85%（46 個病人裡
+  39 個的所有 monthly cluster 完全配不上 post）。
+  根因：`drawDateIso` 是用 `bucket.effectiveTime` 算 local YYYY-MM-DD，
+  `bunIdx.post` 是用 `e.date` 當 key。vhyl 醫囑下單（生效時間）和實際抽血
+  日期平均差 5–9 天（797 筆 BUN_pre 裡 685 筆 mismatch，最大宗 gap=9 天
+  338 筆）→ cross-cluster lookup 完全 miss。
+  pre 早就有 fallback 救到（line 271–274 三層 fallback），post 卻沒。
+- 修法：line 276 加入和 pre 平行的 fallback。pre 和 post 在 vhyl 共用同一個
+  `effectiveTime` cluster（同張醫囑下出來），所以 `bucket.byTestId.BUN_post`
+  通常就有資料；vhtt 端 eff==date 時主 lookup 先命中，fallback 不會走到
+  → vhtt 行為無變化。
+  ```js
+  const post = bunIdx.post[drawDateIso]
+    || (bucket.byTestId.BUN_post && bucket.byTestId.BUN_post[0])
+    || null;
+  ```
+- 測試：vhyl 同 50 ID(46 唯一)上跑前後對照：
+  - 修前：520 monthly clusters 中只有 11 個 pre+post 配對(2.1%)，URR
+    在 draw 層級只算出 11 筆，39/46 病人零配對。
+  - 修後：520 中 516 配對(**99.2%**)，URR 算出 515 筆，0/46 零配對；
+    剩下 4 個 pre-only 是真實當月沒抽 post 的 case。
+- 相依：無。groups/dialysis.js 是 reporter repo own file，沒動 patterns。
+- 跨機 handoff：`hospital-lab-patterns/docs/task-briefs/TASK_BRIEF_handoff_vhyl_to_vhtt_2026-05-12.md`
+  告知 vhtt 端 git pull 即可。
+
 ## 2026-05-08 — sync 拉新版 catalog（GluAC 收緊 bare-Glucose）
 
 - 作者：claude（與 YC 共同）

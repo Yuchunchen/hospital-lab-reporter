@@ -323,7 +323,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-05-08T06:54:13.163Z
+//   Synced at: 2026-05-12T01:00:51.292Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -1603,8 +1603,14 @@ const DIALYSIS_GROUP = {
         || (bucket.byTestId.BUN_pre && bucket.byTestId.BUN_pre[0])
         || (bucket.byTestId.BUN     && bucket.byTestId.BUN[0])
         || null;
-      // BUN post: cross-cluster lookup by date (post lives in its own cluster).
-      const post = bunIdx.post[drawDateIso] || null;
+      // BUN post: cross-cluster lookup by date (post lives in its own cluster
+      // on vhtt where eff==entry.date). On vhyl, eff is days before the actual
+      // draw date, so the date-keyed bunIdx lookup misses — fall back to the
+      // current cluster's own BUN_post bucket, which is where pre/post end up
+      // when they share an effectiveTime (vhyl pattern, 2026-05-12).
+      const post = bunIdx.post[drawDateIso]
+        || (bucket.byTestId.BUN_post && bucket.byTestId.BUN_post[0])
+        || null;
 
       // Collect non-BUN labs (one entry per testId — they share the cluster
       // key, so any duplicate is a parser-side dedupe miss).
