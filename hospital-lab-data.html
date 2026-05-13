@@ -335,7 +335,7 @@ body {
 //   3. cd hospital-lab-reporter && node sync-patterns.js
 //   4. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-13T11:29:08.851Z
+// Synced at: 2026-05-13T12:06:16.751Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -871,6 +871,7 @@ const CATALOG = [
     //   vhyl: `FREE PSA/PSA RATIO: 0.097`  ← Free PSA(YL)
     //   通用: `Free PSA: N`                ← 其他院區（若有）
     pattern: /(?:Free PSA|FREE PSA\/PSA RATIO|RATIO):\s*([<>]?\s*[\d.]+)/,
+    orderNameFilter: /Free\s*PSA/i,
     displayName:'游離 PSA (Free PSA)', shortLabel:'Free PSA',
     unit:'ng/mL', category:'癌症指數',
     gender:'M' },
@@ -1347,7 +1348,7 @@ var COMPUTED_TESTS = REPORTER_COMPUTED;
 //   2. node sync-patterns.js
 //   3. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-05-13T11:29:08.862Z
+// Synced at: 2026-05-13T12:06:16.778Z
 // Files:    dialysis.js, early-ckd.js
 // ════════════════════════════════════════════════════════════════════════════
 
