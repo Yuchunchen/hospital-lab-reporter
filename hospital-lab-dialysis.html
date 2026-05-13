@@ -323,7 +323,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-05-12T14:07:48.827Z
+//   Synced at: 2026-05-13T11:29:08.924Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -849,22 +849,16 @@ const CATALOG = [
     gender:'M' },
 
   { id:'FreePSA',
-    // 2026-05-08: removed `|RATIO` alternation. vhtt Free PSA(TT) reports
-    // only emit `RATIO: 0.152` (the Free/Total fraction, not the ng/mL
-    // concentration); the alternation was capturing that ratio as a
-    // FreePSA value. Verified bad cases: vhtt 000017679E (PSA 0.631,
-    // RATIO 0.152 → FreePSA was being stored as 0.152) and 000043524F
-    // (PSA 0.113, RATIO 0.093). With this change, vhtt reports correctly
-    // leave FreePSA null; PSARatio computed entry then doesn't fire,
-    // which matches what those reports actually convey. Other sites that
-    // emit "Free PSA: N" verbatim are unaffected.
-    // 2026-05-12: vhyl `Free PSA(YL)` 報告輸出 `FREE PSA/PSA RATIO: 0.097`
-    // (該值為 Free PSA 絕對濃度 ng/mL，非比值；經 vhyl/000025318J 確認
-    // PSA=0.395, FreePSA=0.097 → ratio 24.6% 屬正常範圍)。加 alternation
-    // 涵蓋此 label 樣式。注意 2026-05-08 對 vhtt `RATIO:` 樣式的解讀
-    // 是否誤判另以 TASK_BRIEF 帶回 vhtt 評估（涉及歷史 vhtt case 重新檢視，
-    // 不在本次 vhyl minor revision 範圍內）。
-    pattern: /(?:Free PSA|FREE PSA\/PSA RATIO):\s*([<>]?\s*[\d.]+)/,
+    // 2026-05-08: 原本移除 `|RATIO` alternation，錯誤假設 vhtt `RATIO:` 值為
+    // Free/Total 比值。2026-05-13 vhtt 端以 3 個病人取樣驗證（000017679E /
+    // 000043524F / 000026353G），YC（clinician）確認：vhtt 與 vhyl 的 RATIO
+    // 值都是 Free PSA 絕對濃度（ng/mL），報告後接的 boilerplate 是判讀指引，
+    // 不是數值語意描述。故加回 `RATIO` alternation。
+    // Label 樣式覆蓋：
+    //   vhtt: `RATIO: 0.152`               ← Free PSA(TT) / FREE PSA
+    //   vhyl: `FREE PSA/PSA RATIO: 0.097`  ← Free PSA(YL)
+    //   通用: `Free PSA: N`                ← 其他院區（若有）
+    pattern: /(?:Free PSA|FREE PSA\/PSA RATIO|RATIO):\s*([<>]?\s*[\d.]+)/,
     displayName:'游離 PSA (Free PSA)', shortLabel:'Free PSA',
     unit:'ng/mL', category:'癌症指數',
     gender:'M' },
