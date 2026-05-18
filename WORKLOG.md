@@ -1,5 +1,17 @@
 # WORKLOG
 
+## 2026-05-19 — Behavior rules:CLAUDE.md 加入 Coding behavior contract
+
+- 作者:claude(與 YC 共同,在 vhyl 動手)
+- 範圍:meta-rules(非 reporter code;改的是 CLAUDE.md)
+- 檔案:`CLAUDE.md`(「不要做的事」前加 § Coding behavior contract,A–C 三條)
+- 原因:Karpathy / Forrest Chang 12-rule CLAUDE.md(blocktempo 2026-05-14)經篩選後,挑出原規則 3(外科修改)、7(矛盾模式不混用)、8(新增前讀 caller)三條。歷史教訓對 reporter 端特別相關:Notion #3 IndexedDB migration 之前若沒先讀 `core/indexeddb-cache.js` 已遷的部分(ordersCache 已搬、labs_&lt;group&gt; 還沒搬),會誤以為已完成 — 規則 C 直接針對這類錯誤。
+- Cowork 端對應的「思考規則」(#8–#11)加在 patterns/docs/cowork-project-instructions.md。
+- 三 repo 共用版本:patterns / viewer / reporter 三個 CLAUDE.md 同 commit 加同一份 contract;下次規則改動需三個一起。
+- 測試:N/A(規則層,不跑 build / sync)。
+- 相依:patterns repo 同 commit + viewer repo 同 commit,三個 repo 一起 push。
+- 來源連結:https://www.blocktempo.com/claude-code-12-rules-error-rate-3-percent-karpathy-agent/
+
 ## 2026-05-12 — sync 拉新版 catalog(RBC + GluAC negative lookahead)
 
 - 作者:claude(與 YC 共同,在 vhyl 動手)
