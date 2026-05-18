@@ -1,5 +1,16 @@
 # WORKLOG
 
+## 2026-05-19 — Session 切換 SOPs G–J:本 repo pointer 條目
+
+- 作者:claude(與 YC 共同,在 vhyl 動手)
+- 範圍:meta-process(本 repo 無 code 動;真正變動在 patterns repo)
+- 檔案:無檔(僅 pointer 註記)
+- patterns repo 同日 commit 加入:`docs/session-state-vhyl.md` / `session-state-vhtt.md` / `session-state-archive/.gitkeep` / `workflow-changelog.md`,PROJECT_CONTEXT § 12「Session 切換 SOPs」+ § 13「Cowork ↔ Chat mode handoff」
+- Trigger 對照:「階段完成」→ SOP G(Wrap);「離開 vhyl/vhtt」→ SOP H;「接續 vhtt/vhyl/上次」→ SOP I(Resume);「結束 session」→ SOP J
+- 影響本 repo:無 — 各 SOP 步驟內仍會跑「本 repo `WORKLOG.md` 加條目」(rule #2)及「git status / commit / push」(rule #3),機制不變
+- 測試:N/A
+- 相依:patterns repo 同 commit
+
 ## 2026-05-19 — Brief 集中:本 repo 3 條歷史 brief 搬至 patterns/docs/task-briefs/
 
 - 作者:claude(與 YC 共同,在 vhyl 動手)
