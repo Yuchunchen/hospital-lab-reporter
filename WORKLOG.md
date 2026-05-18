@@ -1,5 +1,17 @@
 # WORKLOG
 
+## 2026-05-19 — Brief 集中:本 repo 3 條歷史 brief 搬至 patterns/docs/task-briefs/
+
+- 作者:claude(與 YC 共同,在 vhyl 動手)
+- 範圍:doc relocation(本 repo 無 code 動)
+- 變更:移除
+- 檔案:原 `TASK_BRIEF_step1_done.md` / `TASK_BRIEF_step1_v3_done.md` / `TASK_BRIEF_step2.md` 從 repo root 搬至 `hospital-lab-patterns/docs/task-briefs/`,加 `reporter_` 前綴 + 改成可讀描述名,step2 補加 `_done`(YC 確認當已完成)。
+- 原因:.gitignore line 25 把 `TASK_BRIEF*.md` 排除,這些 brief 從未進 git → 兩台機本機版本可能 drift。集中到 patterns/docs/task-briefs/ 後第一次納入 git 追蹤、跨機可見。
+- 新路徑見 patterns WORKLOG 2026-05-19 同日條目(完整對應表)。
+- 影響:本 repo `.gitignore` 規則不變(future TASK_BRIEF 仍 ignored,但慣例上 brief 直接寫到 patterns/docs/task-briefs/)。
+- 測試:N/A。
+- 相依:patterns repo 同 commit 加入 4 個 brief 檔(本 repo 3 + viewer repo 1)。
+
 ## 2026-05-19 — Behavior rules:CLAUDE.md 加入 Coding behavior contract
 
 - 作者:claude(與 YC 共同,在 vhyl 動手)
