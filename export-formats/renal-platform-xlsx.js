@@ -58,7 +58,7 @@ function _renalVal(draw, id) {
  * Export the active CKD group's tracked patients to a 腎臟病平台 xlsx.
  * Selection-aware: respects the Phase 1.5 patient-checkbox filter.
  */
-function exportRenalPlatformXlsx() {
+async function exportRenalPlatformXlsx() {
   if (typeof XLSX === 'undefined') {
     showToast('xlsx library 未載入', 'error');
     return;
@@ -79,7 +79,7 @@ function exportRenalPlatformXlsx() {
     if (!patients.length) { showToast('勾選的病患都不在清單中', 'error'); return; }
   }
 
-  const allLabData = loadLabData();
+  const allLabData = await loadLabData();
 
   // 23-column schema. Row 1 keys / Row 2 labels / Row 3 units / Row 4+ data.
   // Source: TASK_BRIEF_phase3_early_ckd.md §3.2.

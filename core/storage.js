@@ -35,7 +35,9 @@ if (typeof window !== 'undefined') window.ACTIVE_GROUP = GROUP;
 const STORAGE_KEYS = {
   patients: GROUP.storageKey.patients,   // 'patients_dialysis'
   settings: 'hd_settings',                // shell-global
-  labData:  GROUP.storageKey.labs,        // 'labs_dialysis'
+  // labData 不再在 localStorage（2026-05-13 搬到 IDB labData store）。
+  // GROUP.storageKey.labs 留著給 indexeddb-cache.js 的一次性 migration IIFE
+  // 找舊 localStorage key 用。
   // Hotfix v2 (2026-05-05): per-group sort + filter UI state.
   patientSort:    GROUP.storageKey.patients + '_sort',    // {column, dir}
   patientFilters: GROUP.storageKey.patients + '_filters', // {col: value, ...}
@@ -46,9 +48,6 @@ const STORAGE_KEYS = {
 (function migrateLegacyStorage() {
   if (!localStorage.getItem(STORAGE_KEYS.patients) && localStorage.getItem('hd_patients')) {
     localStorage.setItem(STORAGE_KEYS.patients, localStorage.getItem('hd_patients'));
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.labData) && localStorage.getItem('hd_labData')) {
-    localStorage.setItem(STORAGE_KEYS.labData, localStorage.getItem('hd_labData'));
   }
 })();
 
@@ -61,13 +60,27 @@ function savePatients(list) {
   localStorage.setItem(STORAGE_KEYS.patients, JSON.stringify(list));
 }
 
-/** Load lab data from localStorage. Returns { chartno: { testId: [{date,value},...] } } */
-function loadLabData() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.labData)) || {}; }
-  catch { return {}; }
+/**
+ * Load lab data from IDB labData store (2026-05-13 從 localStorage 搬來).
+ * Returns { chartno: { chartno, <testId>: [{date,value},...], _lastUpdate } }
+ * 注意：async — 所有 call site 必須 await。
+ */
+async function loadLabData() {
+  try { return await labDataGetAll(); }
+  catch (e) { console.warn('[loadLabData] IDB read failed:', e); return {}; }
 }
-function saveLabData(data) {
-  localStorage.setItem(STORAGE_KEYS.labData, JSON.stringify(data));
+
+/**
+ * Persist the lab-data map. Iterates entries and writes one IDB record per
+ * chartno (keyPath=chartno). 注意：async — 所有 call site 必須 await。
+ */
+async function saveLabData(data) {
+  if (!data || typeof data !== 'object') return;
+  for (const [cn, lab] of Object.entries(data)) {
+    if (!cn || !lab || typeof lab !== 'object') continue;
+    try { await labDataPut(cn, lab); }
+    catch (e) { console.warn(`[saveLabData] put failed for ${cn}:`, e); }
+  }
 }
 
 /** Load settings */

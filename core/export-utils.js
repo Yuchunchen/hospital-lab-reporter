@@ -14,7 +14,7 @@
  * Export all tracked patients × YYYYMM as a single long-format CSV.
  * Layout (header, rows) lives in GROUP.exporter.formatAll (groups/dialysis.js).
  */
-function exportCombinedCSV() {
+async function exportCombinedCSV() {
   if (!GROUP.exporter || typeof GROUP.exporter.formatAll !== 'function') {
     showToast('此疾病模組尚未提供 CSV 匯出', 'error'); return;
   }
@@ -31,7 +31,7 @@ function exportCombinedCSV() {
     }
   }
 
-  const labData  = loadLabData();
+  const labData  = await loadLabData();
   const csv      = GROUP.exporter.formatAll(patients, labData);
   // BOM so Excel opens UTF-8 without garbling Chinese display labels.
   const blob     = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
