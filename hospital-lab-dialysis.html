@@ -117,6 +117,13 @@ body {
 .val-q-pos { color: #c0392b; font-weight: 700; }
 .val-q-neg { color: #27ae60; }
 .latest-col { background: rgba(255,235,59,.1); }
+/* KDIGO-aligned staging colours (CKD HTML only — dialysis.computed has no
+   staging ids so these classes never apply there). 4 levels: normal / mild /
+   moderate / severe. */
+.val-stage-normal   { background: #c8e6c9; color: #1b5e20; font-weight: 600; }
+.val-stage-mild     { background: #fff9c4; color: #827717; font-weight: 600; }
+.val-stage-moderate { background: #ffcc80; color: #8a4500; font-weight: 600; }
+.val-stage-severe   { background: #ef9a9a; color: #b71c1c; font-weight: 700; }
 
 /* ─── Modal ────────────────────────────────────────────────────────────────── */
 .modal-overlay {
@@ -323,7 +330,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-05-13T13:23:51.691Z
+//   Synced at: 2026-05-20T15:56:07.773Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -1188,6 +1195,7 @@ const CATEGORIES = [
   { id:'TRACE',    label:'微量元素' },
   { id:'PTH',      label:'副甲狀腺' },
   { id:'HEPAT',    label:'肝炎 / 感染' },
+  { id:'STAGING',  label:'腎臟病分期' },
   { id:'COMPUTED', label:'計算值' },
 ];
 
@@ -1272,22 +1280,31 @@ const REPORTER_MANIFEST = [
   { id:'RPR',      cat:'HEPAT',   label:'RPR' },
 ];
 
-// ─── Computed tests (URR, Ca×P) — reporter-specific derivations ─────────
-// These coexist with patterns/computed.js; reporter's HTML loads them
-// as COMPUTED_TESTS via a backwards-compat alias.
+// ─── Computed tests — render manifest for derived values ────────────────
+//
+// Each entry is a "what to render" row in the reporter's lab table; the
+// actual compute logic lives in patterns/computed.js (COMPUTATIONS), which
+// the reporter inlines at sync/build time and dispatches via core/compute.js.
+//
+// `kind:'staging'` flags string-valued entries (GFR/UACR/etc.) so the
+// lab-view skips numeric hi/lo alarming and uses the staging colour map.
+//
+// URR / CaxP retain their original render metadata (cat:'COMPUTED'); the new
+// CKD-staging entries go under cat:'STAGING'. eGFR is numeric (so plain
+// hi/lo applies) but kept here because it is also derived from CREAT.
 const REPORTER_COMPUTED = [
-  { id:'URR',  cat:'COMPUTED', label:'URR',  unit:'%', ref:'>65%', hi:null, lo:65,
-    needs:['BUN_pre', 'BUN_post'],
-    compute: (pre, post) => {
-      if (pre == null || post == null || pre === 0) return null;
-      return +((1 - post / pre) * 100).toFixed(1);
-    } },
-  { id:'CaxP', cat:'COMPUTED', label:'Ca×P', unit:'',  ref:'<55',  hi:55,   lo:null,
-    needs:['Ca', 'P'],
-    compute: (ca, p) => {
-      if (ca == null || p == null) return null;
-      return +(ca * p).toFixed(1);
-    } },
+  // Dialysis-era derivations
+  { id:'URR',  cat:'COMPUTED', label:'URR',  unit:'%', ref:'>65%', hi:null, lo:65 },
+  { id:'CaxP', cat:'COMPUTED', label:'Ca×P', unit:'',  ref:'<55',  hi:55,   lo:null },
+
+  // CKD staging (eGFR numeric; rest are qualitative staging strings)
+  { id:'eGFR',      cat:'STAGING', label:'eGFR',         unit:'mL/min/1.73m²', ref:'>60', hi:null, lo:60 },
+  { id:'GFRStage',  cat:'STAGING', label:'GFR 分期',      kind:'staging' },
+  { id:'UACRStage', cat:'STAGING', label:'UACR 分期',     kind:'staging' },
+  { id:'UPCRStage', cat:'STAGING', label:'UPCR 分期',     kind:'staging' },
+  { id:'KDIGORisk', cat:'STAGING', label:'KDIGO 風險',    kind:'staging' },
+  { id:'TaiwanCKD', cat:'STAGING', label:'台灣 CKD 分期', kind:'staging' },
+  { id:'EarlyCKD',  cat:'STAGING', label:'健保 CKD 分群', kind:'staging' },
 ];
 
 // ─── Exports (CommonJS + browser global) ─────────────────────────────────
@@ -1304,6 +1321,278 @@ if (typeof window !== 'undefined') {
     REPORTER_MANIFEST,
     REPORTER_COMPUTED,
   };
+}
+'use strict';
+
+/**
+ * computed.js — Derived-value formulas shared by viewer and reporter.
+ *
+ * Each computation has:
+ *   id        unique string
+ *   needs     ids of source patterns (looked up from viewer/reporter
+ *             catalogs by the consumer)
+ *   compute   pure function — receives an input bag keyed by `needs` ids,
+ *             returns the computed value (number, string, or {value, tag}).
+ *   meta      optional display info {unit, ref, hi, lo}
+ *
+ * The implementations here mirror those embedded in
+ * hospital-lab-viewer/report.js and hospital-lab-reporter/hospital-lab-data.html
+ * so that consumers can move to this file without behaviour changes.
+ */
+
+// ─── eGFR via CKD-EPI 2021 (race-free) ───────────────────────────────────
+//   GFR = 142 × min(Scr/κ, 1)^α × max(Scr/κ, 1)^-1.200 × 0.9938^age × (1.012 if female)
+// Where κ = 0.7 (F) / 0.9 (M); α = -0.241 (F) / -0.302 (M).
+function eGFR_CKDEPI_2021({ creatinine, age, gender }) {
+  if (creatinine == null || age == null || gender == null) return null;
+  const isF = gender === 'F' || gender === '女';
+  const k     = isF ? 0.7  : 0.9;
+  const alpha = isF ? -0.241 : -0.302;
+  const female_factor = isF ? 1.012 : 1.0;
+  const ratio = creatinine / k;
+  const min = Math.min(ratio, 1);
+  const max = Math.max(ratio, 1);
+  return +(142 * Math.pow(min, alpha) * Math.pow(max, -1.200)
+              * Math.pow(0.9938, age) * female_factor).toFixed(1);
+}
+
+// ─── URR (Urea Reduction Ratio) ──────────────────────────────────────────
+function URR({ bun_pre, bun_post }) {
+  if (bun_pre == null || bun_post == null || bun_pre === 0) return null;
+  return +((1 - bun_post / bun_pre) * 100).toFixed(1);
+}
+
+// ─── Ca × P product ──────────────────────────────────────────────────────
+function CaP({ Ca, P }) {
+  if (Ca == null || P == null) return null;
+  return +(Ca * P).toFixed(1);
+}
+
+// ─── UIBC (Unsaturated Iron Binding Capacity) ───────────────────────────
+//   UIBC = TIBC − Fe
+function UIBC({ TIBC, Fe }) {
+  if (TIBC == null || Fe == null) return null;
+  const v = TIBC - Fe;
+  return v >= 0 ? +v.toFixed(1) : null;
+}
+
+// ─── PSA Free/Total ratio (only meaningful when PSA > 4) ─────────────────
+function PSARatio({ PSA, FreePSA }) {
+  if (PSA == null || FreePSA == null || PSA <= 4) return null;
+  const r = +(FreePSA / PSA * 100).toFixed(1);
+  let tag = 'normal';
+  if (r < 10) tag = 'warning';
+  else if (r < 25) tag = 'caution';
+  return { value: r, tag };
+}
+
+// ─── GFR stage (KDIGO) ───────────────────────────────────────────────────
+function GFRStage({ eGFR }) {
+  if (eGFR == null) return null;
+  if (eGFR >= 90) return '正常';
+  if (eGFR >= 60) return 'CKD2';
+  if (eGFR >= 45) return 'CKD3a';
+  if (eGFR >= 30) return 'CKD3b';
+  if (eGFR >= 15) return 'CKD4';
+  return 'CKD5';
+}
+
+// ─── UACR stage (mg/g) ───────────────────────────────────────────────────
+function UACRStage({ UACR }) {
+  if (UACR == null) return null;
+  if (UACR < 30)  return '正常';
+  if (UACR < 300) return 'A2';
+  return 'A3';
+}
+
+// ─── UPCR stage (mg/g) ───────────────────────────────────────────────────
+function UPCRStage({ UPCR }) {
+  if (UPCR == null) return null;
+  if (UPCR < 150)  return '正常';
+  if (UPCR < 500)  return '輕度';
+  if (UPCR < 3500) return '顯著';
+  return '腎病範圍';
+}
+
+// ─── KDIGO risk grid ─────────────────────────────────────────────────────
+//
+//             | A1 (UACR<30)   A2 (30–300)   A3 (>=300)
+//  G1 (>=90)  | low            moderate       high
+//  G2 (60–89) | low            moderate       high
+//  G3a(45–59) | moderate       high           very high
+//  G3b(30–44) | high           very high      very high
+//  G4 (15–29) | very high      very high      very high
+//  G5 (<15)   | very high      very high      very high
+function KDIGORisk({ eGFR, UACR }) {
+  if (eGFR == null || UACR == null) return null;
+  const g = eGFR >= 90 ? 1 : eGFR >= 60 ? 2 : eGFR >= 45 ? 3 : eGFR >= 30 ? 4 : eGFR >= 15 ? 5 : 6;
+  const a = UACR < 30 ? 1 : UACR < 300 ? 2 : 3;
+  const grid = [
+    null,
+    ['低', '中', '高'],
+    ['低', '中', '高'],
+    ['中', '高', '極高'],
+    ['高', '極高', '極高'],
+    ['極高', '極高', '極高'],
+    ['極高', '極高', '極高'],
+  ];
+  return grid[g][a - 1] + '風險';
+}
+
+// ─── Taiwan CKD stage (similar to KDIGO but uses UPCR fallback) ─────────
+function TaiwanCKD({ eGFR, UACR, UPCR }) {
+  if (eGFR == null) return null;
+  // Damage marker: UACR ≥ 30 OR UPCR ≥ 150
+  const hasDamage = (UACR != null && UACR >= 30) || (UPCR != null && UPCR >= 150);
+  if (eGFR >= 90 && !hasDamage) return '正常';
+  if (eGFR >= 90)  return '第一期';
+  if (eGFR >= 60)  return hasDamage ? '第二期' : '正常';
+  if (eGFR >= 45)  return '第三期 3a';
+  if (eGFR >= 30)  return '第三期 3b';
+  if (eGFR >= 15)  return '第四期';
+  return '第五期';
+}
+
+// ─── Early CKD class (健保 P1 / P2) ─────────────────────────────────────
+function EarlyCKD({ TaiwanCKD: tw, eGFR }) {
+  if (eGFR == null) return null;
+  if (tw === '正常') return '正常';
+  return eGFR >= 45 ? 'P1早期' : 'P2中晚期';
+}
+
+// ─── HCV / HBsAg / RPR / TPHA qualitative ───────────────────────────────
+//
+// These map free-form "Reactive / Non-Reactive" plus an optional numeric
+// titer into a user-facing string. Implementations live in each consumer's
+// report.js today; the canonical behaviour is captured here for reuse.
+function qualitativeFromText({ rawText, label }) {
+  if (!rawText) return null;
+  // Match a label-prefixed line, e.g. "Anti-HCV: Non-Reactive  1.92"
+  const re = new RegExp(`${label}[^:\\n]*:\\s*([^\\s,;]+)(?:\\s+([\\d.]+))?`, 'i');
+  const m  = rawText.match(re);
+  if (!m) return null;
+  const verdict = m[1].toLowerCase();
+  const isPositive = /^react/.test(verdict);
+  const isNegative = /^non[-\s]?react/.test(verdict);
+  let label_zh;
+  if (isPositive) label_zh = '帶原';
+  else if (isNegative) label_zh = '正常';
+  else label_zh = m[1]; // pass-through
+  const titer = m[2] ? ` (${label} ${m[2]})` : '';
+  return { value: label_zh + titer, tag: isPositive ? 'warning' : 'normal' };
+}
+
+// ─── Hepatitis display ──────────────────────────────────────────────────
+//
+// Three markers (HBsAg / Anti-HBs / Anti-HCV) share one display function;
+// the only axis of variation is polarity:
+//   antigen   — Reactive = 有疾病 (warning), Non-Reactive = 正常 (normal)
+//   antibody  — Reactive = 有抗體 (normal),  Non-Reactive = 無抗體 (warning)
+//
+// Inputs come from raw catalog entries as arrays of {date, value, ...}
+// (the consumer's parse loop produces these). We take the most recent.
+// Returns { date, value, tag } or null when the qualitative entry is missing.
+function _hepatitisDisplay(qualEntries, titerEntries, label, polarity) {
+  const q = (qualEntries && qualEntries[0]) || null;
+  if (!q) return null;
+  const t = (titerEntries && titerEntries[0]) || null;
+  const numStr = t ? t.value : '';
+
+  let displayVal, tag;
+  const qualRaw = q.value;
+  if (qualRaw === 'Reactive') {
+    if (polarity === 'antigen') { displayVal = '帶原';   tag = 'warning'; }
+    else                         { displayVal = '有抗體'; tag = 'normal';  }
+  } else if (qualRaw === 'Non-Reactive') {
+    if (polarity === 'antigen') { displayVal = '正常';   tag = 'normal';  }
+    else                         { displayVal = '無抗體'; tag = 'warning'; }
+  } else {
+    displayVal = qualRaw; tag = 'caution';
+  }
+  if (numStr) displayVal += ` (${label} ${numStr})`;
+
+  return { date: q.date, value: displayVal, tag };
+}
+
+function HBsAgDisplay({ HBsAg, HBsAgTiter }) {
+  return _hepatitisDisplay(HBsAg, HBsAgTiter, 'HBsAg', 'antigen');
+}
+function AntiHBsDisplay({ AntiHBs, AntiHBsTiter }) {
+  return _hepatitisDisplay(AntiHBs, AntiHBsTiter, 'Anti-HBs', 'antibody');
+}
+function HCV({ AntiHCV, AntiHCVTiter }) {
+  return _hepatitisDisplay(AntiHCV, AntiHCVTiter, 'Anti-HCV', 'antigen');
+}
+
+// ─── Computation registry ───────────────────────────────────────────────
+const COMPUTATIONS = [
+  { id:'eGFR',       needs:['CREAT', '__patient.age', '__patient.gender'],
+    compute: ({ CREAT, age, gender }) => eGFR_CKDEPI_2021({ creatinine: CREAT, age, gender }),
+    meta:{ unit:'mL/min/1.73m²', ref:'> 60', lo:60 } },
+
+  // URR needs use the reporter / viewer id convention (BUN_pre / BUN_post).
+  { id:'URR',        needs:['BUN_pre', 'BUN_post'],
+    compute: ({ BUN_pre, BUN_post }) => URR({ bun_pre: BUN_pre, bun_post: BUN_post }),
+    meta:{ unit:'%', ref:'> 65%', lo:65 } },
+
+  // Renamed CaP → CaxP to match the reporter's UI/storage id (results['CaxP']).
+  { id:'CaxP',       needs:['Ca', 'P'],
+    compute: ({ Ca, P }) => CaP({ Ca, P }),
+    meta:{ unit:'', ref:'< 55', hi:55 } },
+
+  { id:'UIBC',       needs:['TIBC', 'Fe'],
+    compute: ({ TIBC, Fe }) => UIBC({ TIBC, Fe }),
+    meta:{ unit:'µg/dL', ref:'110–370 µg/dL', lo:110, hi:370 } },
+
+  { id:'PSARatio',   needs:['PSA', 'FreePSA'],
+    compute: ({ PSA, FreePSA }) => PSARatio({ PSA, FreePSA }),
+    meta:{ unit:'%', ref:'>25 normal, 10-25 caution, <10 warning' } },
+
+  { id:'GFRStage',   needs:['eGFR'],
+    compute: ({ eGFR }) => GFRStage({ eGFR }) },
+
+  { id:'UACRStage',  needs:['UACR'],
+    compute: ({ UACR }) => UACRStage({ UACR }) },
+
+  { id:'UPCRStage',  needs:['UPCR'],
+    compute: ({ UPCR }) => UPCRStage({ UPCR }) },
+
+  { id:'KDIGORisk',  needs:['eGFR', 'UACR'],
+    compute: ({ eGFR, UACR }) => KDIGORisk({ eGFR, UACR }) },
+
+  { id:'TaiwanCKD',  needs:['eGFR', 'UACR', 'UPCR'],
+    compute: ({ eGFR, UACR, UPCR }) => TaiwanCKD({ eGFR, UACR, UPCR }) },
+
+  { id:'EarlyCKD',   needs:['eGFR', 'TaiwanCKD'],
+    compute: ({ eGFR, TaiwanCKD: tw }) => EarlyCKD({ eGFR, TaiwanCKD: tw }) },
+
+  { id:'HBsAgDisplay',   needs:['HBsAg', 'HBsAgTiter'],
+    compute: HBsAgDisplay },
+
+  { id:'AntiHBsDisplay', needs:['AntiHBs', 'AntiHBsTiter'],
+    compute: AntiHBsDisplay },
+
+  { id:'HCV',            needs:['AntiHCV', 'AntiHCVTiter'],
+    compute: HCV },
+];
+
+// Pure helpers (also exported for direct use)
+const HELPERS = {
+  eGFR_CKDEPI_2021,
+  URR, CaP, UIBC, PSARatio,
+  GFRStage, UACRStage, UPCRStage,
+  KDIGORisk, TaiwanCKD, EarlyCKD,
+  qualitativeFromText,
+  _hepatitisDisplay,
+  HBsAgDisplay, AntiHBsDisplay, HCV,
+};
+
+// ─── Exports ─────────────────────────────────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { COMPUTATIONS, HELPERS };
+}
+if (typeof window !== 'undefined') {
+  window.HOSPITAL_LAB_PATTERNS_COMPUTED = { COMPUTATIONS, HELPERS };
 }
 
 // ─── Resolver: merge each manifest entry on top of its catalog entry ──
@@ -1939,10 +2228,10 @@ const EARLY_CKD_GROUP = {
     'UACR',
   ],
 
-  // No CKD-specific derived values yet. eGFR / GFRStage / TaiwanCKD etc
-  // already exist in patterns/computed.js — wiring them to the lab table
-  // is a Phase 3.x follow-up, out of scope for this commit.
-  computed: [],
+  // CKD staging — wired 2026-05-20 via the registry-driven dispatcher in
+  // core/compute.js (formulas live in patterns/computed.js COMPUTATIONS).
+  // Order chosen so the lab-view renders eGFR → 各 stage 由粗到細 → 健保分群。
+  computed: ['eGFR', 'GFRStage', 'UACRStage', 'UPCRStage', 'KDIGORisk', 'TaiwanCKD', 'EarlyCKD'],
 
   // CKD draw detection — much looser than dialysis:
   // any cluster carrying Creatinine OR BUN counts as a check.
@@ -2099,11 +2388,24 @@ const EARLY_CKD_GROUP = {
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
 
+      // Staging entries (2026-05-20): one value-only column per computed id.
+      // No unit/lower/higher because the values are qualitative strings
+      // (CKD3a / A2 / 高風險 / …). eGFR is the one numeric exception but
+      // is also exported as a single column for consistency.
+      const computedList   = EARLY_CKD_GROUP.computed || [];
+      const computedTests  = (typeof COMPUTED_TESTS !== 'undefined') ? COMPUTED_TESTS : [];
+      const compById       = new Map(computedTests.map(c => [c.id, c]));
+      const computedLabel  = id => {
+        const c = compById.get(id);
+        return (c && c.label) ? c.label : id;
+      };
+
       const header = ['id', 'YYYYMM'];
       for (const entry of manifest) {
         const lbl = labelOf(entry);
         header.push(`${lbl} value`, `${lbl} unit`, `${lbl} lower`, `${lbl} higher`);
       }
+      for (const id of computedList) header.push(computedLabel(id));
       const lines = [header.map(csvCell).join(',')];
 
       const patientList = [...(patients || [])].sort((a, b) => {
@@ -2128,6 +2430,10 @@ const EARLY_CKD_GROUP = {
             const val  = cell && cell.value != null ? cell.value : '';
             const unit = (cell && cell.unit) || unitOf(entry.id);
             row.push(val, unit, refLoOf(entry.id), refHiOf(entry.id));
+          }
+          for (const id of computedList) {
+            const cell = draw.labs && draw.labs[id];
+            row.push(cell && cell.value != null ? cell.value : '');
           }
           lines.push(row.map(csvCell).join(','));
         }
@@ -2193,7 +2499,9 @@ if (typeof window !== 'undefined') window.ACTIVE_GROUP = GROUP;
 const STORAGE_KEYS = {
   patients: GROUP.storageKey.patients,   // 'patients_dialysis'
   settings: 'hd_settings',                // shell-global
-  labData:  GROUP.storageKey.labs,        // 'labs_dialysis'
+  // labData 不再在 localStorage（2026-05-13 搬到 IDB labData store）。
+  // GROUP.storageKey.labs 留著給 indexeddb-cache.js 的一次性 migration IIFE
+  // 找舊 localStorage key 用。
   // Hotfix v2 (2026-05-05): per-group sort + filter UI state.
   patientSort:    GROUP.storageKey.patients + '_sort',    // {column, dir}
   patientFilters: GROUP.storageKey.patients + '_filters', // {col: value, ...}
@@ -2204,9 +2512,6 @@ const STORAGE_KEYS = {
 (function migrateLegacyStorage() {
   if (!localStorage.getItem(STORAGE_KEYS.patients) && localStorage.getItem('hd_patients')) {
     localStorage.setItem(STORAGE_KEYS.patients, localStorage.getItem('hd_patients'));
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.labData) && localStorage.getItem('hd_labData')) {
-    localStorage.setItem(STORAGE_KEYS.labData, localStorage.getItem('hd_labData'));
   }
 })();
 
@@ -2219,13 +2524,27 @@ function savePatients(list) {
   localStorage.setItem(STORAGE_KEYS.patients, JSON.stringify(list));
 }
 
-/** Load lab data from localStorage. Returns { chartno: { testId: [{date,value},...] } } */
-function loadLabData() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.labData)) || {}; }
-  catch { return {}; }
+/**
+ * Load lab data from IDB labData store (2026-05-13 從 localStorage 搬來).
+ * Returns { chartno: { chartno, <testId>: [{date,value},...], _lastUpdate } }
+ * 注意：async — 所有 call site 必須 await。
+ */
+async function loadLabData() {
+  try { return await labDataGetAll(); }
+  catch (e) { console.warn('[loadLabData] IDB read failed:', e); return {}; }
 }
-function saveLabData(data) {
-  localStorage.setItem(STORAGE_KEYS.labData, JSON.stringify(data));
+
+/**
+ * Persist the lab-data map. Iterates entries and writes one IDB record per
+ * chartno (keyPath=chartno). 注意：async — 所有 call site 必須 await。
+ */
+async function saveLabData(data) {
+  if (!data || typeof data !== 'object') return;
+  for (const [cn, lab] of Object.entries(data)) {
+    if (!cn || !lab || typeof lab !== 'object') continue;
+    try { await labDataPut(cn, lab); }
+    catch (e) { console.warn(`[saveLabData] put failed for ${cn}:`, e); }
+  }
 }
 
 /** Load settings */
@@ -2545,7 +2864,7 @@ async function fetchIncremental(chartno, cachedOrders, onProgress) {
 
 // ─── core/indexeddb-cache.js ──────────────────────────────────────────
 // ─── indexeddb-cache.js ───────────────────────────────────────────────
-// IndexedDB-backed raw orders cache (LabReporterOrdersCache)
+// IndexedDB-backed caches (LabReporterOrdersCache)
 //
 // Extracted verbatim from hospital-lab-data.html (Phase 1 restructure,
 // 2026-05-08). Functions stay top-level; the build concatenates every
@@ -2554,18 +2873,26 @@ async function fetchIncremental(chartno, cachedOrders, onProgress) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RAW ORDERS CACHE (for incremental fetch, 2026-05-08)
+// LAB DATA CACHE (replaces localStorage labs_<group>, 2026-05-13)
 // ═══════════════════════════════════════════════════════════════════════════════
-// IndexedDB `LabReporterOrdersCache` / store `orders` (keyPath=chartno):
-//   { chartno, orders: [...], ts }
-// Used as the baseline for fetchIncremental. Migrated from localStorage on
-// 2026-05-08 — 30 patients × ~100KB approached the 5MB localStorage cap; per-
-// origin IndexedDB quota is several hundred MB, so quota concerns disappear.
-// enrichCache_dialysis (sub-page text by ordapno) stays in localStorage — it's
-// smaller and out of scope for this migration.
+// IndexedDB `LabReporterOrdersCache` 容納兩個 store：
+//   orders   (keyPath=chartno) — incremental fetch baseline，
+//                                { chartno, orders: [...], ts }
+//   labData  (keyPath=chartno) — 解析後的 lab values（取代 localStorage
+//                                labs_dialysis / labs_ckd / ...），單一 store
+//                                跨 disease group 共用。Shape:
+//                                { chartno, <testId>: [...], _lastUpdate }
+//
+// orders store 是 2026-05-08 從 localStorage 搬來的（quota 5MB 在 30 人就吃緊）。
+// labData store 是 2026-05-13 搬來的（CKD UACR sub-page enrichment 後每人 ~250KB，
+// 20 人就爆 quota，validation 期間實測過 QuotaExceededError）。
+// enrichCache (sub-page text by ordapno) 維持在 localStorage — 體積小、cache 本身
+// 已 disease-neutral，不在這次 migration 範圍。
 
 const ORDERS_DB_NAME = 'LabReporterOrdersCache';
-const ORDERS_DB_VER  = 1;
+const ORDERS_DB_VER  = 2;
 const ORDERS_STORE   = 'orders';
+const LABDATA_STORE  = 'labData';
 let _ordersDb = null;
 
 function openOrdersDB() {
@@ -2576,6 +2903,9 @@ function openOrdersDB() {
       const db = req.result;
       if (!db.objectStoreNames.contains(ORDERS_STORE)) {
         db.createObjectStore(ORDERS_STORE, { keyPath: 'chartno' });
+      }
+      if (!db.objectStoreNames.contains(LABDATA_STORE)) {
+        db.createObjectStore(LABDATA_STORE, { keyPath: 'chartno' });
       }
     };
     req.onsuccess = () => { _ordersDb = req.result; res(_ordersDb); };
@@ -2618,15 +2948,137 @@ async function ordersCacheDelete(chartno) {
   });
 }
 
-// One-time migration: drop the legacy localStorage ordersCache. Anything in
-// it is throwaway baseline data — first fetch after upgrade re-populates the
-// IndexedDB store via fetchAllOrders.
+// ─── labData CRUD ──────────────────────────────────────────────────────────
+// 單一 store、跨 group 共用、keyPath=chartno。Stored record shape:
+//   { chartno, <testId>: [{date, value, dateObj, ...}, ...], ..., _lastUpdate }
+
+async function labDataGet(chartno) {
+  if (!chartno) return null;
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(LABDATA_STORE, 'readonly').objectStore(LABDATA_STORE).get(chartno);
+    r.onsuccess = () => res(r.result || null);
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+// 回傳 { [chartno]: labRecord }，取代舊 loadLabData() 的 in-memory map。
+// labRecord 內的 chartno 屬性無害（call site 都是用 outer key 索引）。
+async function labDataGetAll() {
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(LABDATA_STORE, 'readonly').objectStore(LABDATA_STORE).getAll();
+    r.onsuccess = () => {
+      const out = {};
+      for (const row of (r.result || [])) {
+        if (row && row.chartno) out[row.chartno] = row;
+      }
+      res(out);
+    };
+    r.onerror = () => rej(r.error);
+  });
+}
+
+async function labDataPut(chartno, lab) {
+  if (!chartno) return;
+  const db = await openOrdersDB();
+  // 把 chartno 寫進 record（keyPath 必要）。
+  // _lastUpdate：caller 通常已設好（saveLabData / migration newer-wins 都需要原值）；
+  // 若 lab 沒帶 _lastUpdate，補一個 now 才不會破壞 UI 的「最後更新」欄。
+  const record = Object.assign({}, lab, { chartno });
+  if (record._lastUpdate == null) record._lastUpdate = Date.now();
+  return new Promise((res, rej) => {
+    const r = db.transaction(LABDATA_STORE, 'readwrite').objectStore(LABDATA_STORE).put(record);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+// confirmRemovePatient 呼叫：只在 chartno 不在任何 group 的 patient list
+// 才實際從 IDB 刪除。同一病人若同時在 dialysis + ckd，刪 ckd 那邊不該
+// 連帶清掉 dialysis 還在用的 lab record。掃 localStorage 所有
+// patients_* key（reporter 兩個 HTML 共用同一 origin，localStorage 可見）。
+async function labDataDelete(chartno) {
+  if (!chartno) return;
+  let stillInUse = false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('patients_')) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      let list;
+      try { list = JSON.parse(raw); } catch { continue; }
+      if (!Array.isArray(list)) continue;
+      if (list.some(p => p && (p.chartno === chartno || p.chartNo === chartno))) {
+        stillInUse = true;
+        break;
+      }
+    }
+  } catch (e) {
+    console.warn('[labDataDelete] cross-group scan failed:', e);
+  }
+  if (stillInUse) {
+    console.log(`[labDataDelete] ${chartno} 仍在其他 group，保留 IDB record`);
+    return;
+  }
+  const db = await openOrdersDB();
+  return new Promise((res, rej) => {
+    const r = db.transaction(LABDATA_STORE, 'readwrite').objectStore(LABDATA_STORE)
+                .delete(chartno);
+    r.onsuccess = () => res();
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+// ─── One-time migrations ───────────────────────────────────────────────────
+
+// 2026-05-08：丟棄 legacy localStorage ordersCache（baseline 資料，下次 fetch 自動補）。
 (function dropLegacyOrdersCache() {
   try {
     if (localStorage.getItem('ordersCache_dialysis')) {
       localStorage.removeItem('ordersCache_dialysis');
     }
   } catch (_) { /* ignore */ }
+})();
+
+// 2026-05-13：把 labs_<group> 從 localStorage 搬到 IDB labData store。
+// 每個 disease HTML 各自跑一次；store 跨 group 共用，同一 chartno 若先被
+// 另一個 group migrate 過，用 _lastUpdate newer-wins 決定要不要覆寫。
+// 保留 labs_<group>_legacy 作 backup（給一個 release 的回退空間）。
+(function migrateLabsToIDB() {
+  const groupId = (typeof window !== 'undefined' && window.ACTIVE_GROUP_ID) || 'dialysis';
+  const lsKey = `labs_${groupId}`;
+  let lsData;
+  try { lsData = localStorage.getItem(lsKey); } catch (_) { return; }
+  if (!lsData) return;
+
+  (async () => {
+    try {
+      const obj = JSON.parse(lsData);
+      if (!obj || typeof obj !== 'object') return;
+      let migrated = 0;
+      for (const [cn, lab] of Object.entries(obj)) {
+        if (!cn || !lab || typeof lab !== 'object') continue;
+        const existing = await labDataGet(cn);
+        const incomingTs = lab._lastUpdate || 0;
+        const existingTs = existing ? (existing._lastUpdate || 0) : 0;
+        if (!existing || incomingTs >= existingTs) {
+          await labDataPut(cn, lab);
+          migrated++;
+        }
+      }
+      console.log(`[migration] migrated ${migrated} labs from ${lsKey} → IDB`);
+      try {
+        localStorage.setItem(lsKey + '_legacy', lsData);
+        localStorage.removeItem(lsKey);
+      } catch (e) {
+        console.warn(`[migration] backup/cleanup failed for ${lsKey}:`, e);
+      }
+    } catch (e) {
+      console.warn(`[migration] failed migrating ${lsKey}:`, e);
+    }
+  })();
 })();
 
 
@@ -3076,56 +3528,124 @@ function classifyBUNForDate(entries, date) {
 
 // ─── core/compute.js ──────────────────────────────────────────────────
 // ─── compute.js ───────────────────────────────────────────────
-// computeDerivedValues — pairs BUN_pre/BUN_post (URR) and Ca/P (CaxP) by
-// date and stores the derived series under each COMPUTED_TESTS id.
+// Registry-driven derived-value dispatcher.
 //
-// Extracted from hospital-lab-data.html (Phase 1 restructure, 2026-05-08).
-// Companion to lab-extract.js — runs immediately after extractLabValues in
-// the fetchAndStore pipeline.
+// 2026-05-20: rewritten from the hardcoded URR / Ca×P if-else into a generic
+// dispatcher over the COMPUTATIONS registry inlined from patterns/computed.js.
+// The reporter still asks COMPUTED_TESTS (= REPORTER_COMPUTED) for the rows
+// to render; each id is looked up in COMPUTATIONS for the actual formula.
+//
+// Why: CKD staging (eGFR, GFRStage, UACRStage, UPCRStage, KDIGORisk,
+// TaiwanCKD, EarlyCKD) shares the same per-date pairing shape as URR / CaxP,
+// and the formulas already live in patterns/computed.js. Hardcoding 9
+// branches here would copy logic that the patterns repo owns.
+//
+// Per-date pairing model:
+//   - `needs` whose id starts with `__patient.` are patient-static
+//     (age, gender). They're pulled from the patient argument once.
+//   - Other needs are date-series in `results` (lab values or previously
+//     computed staging strings, e.g. EarlyCKD needs ['eGFR', 'TaiwanCKD']).
+//   - The first lab need is the ANCHOR: its dates drive the output dates.
+//     Other needs fill in at matching dates; missing → null. Each
+//     computation's compute() decides whether nulls are acceptable
+//     (TaiwanCKD tolerates missing UACR/UPCR; KDIGORisk does not).
+//
+// Dialysis URR is still re-derived per cluster by groups/dialysis.js
+// (resolveBunClustersFromStored). Lab-view overrides results['URR'] with
+// the cluster-based map, so the dispatcher's per-date URR is harmless.
 
 /**
- * Compute derived values (URR, Ca*P) from extracted lab data.
- * Adds entries to the results object under computed test IDs.
+ * Compute derived values from extracted lab data.
+ * Iterates COMPUTED_TESTS (render manifest) and dispatches each id to the
+ * matching entry in COMPUTATIONS (formula registry).
+ *
+ * @param {object} results - extracted lab values, mutated in place
+ * @param {object} [patient] - {age, gender} for patient-static needs
  */
-function computeDerivedValues(results) {
+function computeDerivedValues(results, patient) {
+  const registry = (typeof COMPUTATIONS !== 'undefined' && Array.isArray(COMPUTATIONS))
+    ? new Map(COMPUTATIONS.map(c => [c.id, c]))
+    : new Map();
+
   for (const ct of COMPUTED_TESTS) {
     results[ct.id] = [];
-
-    if (ct.id === 'URR') {
-      // Pair BUN_pre and BUN_post by same date
-      const preMap = {};
-      for (const e of (results['BUN_pre'] || [])) {
-        if (!preMap[e.date]) preMap[e.date] = e.value;
-      }
-      for (const e of (results['BUN_post'] || [])) {
-        const pre = preMap[e.date];
-        if (pre != null) {
-          const v = ct.compute(pre, e.value);
-          if (v != null) {
-            results[ct.id].push({ date: e.date, value: v, dateObj: e.dateObj });
-          }
-        }
-      }
-    } else if (ct.id === 'CaxP') {
-      // Pair Ca and P by same date
-      const caMap = {};
-      for (const e of (results['Ca'] || [])) {
-        if (!caMap[e.date]) caMap[e.date] = e.value;
-      }
-      for (const e of (results['P'] || [])) {
-        const ca = caMap[e.date];
-        if (ca != null) {
-          const v = ct.compute(ca, e.value);
-          if (v != null) {
-            results[ct.id].push({ date: e.date, value: v, dateObj: e.dateObj });
-          }
-        }
-      }
-    }
-
-    results[ct.id].sort((a, b) => b.date.localeCompare(a.date));
+    const comp = registry.get(ct.id);
+    if (!comp || typeof comp.compute !== 'function') continue;
+    results[ct.id] = _computeSeries(results, comp, patient);
   }
   return results;
+}
+
+function _computeSeries(results, comp, patient) {
+  const needs = Array.isArray(comp.needs) ? comp.needs : [];
+  const labNeeds = needs.filter(n => !String(n).startsWith('__patient.'));
+  const ptNeeds  = needs.filter(n =>  String(n).startsWith('__patient.'));
+
+  // Patient-static args (age, gender). Missing field = skip the whole series.
+  const ptArgs = {};
+  for (const n of ptNeeds) {
+    const field = n.slice('__patient.'.length);
+    const v = patient ? patient[field] : null;
+    if (v == null || v === '') return [];
+    ptArgs[field] = v;
+  }
+
+  // No lab inputs (e.g. theoretical patient-only formula) — nothing to pair.
+  if (labNeeds.length === 0) return [];
+
+  // Anchor by the first lab need; matching dates fetch the rest.
+  // The anchor entry's effectiveTime / signOffTime propagates to the
+  // computed entry so groups/early-ckd.js _flattenEntriesByCluster()
+  // clusters staging values in the same draw bucket as the source labs.
+  const anchorNeed = labNeeds[0];
+  const seriesByDate = Object.create(null);
+  for (const e of (results[anchorNeed] || [])) {
+    if (!e || !e.date || e.value == null) continue;
+    if (!seriesByDate[e.date]) {
+      seriesByDate[e.date] = {
+        __dateObj:       e.dateObj || null,
+        __effectiveTime: e.effectiveTime || null,
+        __signOffTime:   e.signOffTime || null,
+      };
+    }
+    if (!(anchorNeed in seriesByDate[e.date])) {
+      seriesByDate[e.date][anchorNeed] = e.value;
+    }
+  }
+  for (const needId of labNeeds.slice(1)) {
+    for (const e of (results[needId] || [])) {
+      if (!e || !e.date || e.value == null) continue;
+      const slot = seriesByDate[e.date];
+      if (!slot) continue;                                // anchor absent
+      if (!(needId in slot)) slot[needId] = e.value;      // first wins
+    }
+  }
+
+  const out = [];
+  for (const date of Object.keys(seriesByDate).sort()) {
+    const slot = seriesByDate[date];
+    const args = Object.assign({}, ptArgs);
+    for (const needId of labNeeds) {
+      args[needId] = (needId in slot) ? slot[needId] : null;
+    }
+    let v;
+    try { v = comp.compute(args); }
+    catch (err) {
+      console.warn('[compute] ' + comp.id + ' on ' + date + ' failed:', err);
+      continue;
+    }
+    if (v == null) continue;
+    if (typeof v === 'number' && !isFinite(v)) continue;
+    out.push({
+      date,
+      value: v,
+      dateObj:       slot.__dateObj || new Date(date),
+      effectiveTime: slot.__effectiveTime || null,
+      signOffTime:   slot.__signOffTime || null,
+    });
+  }
+  out.sort((a, b) => b.date.localeCompare(a.date));      // newest first
+  return out;
 }
 
 
@@ -3427,10 +3947,10 @@ function renderPatientBody(visible, cols, labData, totalCount) {
   }).join('');
 }
 
-function renderPatientList() {
+async function renderPatientList() {
   const cols     = buildPatientColumns();
   const patients = loadPatients();
-  const labData  = loadLabData();
+  const labData  = await loadLabData();
   const sort     = loadSortState();
   const filters  = loadFilterState();
   const filtered = applyPatientFilters(patients, filters, labData, cols);
@@ -3442,21 +3962,21 @@ function renderPatientList() {
 }
 
 // Header click handler — cycles unsorted → asc → desc → unsorted.
-function cyclePatientSort(column) {
+async function cyclePatientSort(column) {
   const cur = loadSortState();
   let next;
   if (!cur || cur.column !== column)      next = { column, dir: 'asc' };
   else if (cur.dir === 'asc')             next = { column, dir: 'desc' };
   else                                    next = null;
   saveSortState(next);
-  renderPatientList();
+  await renderPatientList();
 }
 
 // Filter input handler — text inputs call this on every keystroke. With
 // ≤ ~50 patients the re-render cost is negligible, so no debounce needed.
 // Re-rendering the whole table would steal focus from the input being
 // typed into; we restore focus + caret position after the rebuild.
-function setPatientFilter(column, value) {
+async function setPatientFilter(column, value) {
   const filters = loadFilterState();
   if (value == null || String(value).trim() === '') delete filters[column];
   else                                              filters[column] = value;
@@ -3466,7 +3986,7 @@ function setPatientFilter(column, value) {
   const wasInput = active && active.tagName === 'INPUT' && active.dataset.col === column;
   const caret   = wasInput ? active.selectionStart : null;
 
-  renderPatientList();
+  await renderPatientList();
 
   if (wasInput) {
     const next = document.querySelector(`#patientHead input[data-col="${CSS.escape(column)}"]`);
@@ -3494,7 +4014,7 @@ async function refreshOnePatient(chartno, btn) {
   setStatus(`更新 ${chartno} 中...`, true);
   try {
     await fetchAndStore(chartno);
-    renderPatientList();
+    await renderPatientList();
     setStatus(`已更新: ${chartno}`);
     showToast(`已更新 ${chartno}`, 'success');
   } catch (err) {
@@ -3543,15 +4063,15 @@ function confirmRemovePatient(chartno) {
   document.getElementById('confirmMsg').textContent =
     `確定要從追蹤清單移除 ${p.name || ''} (${chartno}) 嗎？此病患的檢驗資料也會一併刪除。`;
   document.getElementById('confirmOkBtn').onclick = async () => {
+    // savePatients 必須先寫回 localStorage，labDataDelete 才能在 cross-group
+    // 掃描時看到此 chartno 已從本 group 移除。
     const patients = loadPatients().filter(x => x.chartno !== chartno);
     savePatients(patients);
-    const labData = loadLabData();
-    delete labData[chartno];
-    saveLabData(labData);
+    try { await labDataDelete(chartno); } catch (e) { console.warn('[labData] delete failed:', e); }
     try { await ordersCacheDelete(chartno); } catch (e) { console.warn('[ordersCache] delete failed:', e); }
     selectedPatients.delete(chartno);
     closeConfirm();
-    renderPatientList();
+    await renderPatientList();
     showToast('已移除', 'info');
   };
   document.getElementById('confirmModal').classList.remove('hidden');
@@ -3658,10 +4178,25 @@ async function fetchAndStore(chartno) {
   }
 
   let labValues = extractLabValues(orders);
-  labValues = computeDerivedValues(labValues);
-  const allLabData = loadLabData();
-  allLabData[chartno] = { ...labValues, _lastUpdate: Date.now() };
-  saveLabData(allLabData);
+  // Patient-static needs for the compute dispatcher (eGFR-CKDEPI 2021 needs
+  // age + gender). Pull from the fresh API response when available, else
+  // fall back to the stored patient row. age is "current" age — historical
+  // eGFRs use the same value (acceptable for early CKD where age drifts a
+  // few years; birthDate-aware upgrade is a follow-up if ernode exposes it).
+  const storedPatient = loadPatients().find(p => p.chartno === chartno);
+  const computePatient = {
+    age:    (patientInfo && patientInfo.age != null)        ? patientInfo.age
+          : (storedPatient && storedPatient.age),
+    gender: (patientInfo && patientInfo.genderCode)         ? patientInfo.genderCode
+          : (storedPatient && (storedPatient.sex || storedPatient.genderCode)) || null,
+  };
+  labValues = computeDerivedValues(labValues, computePatient);
+  // 2026-05-13: 直接 per-chartno 寫 IDB，不再 load 全部 patients 再整批寫。
+  try {
+    await labDataPut(chartno, { ...labValues, _lastUpdate: Date.now() });
+  } catch (e) {
+    console.warn(`[labData] put failed for ${chartno}:`, e);
+  }
 
   // Demographics refresh on every fetch (revision 1: not user-editable).
   if (patientInfo) {
@@ -3716,7 +4251,7 @@ async function addAndUpdateFromInput() {
   }
   if (added > 0) {
     savePatients(patients);
-    renderPatientList();
+    await renderPatientList();
   }
 
   const btnAdd = document.getElementById('btnAddToList');
@@ -3735,7 +4270,7 @@ async function addAndUpdateFromInput() {
       console.warn(`Failed to fetch ${cn}:`, err);
     }
   }
-  renderPatientList();
+  await renderPatientList();
   if (btnAdd) btnAdd.disabled = false;
   if (btnRef) btnRef.disabled = false;
   if (ta && success > 0 && fail === 0) ta.value = '';
@@ -3778,7 +4313,7 @@ async function refreshExistingPatients() {
       console.warn(`Failed to refresh ${cn}:`, err);
     }
   }
-  renderPatientList();
+  await renderPatientList();
   if (btnAdd) btnAdd.disabled = false;
   if (btnRef) btnRef.disabled = false;
   setStatus(`更新完成: ${success} 成功${fail ? `, ${fail} 失敗` : ''}`);
@@ -3799,14 +4334,54 @@ async function refreshExistingPatients() {
 // LAB DATA TABLE RENDERING
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Staging-string → colour class (KDIGO-aligned, 4 levels). Used by entries
+// declared with `kind:'staging'` in REPORTER_COMPUTED (GFRStage / UACRStage /
+// UPCRStage / KDIGORisk / TaiwanCKD / EarlyCKD). eGFR is numeric and uses the
+// regular hi/lo path. Empty class = no colour applied.
+const STAGING_CLASS = {
+  // GFRStage
+  '正常':       'val-stage-normal',
+  'CKD2':       'val-stage-mild',
+  'CKD3a':      'val-stage-mild',
+  'CKD3b':      'val-stage-moderate',
+  'CKD4':       'val-stage-severe',
+  'CKD5':       'val-stage-severe',
+  // UACRStage
+  'A2':         'val-stage-mild',
+  'A3':         'val-stage-moderate',
+  // UPCRStage
+  '輕度':       'val-stage-mild',
+  '顯著':       'val-stage-moderate',
+  '腎病範圍':   'val-stage-severe',
+  // KDIGORisk
+  '低風險':     'val-stage-normal',
+  '中風險':     'val-stage-mild',
+  '高風險':     'val-stage-moderate',
+  '極高風險':   'val-stage-severe',
+  // TaiwanCKD
+  '第一期':     'val-stage-normal',
+  '第二期':     'val-stage-mild',
+  '第三期 3a':  'val-stage-mild',
+  '第三期 3b':  'val-stage-moderate',
+  '第四期':     'val-stage-severe',
+  '第五期':     'val-stage-severe',
+  // EarlyCKD
+  'P1早期':     'val-stage-mild',
+  'P2中晚期':   'val-stage-moderate',
+};
+
+function stagingClass(v) {
+  return STAGING_CLASS[String(v)] || '';
+}
+
 /**
  * View lab data for a specific patient.
  * Switches to the labview tab and renders the full history table.
  */
-function viewPatientLab(chartno) {
+async function viewPatientLab(chartno) {
   const patients = loadPatients();
   const patient = patients.find(p => p.chartno === chartno);
-  const labData = loadLabData()[chartno];
+  const labData = (await loadLabData())[chartno];
 
   // Update header — sex/age come from auto-filled demographics; revision 1
   // dropped the schedule/frequency text in favor of the patient-row selects.
@@ -3959,7 +4534,11 @@ function viewPatientLab(chartno) {
 
         // Determine color class
         let valCls = '';
-        if (test.qualitative) {
+        if (test.kind === 'staging') {
+          // CKD staging strings (GFRStage / UACRStage / UPCRStage / KDIGORisk /
+          // TaiwanCKD / EarlyCKD). No numeric hi/lo — colour via STAGING_CLASS.
+          valCls = stagingClass(val);
+        } else if (test.qualitative) {
           // Qualitative: Reactive/positive = red, Non-Reactive/negative = green
           const lower = String(val).toLowerCase();
           if (lower.includes('reactive') && !lower.includes('non')) {
@@ -4045,7 +4624,7 @@ function saveSettings() {
  * Export all tracked patients × YYYYMM as a single long-format CSV.
  * Layout (header, rows) lives in GROUP.exporter.formatAll (groups/dialysis.js).
  */
-function exportCombinedCSV() {
+async function exportCombinedCSV() {
   if (!GROUP.exporter || typeof GROUP.exporter.formatAll !== 'function') {
     showToast('此疾病模組尚未提供 CSV 匯出', 'error'); return;
   }
@@ -4062,7 +4641,7 @@ function exportCombinedCSV() {
     }
   }
 
-  const labData  = loadLabData();
+  const labData  = await loadLabData();
   const csv      = GROUP.exporter.formatAll(patients, labData);
   // BOM so Excel opens UTF-8 without garbling Chinese display labels.
   const blob     = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
@@ -4172,7 +4751,7 @@ function _kdtVal(draw, id) {
  * Export every tracked patient × monthly draw as a KiDiTi 檢驗記錄 CSV.
  * Field order and decimals follow TASK_BRIEF_phase2_dialysis_kiditi §3.5.
  */
-function exportKiDiTiCSV() {
+async function exportKiDiTiCSV() {
   let patients = loadPatients();
   if (!patients.length) { showToast('尚無病患可匯出', 'error'); return; }
 
@@ -4186,7 +4765,7 @@ function exportKiDiTiCSV() {
     }
   }
 
-  const allLabData = loadLabData();
+  const allLabData = await loadLabData();
   const rows = [];
   for (const p of patients) {
     const cn = p.chartno || p.chartNo || '';

@@ -110,6 +110,13 @@ body {
 .val-q-pos { color: #c0392b; font-weight: 700; }
 .val-q-neg { color: #27ae60; }
 .latest-col { background: rgba(255,235,59,.1); }
+/* KDIGO-aligned staging colours (CKD HTML only — dialysis.computed has no
+   staging ids so these classes never apply there). 4 levels: normal / mild /
+   moderate / severe. */
+.val-stage-normal   { background: #c8e6c9; color: #1b5e20; font-weight: 600; }
+.val-stage-mild     { background: #fff9c4; color: #827717; font-weight: 600; }
+.val-stage-moderate { background: #ffcc80; color: #8a4500; font-weight: 600; }
+.val-stage-severe   { background: #ef9a9a; color: #b71c1c; font-weight: 700; }
 
 /* ─── Modal ────────────────────────────────────────────────────────────────── */
 .modal-overlay {

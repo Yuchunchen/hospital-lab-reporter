@@ -10,6 +10,46 @@
 // LAB DATA TABLE RENDERING
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Staging-string → colour class (KDIGO-aligned, 4 levels). Used by entries
+// declared with `kind:'staging'` in REPORTER_COMPUTED (GFRStage / UACRStage /
+// UPCRStage / KDIGORisk / TaiwanCKD / EarlyCKD). eGFR is numeric and uses the
+// regular hi/lo path. Empty class = no colour applied.
+const STAGING_CLASS = {
+  // GFRStage
+  '正常':       'val-stage-normal',
+  'CKD2':       'val-stage-mild',
+  'CKD3a':      'val-stage-mild',
+  'CKD3b':      'val-stage-moderate',
+  'CKD4':       'val-stage-severe',
+  'CKD5':       'val-stage-severe',
+  // UACRStage
+  'A2':         'val-stage-mild',
+  'A3':         'val-stage-moderate',
+  // UPCRStage
+  '輕度':       'val-stage-mild',
+  '顯著':       'val-stage-moderate',
+  '腎病範圍':   'val-stage-severe',
+  // KDIGORisk
+  '低風險':     'val-stage-normal',
+  '中風險':     'val-stage-mild',
+  '高風險':     'val-stage-moderate',
+  '極高風險':   'val-stage-severe',
+  // TaiwanCKD
+  '第一期':     'val-stage-normal',
+  '第二期':     'val-stage-mild',
+  '第三期 3a':  'val-stage-mild',
+  '第三期 3b':  'val-stage-moderate',
+  '第四期':     'val-stage-severe',
+  '第五期':     'val-stage-severe',
+  // EarlyCKD
+  'P1早期':     'val-stage-mild',
+  'P2中晚期':   'val-stage-moderate',
+};
+
+function stagingClass(v) {
+  return STAGING_CLASS[String(v)] || '';
+}
+
 /**
  * View lab data for a specific patient.
  * Switches to the labview tab and renders the full history table.
@@ -170,7 +210,11 @@ async function viewPatientLab(chartno) {
 
         // Determine color class
         let valCls = '';
-        if (test.qualitative) {
+        if (test.kind === 'staging') {
+          // CKD staging strings (GFRStage / UACRStage / UPCRStage / KDIGORisk /
+          // TaiwanCKD / EarlyCKD). No numeric hi/lo — colour via STAGING_CLASS.
+          valCls = stagingClass(val);
+        } else if (test.qualitative) {
           // Qualitative: Reactive/positive = red, Non-Reactive/negative = green
           const lower = String(val).toLowerCase();
           if (lower.includes('reactive') && !lower.includes('non')) {
