@@ -14,10 +14,10 @@
  * View lab data for a specific patient.
  * Switches to the labview tab and renders the full history table.
  */
-function viewPatientLab(chartno) {
+async function viewPatientLab(chartno) {
   const patients = loadPatients();
   const patient = patients.find(p => p.chartno === chartno);
-  const labData = loadLabData()[chartno];
+  const labData = (await loadLabData())[chartno];
 
   // Update header — sex/age come from auto-filled demographics; revision 1
   // dropped the schedule/frequency text in favor of the patient-row selects.

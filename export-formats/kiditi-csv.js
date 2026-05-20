@@ -58,7 +58,7 @@ function _kdtVal(draw, id) {
  * Export every tracked patient × monthly draw as a KiDiTi 檢驗記錄 CSV.
  * Field order and decimals follow TASK_BRIEF_phase2_dialysis_kiditi §3.5.
  */
-function exportKiDiTiCSV() {
+async function exportKiDiTiCSV() {
   let patients = loadPatients();
   if (!patients.length) { showToast('尚無病患可匯出', 'error'); return; }
 
@@ -72,7 +72,7 @@ function exportKiDiTiCSV() {
     }
   }
 
-  const allLabData = loadLabData();
+  const allLabData = await loadLabData();
   const rows = [];
   for (const p of patients) {
     const cn = p.chartno || p.chartNo || '';

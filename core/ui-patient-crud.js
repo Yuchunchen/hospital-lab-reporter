@@ -94,9 +94,12 @@ async function fetchAndStore(chartno) {
 
   let labValues = extractLabValues(orders);
   labValues = computeDerivedValues(labValues);
-  const allLabData = loadLabData();
-  allLabData[chartno] = { ...labValues, _lastUpdate: Date.now() };
-  saveLabData(allLabData);
+  // 2026-05-13: 直接 per-chartno 寫 IDB，不再 load 全部 patients 再整批寫。
+  try {
+    await labDataPut(chartno, { ...labValues, _lastUpdate: Date.now() });
+  } catch (e) {
+    console.warn(`[labData] put failed for ${chartno}:`, e);
+  }
 
   // Demographics refresh on every fetch (revision 1: not user-editable).
   if (patientInfo) {
@@ -151,7 +154,7 @@ async function addAndUpdateFromInput() {
   }
   if (added > 0) {
     savePatients(patients);
-    renderPatientList();
+    await renderPatientList();
   }
 
   const btnAdd = document.getElementById('btnAddToList');
@@ -170,7 +173,7 @@ async function addAndUpdateFromInput() {
       console.warn(`Failed to fetch ${cn}:`, err);
     }
   }
-  renderPatientList();
+  await renderPatientList();
   if (btnAdd) btnAdd.disabled = false;
   if (btnRef) btnRef.disabled = false;
   if (ta && success > 0 && fail === 0) ta.value = '';
@@ -213,7 +216,7 @@ async function refreshExistingPatients() {
       console.warn(`Failed to refresh ${cn}:`, err);
     }
   }
-  renderPatientList();
+  await renderPatientList();
   if (btnAdd) btnAdd.disabled = false;
   if (btnRef) btnRef.disabled = false;
   setStatus(`更新完成: ${success} 成功${fail ? `, ${fail} 失敗` : ''}`);

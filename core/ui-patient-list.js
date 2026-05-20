@@ -263,10 +263,10 @@ function renderPatientBody(visible, cols, labData, totalCount) {
   }).join('');
 }
 
-function renderPatientList() {
+async function renderPatientList() {
   const cols     = buildPatientColumns();
   const patients = loadPatients();
-  const labData  = loadLabData();
+  const labData  = await loadLabData();
   const sort     = loadSortState();
   const filters  = loadFilterState();
   const filtered = applyPatientFilters(patients, filters, labData, cols);
@@ -278,21 +278,21 @@ function renderPatientList() {
 }
 
 // Header click handler — cycles unsorted → asc → desc → unsorted.
-function cyclePatientSort(column) {
+async function cyclePatientSort(column) {
   const cur = loadSortState();
   let next;
   if (!cur || cur.column !== column)      next = { column, dir: 'asc' };
   else if (cur.dir === 'asc')             next = { column, dir: 'desc' };
   else                                    next = null;
   saveSortState(next);
-  renderPatientList();
+  await renderPatientList();
 }
 
 // Filter input handler — text inputs call this on every keystroke. With
 // ≤ ~50 patients the re-render cost is negligible, so no debounce needed.
 // Re-rendering the whole table would steal focus from the input being
 // typed into; we restore focus + caret position after the rebuild.
-function setPatientFilter(column, value) {
+async function setPatientFilter(column, value) {
   const filters = loadFilterState();
   if (value == null || String(value).trim() === '') delete filters[column];
   else                                              filters[column] = value;
@@ -302,7 +302,7 @@ function setPatientFilter(column, value) {
   const wasInput = active && active.tagName === 'INPUT' && active.dataset.col === column;
   const caret   = wasInput ? active.selectionStart : null;
 
-  renderPatientList();
+  await renderPatientList();
 
   if (wasInput) {
     const next = document.querySelector(`#patientHead input[data-col="${CSS.escape(column)}"]`);
@@ -330,7 +330,7 @@ async function refreshOnePatient(chartno, btn) {
   setStatus(`更新 ${chartno} 中...`, true);
   try {
     await fetchAndStore(chartno);
-    renderPatientList();
+    await renderPatientList();
     setStatus(`已更新: ${chartno}`);
     showToast(`已更新 ${chartno}`, 'success');
   } catch (err) {
