@@ -50,7 +50,7 @@ const banner = [
   '//   https://github.com/Yuchunchen/hospital-lab-patterns',
   '//',
   '// To update:',
-  '//   1. Edit ../hospital-lab-patterns/patterns/{catalog,reporter}.js',
+  '//   1. Edit ../hospital-lab-patterns/patterns/{catalog,reporter,computed}.js',
   '//   2. git commit + git push',
   '//   3. cd hospital-lab-reporter && node sync-patterns.js',
   '//   4. Reload hospital-lab-data.html in your browser',
@@ -92,8 +92,11 @@ const manifestSrc     = read('reporter.js');
 const normalizersSrc  = fs.existsSync(path.join(PATTERNS_DIR, 'normalizers.js'))
   ? read('normalizers.js')
   : '';
+// computed.js exposes COMPUTATIONS + HELPERS as top-level consts; core/compute.js
+// dispatches against COMPUTATIONS at runtime, so it must be inlined here.
+const computedSrc     = read('computed.js');
 
-const blockBody = banner + catalogSrc + normalizersSrc + manifestSrc + resolverAndAliases;
+const blockBody = banner + catalogSrc + normalizersSrc + manifestSrc + computedSrc + resolverAndAliases;
 const replacementBlock = BEGIN + '\n' + blockBody + END;
 
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }

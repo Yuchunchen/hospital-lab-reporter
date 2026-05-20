@@ -1,5 +1,36 @@
 # WORKLOG
 
+## 2026-05-20 — ckd_egfr_staging brief Phase A+B+C：接上 eGFR / GFRStage / KDIGORisk / TaiwanCKD computed dispatch
+
+- 作者：claude（與 YC 共同）
+- 範圍：core（compute dispatcher + ui-lab-view staging 分支 + ui-patient-crud patient param）+ styles + groups/early-ckd（computed list + exporter staging 欄）+ sync-script + build
+- 變更：修改
+- 檔案：
+  - `core/compute.js`：完全改寫。從「URR / CaxP 兩條 hardcode if-else」改成 registry-driven dispatcher — iterate `COMPUTED_TESTS`（= REPORTER_COMPUTED），每個 id 在 `COMPUTATIONS` registry 查 compute fn。`_computeSeries()` 把 needs 拆成 lab needs vs `__patient.<field>` needs（後者從第 2 參數 patient 取）；以第一個 lab need 當 anchor，其他 needs 在同日期內 fill；缺值 → null，由 compute fn 決定是否容忍（TaiwanCKD 容、KDIGORisk 不容）。compute 出來的 entry 帶 `effectiveTime` / `signOffTime`（從 anchor entry 複製），讓 staging 跟原始 lab 落同一 cluster bucket（CKD exporter 的 `_flattenEntriesByCluster` 依賴 effectiveTime）。
+  - `core/ui-patient-crud.js`：`fetchAndStore` 內 `computeDerivedValues(labValues)` → `computeDerivedValues(labValues, computePatient)`。`computePatient = { age, gender }`，優先用本次 fetch 的 `patientInfo`，fallback 到 saved `patients[]` row（首次 fetch 也有值）。age 用「current age」簡單版（brief § 風險 § 1，birthDate 推算列後續 followup）。
+  - `core/ui-lab-view.js`：頂端新增 `STAGING_CLASS` 對照表（24 個 staging 字串 → 4 級 colour class）+ `stagingClass(v)` helper；rendering loop 加 `test.kind === 'staging'` 分支（在 `test.qualitative` 之前），略過數值 hi/lo 比較直接套 staging 顏色。
+  - `core/styles.css`：新增 4 條 staging 配色 class（`.val-stage-normal/mild/moderate/severe`，KDIGO 對齊綠 #c8e6c9 / 黃 #fff9c4 / 橙 #ffcc80 / 紅 #ef9a9a）。
+  - `groups/early-ckd.js`：`computed: []` → `['eGFR','GFRStage','UACRStage','UPCRStage','KDIGORisk','TaiwanCKD','EarlyCKD']`，移除 line 67–69 舊 backlog 註解。`exporter.formatAll` 末尾加 staging 欄（每 id 一欄，value only，無 unit/lo/hi — 字串型 staging 不需 4-tuple）。
+  - `sync-patterns.js` + `build.js`：兩個 entry-point 都把 `patterns/computed.js` 一起 inline 到 patterns block（順序：catalog → normalizers → reporter → computed → resolver+aliases）。computed.js 提供 top-level `const COMPUTATIONS` + `const HELPERS`，core/compute.js dispatcher 直接讀。
+  - HTML 重 build：`hospital-lab-dialysis.html` 171.7 → 193.0 KB（+21 KB 全來自 computed.js inline）、`hospital-lab-ckd.html` 412 → 437.8 KB；legacy `hospital-lab-data.html` 同步重 sync。
+- 原因：CKD HTML 上線 12 天，46 個病人 0 個有 eGFR / 分期（patterns/computed.js 早寫好 + reporter `core/compute.js` 沒接）。brief `TASK_BRIEF_ckd_egfr_staging` Phase A（dispatcher 重構）+ Phase B（UI staging 欄）+ Phase C（CSV staging 欄）一次做完。
+- 設計決議：
+  1. staging 走 `COMPUTED_TESTS` track（不塞 REPORTER_MANIFEST）— 與現存 URR/CaxP 同架構，dialysis vs CKD 用 `GROUP.computed` array 選擇渲染哪些。dialysis 的 `computed: ['URR']` 不變 → 不顯示 staging（brief § Phase B § B3 — 透析 eGFR<15 全紅沒意義）。
+  2. dispatcher 用 anchor-need-driven 而非「intersection of all needs」— 讓 TaiwanCKD 在「只有 eGFR、無 UACR / UPCR」時仍能輸出 G3a–G5 階段（compute fn 已支援），KDIGORisk 因 compute fn 自己 `if eGFR==null||UACR==null return null` 仍會 strict skip。
+  3. computed entry 複製 anchor 的 effectiveTime / signOffTime — 讓 CKD exporter 的 cluster builder 把 eGFR 跟 CREAT 落同 cluster（不會出 `[early-ckd] entries missing effectiveTime` warn）。
+- 測試（Node smoke test，跑完即刪 `.tmp.compute-smoke.js`）：
+  1. **65y M, CREAT 1.8 / 1.6, UACR 120, UPCR 800**：eGFR 41.3 / 47.5；GFRStage CKD3b / CKD3a；UACRStage A2；UPCRStage 顯著；KDIGORisk 極高風險；TaiwanCKD 第三期 3b / 第三期 3a；EarlyCKD P2 中晚期 / P1 早期。✓
+  2. **65y F, same CREAT**：eGFR 30.9 / 35.6（明顯低於男性的 41.3 / 47.5）— CKD-EPI 2021 性別係數正確套用。✓
+  3. **無 UACR / 無 UPCR**：KDIGORisk = `[]`（needs 不滿足，compute fn return null）；GFRStage 仍有；TaiwanCKD/EarlyCKD 仍有（G3a-G5 不需 damage marker）。✓
+  4. **URR / CaxP regression**：BUN 60/18 → URR 70%、Ca 9.2 × P 5.4 → CaxP 49.7。✓
+  5. **detection-limit `<2`**：dispatcher 跑 eGFR 公式得 NaN → `isFinite` 過濾 → eGFR = `[]`。✓
+- 測試（手動 / 瀏覽器）— **未做，需 YC 跑**：
+  6. 開 `hospital-lab-ckd.html`、bulk-add 已知 stage 3 病人各一（vhyl + vhtt）、開檢驗資料 tab、確認新 STAGING category 出現、值顏色合理。
+  7. `hospital-lab-dialysis.html` 不出現 staging 欄（GROUP.computed 仍只 `['URR']`）— regression check。
+  8. CKD 匯出 csv，header 末尾應多 7 欄（eGFR / GFR 分期 / …），row 值對應 cluster 內 staging。
+- 跨 repo：先 patterns repo（同日條目）push，再 viewer 跑 `node sync-patterns.js` 拿 URR / CaxP 命名（viewer 行為不變，純為 staleness 預防）；reporter 本 commit 含 inline 後的所有 HTML + core 改動，pushed 之後使用者 reload 即可。
+- 相依：patterns repo 同日 commit（COMPUTATIONS naming + REPORTER_COMPUTED 擴充）+ viewer repo 同日 sync commit。
+
 ## 2026-05-19 — Session 切換 SOPs G–J:本 repo pointer 條目
 
 - 作者:claude(與 YC 共同,在 vhyl 動手)

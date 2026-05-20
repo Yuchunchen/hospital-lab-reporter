@@ -64,10 +64,10 @@ const EARLY_CKD_GROUP = {
     'UACR',
   ],
 
-  // No CKD-specific derived values yet. eGFR / GFRStage / TaiwanCKD etc
-  // already exist in patterns/computed.js — wiring them to the lab table
-  // is a Phase 3.x follow-up, out of scope for this commit.
-  computed: [],
+  // CKD staging — wired 2026-05-20 via the registry-driven dispatcher in
+  // core/compute.js (formulas live in patterns/computed.js COMPUTATIONS).
+  // Order chosen so the lab-view renders eGFR → 各 stage 由粗到細 → 健保分群。
+  computed: ['eGFR', 'GFRStage', 'UACRStage', 'UPCRStage', 'KDIGORisk', 'TaiwanCKD', 'EarlyCKD'],
 
   // CKD draw detection — much looser than dialysis:
   // any cluster carrying Creatinine OR BUN counts as a check.
@@ -224,11 +224,24 @@ const EARLY_CKD_GROUP = {
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
 
+      // Staging entries (2026-05-20): one value-only column per computed id.
+      // No unit/lower/higher because the values are qualitative strings
+      // (CKD3a / A2 / 高風險 / …). eGFR is the one numeric exception but
+      // is also exported as a single column for consistency.
+      const computedList   = EARLY_CKD_GROUP.computed || [];
+      const computedTests  = (typeof COMPUTED_TESTS !== 'undefined') ? COMPUTED_TESTS : [];
+      const compById       = new Map(computedTests.map(c => [c.id, c]));
+      const computedLabel  = id => {
+        const c = compById.get(id);
+        return (c && c.label) ? c.label : id;
+      };
+
       const header = ['id', 'YYYYMM'];
       for (const entry of manifest) {
         const lbl = labelOf(entry);
         header.push(`${lbl} value`, `${lbl} unit`, `${lbl} lower`, `${lbl} higher`);
       }
+      for (const id of computedList) header.push(computedLabel(id));
       const lines = [header.map(csvCell).join(',')];
 
       const patientList = [...(patients || [])].sort((a, b) => {
@@ -253,6 +266,10 @@ const EARLY_CKD_GROUP = {
             const val  = cell && cell.value != null ? cell.value : '';
             const unit = (cell && cell.unit) || unitOf(entry.id);
             row.push(val, unit, refLoOf(entry.id), refHiOf(entry.id));
+          }
+          for (const id of computedList) {
+            const cell = draw.labs && draw.labs[id];
+            row.push(cell && cell.value != null ? cell.value : '');
           }
           lines.push(row.map(csvCell).join(','));
         }

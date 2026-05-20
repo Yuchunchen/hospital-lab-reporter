@@ -93,7 +93,19 @@ async function fetchAndStore(chartno) {
   }
 
   let labValues = extractLabValues(orders);
-  labValues = computeDerivedValues(labValues);
+  // Patient-static needs for the compute dispatcher (eGFR-CKDEPI 2021 needs
+  // age + gender). Pull from the fresh API response when available, else
+  // fall back to the stored patient row. age is "current" age — historical
+  // eGFRs use the same value (acceptable for early CKD where age drifts a
+  // few years; birthDate-aware upgrade is a follow-up if ernode exposes it).
+  const storedPatient = loadPatients().find(p => p.chartno === chartno);
+  const computePatient = {
+    age:    (patientInfo && patientInfo.age != null)        ? patientInfo.age
+          : (storedPatient && storedPatient.age),
+    gender: (patientInfo && patientInfo.genderCode)         ? patientInfo.genderCode
+          : (storedPatient && (storedPatient.sex || storedPatient.genderCode)) || null,
+  };
+  labValues = computeDerivedValues(labValues, computePatient);
   // 2026-05-13: 直接 per-chartno 寫 IDB，不再 load 全部 patients 再整批寫。
   try {
     await labDataPut(chartno, { ...labValues, _lastUpdate: Date.now() });

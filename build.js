@@ -148,8 +148,11 @@ function buildPatternsBlock() {
   const normalizersSrc = fs.existsSync(path.join(PATTERNS_DIR, 'normalizers.js'))
     ? readPattern('normalizers.js')
     : '';
+  // computed.js (COMPUTATIONS + HELPERS) is required by core/compute.js's
+  // registry-driven dispatcher (URR / CaxP / eGFR / CKD staging).
+  const computedSrc    = readPattern('computed.js');
 
-  return banner + catalogSrc + normalizersSrc + manifestSrc + resolverAndAliases;
+  return banner + catalogSrc + normalizersSrc + manifestSrc + computedSrc + resolverAndAliases;
 }
 
 // ─── Groups block (concatenated alpha-sorted groups/*.js) ───────────────────
