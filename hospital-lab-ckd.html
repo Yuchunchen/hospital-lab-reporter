@@ -330,7 +330,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-05-20T15:56:07.831Z
+//   Synced at: 2026-05-25T11:21:53.999Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -838,8 +838,12 @@ const CATALOG = [
     ref:'< 20 ng/mL（肝臟）',
     refLo:null, refHi:20, hi:20, lo:null },
 
+  // vhyl sample (2026-05-25): "正式報告 CEA(YL): 7.37" — chartno 000023172B
+  // 比照 AFP / Fe / TSAT 同期 fix 加 (TT|YL) 可選後綴。
+  // 同 section 其他 test (PSA / FreePSA / CA199 / CA125) 在 vhyl 端 value
+  // line 都不帶 (YL)，CEA 是異例 — 不擴張本 fix 範圍。
   { id:'CEA',
-    pattern: /CEA:\s*([<>]?[\d.]+)/,
+    pattern: /CEA\s*(?:\((?:TT|YL)\))?:\s*([<>]?\s*[\d.]+)/,
     displayName:'癌胚抗原 (CEA)', shortLabel:'CEA',
     unit:'ng/mL', category:'癌症指數',
     ref:'< 5 ng/mL（大腸直腸）',
@@ -1111,6 +1115,69 @@ const CATALOG = [
       { label:'左腎', options:['正常','水泡','萎縮','結石'] },
     ],
     displayName:'腹部超音波', category:'影像 / 文字報告' },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // EXAMINATIONS (track-only — used by CKD/DM screening Dashboard)
+  // ═══════════════════════════════════════════════════════════════════════
+  // 為 TASK_BRIEF_ckd_screening_dashboard S1 加入。Pattern 只 match orderName
+  // (不 capture 數值) — Dashboard 端拿 orderDate / status，不需 lab value。
+  // 此 category「檢查」目前不在任何 manifest 裡，所以是 track-only：viewer /
+  // reporter 既有報表不會額外渲染。
+  //
+  // vhtt order name 實測（Phase 0, 2026-05-21）：
+  //   EKG    : `E.K.G.(TT)`                       (unit: ER)
+  //   ABI/PVR: `Doppling ex. and pressure recodring`  (unit: ER, 合併一筆)
+  //   Fundus : `Fundoscopy(眼底鏡檢查)`             (unit: META)
+  // vhyl 預期 ABI / PVR 分開兩筆 order — `\b` word boundary 由各自 id match。
+
+  { id:'EKG',    displayName:'心電圖',
+    pattern: /E\.K\.G\.|心電圖|EKG|ECG/i,
+    category:'檢查',
+    unit:'', ref:'', lo:null, hi:null },
+
+  { id:'ABI',    displayName:'ABI',
+    pattern: /\bABI\b|Doppling ex\.|四肢血流探測/i,
+    category:'檢查',
+    unit:'', ref:'', lo:null, hi:null },
+
+  { id:'PVR',    displayName:'PVR',
+    pattern: /\bPVR\b|Doppling ex\./i,
+    category:'檢查',
+    unit:'', ref:'', lo:null, hi:null },
+
+  { id:'Fundus', displayName:'眼底鏡',
+    pattern: /Fundoscopy|眼底鏡|Fundus\s+color/i,
+    category:'檢查',
+    unit:'', ref:'', lo:null, hi:null },
+
+  // CXR — TASK_BRIEF_health_check_cxr S1（2026-05-21）。健檢 order name 為
+  // `PE CXR`（unit: 放射線, IMPRESSION: Z00.00_體檢）；臨床 order 為
+  // `CHEST PA or AP View (TT)`。alternation 同時涵蓋兩者，且不誤命中
+  // `Chest Left oblique(TT)` 等其他胸部影像。
+  { id:'CXR',    displayName:'CXR (胸部X光)', shortLabel:'CXR',
+    pattern: /PE\s*CXR|CHEST\s+PA\s+or\s+AP/i,
+    category:'檢查',
+    unit:'', ref:'', lo:null, hi:null },
+
+  // 健檢影像三項 — TASK_BRIEF_health_check_cxr S1 補充（2026-05-21）。與 CXR
+  // 同為 track-only「檢查」,健檢報告視窗（cxr.html）批次抓取 + LLM 翻譯。
+  // order name 範例：`PE Whole Body Bone density scan` / `PE85 Coronary
+  // Calcium Score CT` / `PE Low Dose Chest CT`。pattern 抓 order name 不誤命中
+  // `PE CXR`（CXR）或 `Chest Left oblique`（其他胸部影像）。
+  { id:'BMD',  displayName:'骨質密度 (BMD)', shortLabel:'BMD',
+    pattern: /Bone\s+density/i,
+    category:'檢查',
+    unit:null, ref:null, lo:null, hi:null },
+
+  { id:'CAC',  displayName:'冠狀動脈鈣化 (CAC)', shortLabel:'CAC',
+    pattern: /Coronary\s+Calcium/i,
+    category:'檢查',
+    unit:null, ref:null, lo:null, hi:null },
+
+  { id:'LDCT', displayName:'低劑量肺部CT (LDCT)', shortLabel:'LDCT',
+    pattern: /Low\s+Dose\s+Chest\s+CT/i,
+    category:'檢查',
+    unit:null, ref:null, lo:null, hi:null },
 
 ];
 
