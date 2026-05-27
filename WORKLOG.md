@@ -1,5 +1,23 @@
 # WORKLOG
 
+## 2026-05-28 — 接 resolveRef(機器×時間×性別 ref)+ first-run 院區 modal
+
+- 作者：claude（與 YC 共同，Claude Code workspace root 跨 repo）
+- 範圍：core（ui-lab-view 上色 + storage machine helper + init first-run + body modal）+ sync-script + build
+- 變更：修改
+- 對應 brief：`../hospital-lab-patterns/docs/task-briefs/TASK_BRIEF_ref_range_machine_time_dim.md`（Order 5.0）
+- 檔案：
+  - `core/ui-lab-view.js`：數值上色的 gender-aware 區塊改為：catalog-backed in-scope test（帶 `refHistory`）→ 經 `resolveRef(test.id, getMachineSource(), d, sex, CATALOG)` 解 hi/lo；`d` 是該欄 ISO 日期（`toSortableDate`，西元）；無 refHistory（BUN_pre/post、computed、qualitative、排除項）→ 維持原 `test.lo/hi` + SOP G 性別 fallback（零 regression）。allTests = `LAB_TESTS ∩ 各 group manifest`,故 dialysis 與 CKD HTML 的 in-scope test 都吃得到（CKD 表格上色因共用 catalog-backed LAB_TESTS 自然 machine-aware；CKD 的 xlsx export 維持 universal 不動，依 YC #2/#3）
+  - `core/storage.js`：新增 `getMachineSource()` / `setMachineSource()`，讀寫 localStorage `currentMachine`（**非** disease-namespace；3 HTML 同 file:// origin 共用，設一次全部生效）
+  - `core/init.js`：DOMContentLoaded 末加 `if(!getMachineSource()) showMachineFirstRun()`;新增 first-run modal 邏輯（pick→confirm 兩段,§11.5 防誤選）
+  - `core/body.html`：加 `#machineModal`（重用既有 `.modal-overlay` 樣式;body 由 init.js 填）
+  - `build.js` + `sync-patterns.js`：patterns block 多 inline `lib/resolveRef.js`（CODE,不走 dist）
+  - 重 build：`hospital-lab-dialysis.html` 213.5 KB、`hospital-lab-ckd.html` 458.3 KB;legacy `hospital-lab-data.html` 同步重 sync（其 inline 上色邏輯未改,只多 unused resolveRef + refHistory 資料）
+- 測試：`node sync-patterns.js`（chain build）+ `node build.js`;node `new Function(scriptBody)` 驗兩個 built HTML 的單一 `<script>` 語法有效 + 含 resolveRef / refHistory(51) / ui-lab-view resolveRef call / getMachineSource / showMachineFirstRun / machineModal;所有手改 source `node --check` 通過
+- 設計：machine 未設 → resolveRef 只 match `'*'` → universal base（seed 自 lo/hi）= **零 regression**。base seed 自 lo/hi 非 refLo/refHi（YC 2026-05-28 拍板）
+- 相依：需 `hospital-lab-patterns` 先發版（catalog refHistory + lib/resolveRef.js + schema）。schema 屬破壞性改動,**push 前先問**（規則 #3）
+- 尚未做：真機驗證（瀏覽器開兩個 HTML 測 first-run modal + 上色 no-regression）;整合 A+B
+
 ## 2026-05-20 — ckd_egfr_staging brief Phase A+B+C：接上 eGFR / GFRStage / KDIGORisk / TaiwanCKD computed dispatch
 
 - 作者：claude（與 YC 共同）
