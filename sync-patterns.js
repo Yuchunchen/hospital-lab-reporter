@@ -95,8 +95,13 @@ const normalizersSrc  = fs.existsSync(path.join(PATTERNS_DIR, 'normalizers.js'))
 // computed.js exposes COMPUTATIONS + HELPERS as top-level consts; core/compute.js
 // dispatches against COMPUTATIONS at runtime, so it must be inlined here.
 const computedSrc     = read('computed.js');
+// resolveRef is CODE (machine × time × gender ref resolver), bundled into the
+// patterns block — it can't ride dist/patterns.json. Self-contained.
+const resolveRefSrc   = fs.existsSync(path.join(PATTERNS_DIR, 'lib', 'resolveRef.js'))
+  ? read('lib/resolveRef.js')
+  : '';
 
-const blockBody = banner + catalogSrc + normalizersSrc + manifestSrc + computedSrc + resolverAndAliases;
+const blockBody = banner + catalogSrc + normalizersSrc + manifestSrc + computedSrc + resolverAndAliases + resolveRefSrc;
 const replacementBlock = BEGIN + '\n' + blockBody + END;
 
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }

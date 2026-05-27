@@ -225,18 +225,31 @@ async function viewPatientLab(chartno) {
         } else {
           const numVal = typeof val === 'number' ? val : parseFloat(val);
           if (!isNaN(numVal)) {
-            // Gender-aware threshold: pick loM/hiM or loF/hiF when the
-            // catalog entry provides them and patient sex is known
-            // ('M'/'F' from genderCode). Falls back to lo/hi (wide envelope)
-            // for unknown sex or non-gendered tests.
-            const sex = patient && (patient.sex || patient.genderCode);
+            // sex is 'M'/'F' from the patient record (or null/unknown).
+            const sex = (patient && (patient.sex || patient.genderCode)) || null;
             let hi = test.hi, lo = test.lo;
-            if (sex === 'M' && (test.hiM != null || test.loM != null)) {
-              if (test.hiM != null) hi = test.hiM;
-              if (test.loM != null) lo = test.loM;
-            } else if (sex === 'F' && (test.hiF != null || test.loF != null)) {
-              if (test.hiF != null) hi = test.hiF;
-              if (test.loF != null) lo = test.loF;
+            // Route through the shared machine × time × gender resolver ONLY for
+            // catalog-backed in-scope tests (they carry refHistory). allTests here
+            // is LAB_TESTS ∩ active manifest, so in-scope tests in BOTH the
+            // dialysis and CKD HTML get this. BUN_pre/post, computed, qualitative,
+            // and excluded entries have no refHistory → keep their own lo/hi (zero
+            // regression). d is this column's ISO date; resolveRef + CATALOG come
+            // from the patterns block (single <script>, defined before core).
+            if (typeof resolveRef === 'function' && test.refHistory && test.id) {
+              const catList = (typeof CATALOG !== 'undefined') ? CATALOG
+                            : (window.HOSPITAL_LAB_PATTERNS_CATALOG || []);
+              const g = (sex === 'M' || sex === 'F') ? sex : null;
+              const r = resolveRef(test.id, getMachineSource(), d, g, catList);
+              if (r) { hi = r.refHi; lo = r.refLo; }
+            } else {
+              // Gender-aware fallback (SOP G, unchanged): loM/hiM or loF/hiF.
+              if (sex === 'M' && (test.hiM != null || test.loM != null)) {
+                if (test.hiM != null) hi = test.hiM;
+                if (test.loM != null) lo = test.loM;
+              } else if (sex === 'F' && (test.hiF != null || test.loF != null)) {
+                if (test.hiF != null) hi = test.hiF;
+                if (test.loF != null) lo = test.loF;
+              }
             }
             if (hi != null && numVal > hi) valCls = 'val-hi';
             else if (lo != null && numVal < lo) valCls = 'val-lo';

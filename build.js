@@ -151,8 +151,13 @@ function buildPatternsBlock() {
   // computed.js (COMPUTATIONS + HELPERS) is required by core/compute.js's
   // registry-driven dispatcher (URR / CaxP / eGFR / CKD staging).
   const computedSrc    = readPattern('computed.js');
+  // resolveRef is CODE (machine × time × gender ref resolver) used by
+  // ui-lab-view.js — it can't ride dist/patterns.json (functions are dropped),
+  // so it's inlined into the single <script> here. Self-contained (takes the
+  // catalog as an arg); exposes a global resolveRef + window.resolveRef.
+  const resolveRefSrc  = readPattern('lib/resolveRef.js');
 
-  return banner + catalogSrc + normalizersSrc + manifestSrc + computedSrc + resolverAndAliases;
+  return banner + catalogSrc + normalizersSrc + manifestSrc + computedSrc + resolverAndAliases + resolveRefSrc;
 }
 
 // ─── Groups block (concatenated alpha-sorted groups/*.js) ───────────────────

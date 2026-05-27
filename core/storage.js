@@ -97,3 +97,21 @@ function loadSettings() {
 function saveSettingsData(s) {
   localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(s));
 }
+
+// ─── Machine source (vhtt / vhyl) ──────────────────────────────────────────────
+// Which physical machine this install belongs to — feeds resolveRef so it reads
+// machine-specific reference ranges (refHistory). Per TASK_BRIEF §3.2 the reporter
+// keeps it in localStorage (it can't see the viewer's chrome.storage). The key is
+// NOT disease-namespaced: it's machine-wide and shared across the three HTMLs (same
+// file:// origin). When unset, getMachineSource() → null so resolveRef matches only
+// the '*' universal ref (= zero regression). Set once via a first-run modal.
+function getMachineSource() {
+  try {
+    const m = localStorage.getItem('currentMachine');
+    return (m === 'vhtt' || m === 'vhyl') ? m : null;
+  } catch (_) { return null; }
+}
+function setMachineSource(m) {
+  if (m !== 'vhtt' && m !== 'vhyl') return;
+  try { localStorage.setItem('currentMachine', m); } catch (_) {}
+}
