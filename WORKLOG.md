@@ -1,5 +1,18 @@
 # WORKLOG
 
+## 2026-05-28 — sync patterns:13 條 vhtt refHistory override(cross-ref 12 chart batch)
+
+- 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)
+- 範圍:sync-script(重產 3 個 disease HTML 的 patterns/groups 區塊)
+- 變更:修改(auto-generated)
+- 對應 brief:`hospital-lab-patterns/docs/task-briefs/TASK_BRIEF_vhtt_refHistory_batch_13_done.md`
+- 檔案:
+  - `hospital-lab-data.html`、`hospital-lab-dialysis.html`、`hospital-lab-ckd.html`:`node sync-patterns.js` 重產(patterns 區塊 + groups + build chain)
+- 原因:patterns repo 加 13 條 vhtt refHistory override(Hb / Platelet / BUN / CREAT / GOT / GPT / ALP / UA / GluAC / HbA1c / LDL / Fe / AFP),reporter 三 HTML pattern block 需重 bundle
+- 測試:`node sync-patterns.js` 成功(legacy data.html markers OK + dialysis.html 216.7KB + ckd.html 461.5KB 重 build);真機開瀏覽器跑單病人驗證留待 YC(brief §5 success #5 pending)
+- 相依:hospital-lab-patterns 已 push(commit `5bcd638`);hospital-lab-viewer 已 push(commit `39e7485`)
+- 影響:無 disease group 邏輯改動,純資料層更新;dialysis / ckd 既有病患清單不受影響(localStorage 不動)
+
 ## 2026-05-28 — 接 resolveRef(機器×時間×性別 ref)+ first-run 院區 modal
 
 - 作者：claude（與 YC 共同，Claude Code workspace root 跨 repo）
