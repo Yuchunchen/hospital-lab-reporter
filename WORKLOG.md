@@ -1,5 +1,18 @@
 # WORKLOG
 
+## 2026-06-04 — sync patterns:Platelet regex 加 PLATE alternation
+
+- 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)
+- 範圍:sync-script(重產 3 個 disease HTML 的 patterns 區塊;chain 到 build)
+- 變更:修改(auto-generated)
+- 對應 brief:`../hospital-lab-patterns/docs/task-briefs/TASK_BRIEF_platelet_PLATE_alternation_done.md`
+- 檔案:
+  - `hospital-lab-data.html`、`hospital-lab-dialysis.html`、`hospital-lab-ckd.html`:`node sync-patterns.js` 重產(catalog Platelet 行差異;CKD HTML 雖 manifest 不含 Platelet 但 catalog 整包共用,patterns 區塊照重出)
+- 原因:patterns repo 改 catalog Platelet regex 加 PLATE alternation(`/Platelet:/` → `/(?:Platelet|PLATE):/`),reporter 三 HTML 的 patterns 區塊需重 bundle。修因:ernode CBC 套餐 reportText 用 `PLATE:` label,舊 regex 漏抓,dialysis KiDiTi 匯出 field 6(Platelet)空格
+- 測試:`node sync-patterns.js` 成功(legacy data.html markers + dialysis.html 216.7KB + ckd.html 461.5KB chain build);`Select-String hospital-lab-dialysis.html "Platelet|PLATE"` 第 424 行 pattern 已含 alternation。真機驗證(瀏覽器開 dialysis HTML → vhtt `000030794I` → 全部更新 → KiDiTi 匯出 field 6 5 月有 89)留待 YC 在 vhtt 機器上跑(brief T6)
+- 相依:hospital-lab-patterns 同輪 commit + push;hospital-lab-viewer 同輪 commit + push
+- 影響:dialysis group 受影響(Platelet 漏抓修復 + KiDiTi field 6 補完整);CKD manifest 不含 Platelet 不影響輸出;既有病患清單不受影響(localStorage 不動);reporter 6h orders cache 要點「全部更新」清才會用新 regex 重 parse
+
 ## 2026-05-28 — sync patterns:13 條 vhtt refHistory override(cross-ref 12 chart batch)
 
 - 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)

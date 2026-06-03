@@ -339,7 +339,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-05-28T14:28:04.327Z
+//   Synced at: 2026-06-03T21:12:30.366Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -421,7 +421,7 @@ const CATALOG = [
     refHistory: [{ machine:'*', refLo:79, refHi:99, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' }] },
 
   { id:'Platelet',
-    pattern: /Platelet:\s*([<>]?\s*[\d.]+)/,
+    pattern: /(?:Platelet|PLATE):\s*([<>]?\s*[\d.]+)/,
     displayName:'血小板 (Platelet)', shortLabel:'PLT',
     unit:'×10³/µL', category:'血液',
     ref:'150–400 ×10³/µL',
