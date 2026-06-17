@@ -1,5 +1,19 @@
 # WORKLOG
 
+## 2026-06-17 — sync patterns:viewer page 2 layout 收斂(reporter 不受影響)
+
+- 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)
+- 範圍:sync-script(重產 legacy data.html 的 patterns 區塊 + 兩個 disease HTML build)
+- 變更:修改(auto-generated)
+- 對應 brief:`../hospital-lab-patterns/docs/task-briefs/TASK_BRIEF_viewer_wbc_dc_section_done.md`(brief Open #3 延伸)
+- 檔案:
+  - `hospital-lab-data.html`:patterns 區塊重出(內含 viewer manifest snapshot,BoneDensity/Endoscopy/AbdSono col:1、DC + HIV col:2)
+  - `hospital-lab-dialysis.html`、`hospital-lab-ckd.html`:`buildOne()` chain 重產
+- 原因:viewer 端 page 2 layout 改成 col 1 文字報告 + col 2 DC + HIV;catalog 不變,reporter manifest 仍不收 DC / HIV,sync 跑保持 catalog snapshot 一致
+- 測試:`node sync-patterns.js` 成功;disease group 行為不變(LAB_TESTS / COMPUTED_TESTS 不含 DC 即不渲染)
+- 相依:hospital-lab-patterns 同輪 commit + push;hospital-lab-viewer 同輪 commit + push
+- 影響:無 disease group 邏輯改動;dialysis / ckd 既有病患清單不受影響
+
 ## 2026-06-17 — sync patterns:DC section page/col 微調(reporter manifest 仍不收)
 
 - 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)
