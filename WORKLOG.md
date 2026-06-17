@@ -1,5 +1,19 @@
 # WORKLOG
 
+## 2026-06-16 — sync patterns:新增 DC 五分類 catalog entries(reporter manifest 不收)
+
+- 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)
+- 範圍:sync-script(重產 legacy data.html 的 patterns/groups 區塊 + 兩個 disease HTML build)
+- 變更:修改(auto-generated)
+- 對應 brief:`../hospital-lab-patterns/docs/task-briefs/TASK_BRIEF_viewer_wbc_dc_section.md`
+- 檔案:
+  - `hospital-lab-data.html`:patterns 區塊重出含 5 條新 DC catalog pattern(Neut/Lymph/Mono/Eos/Baso);groups 區塊照重出
+  - `hospital-lab-dialysis.html`、`hospital-lab-ckd.html`:`buildOne()` chain 觸發,patterns 區塊跟著重產出
+- 原因:patterns repo 加 DC 五分類 catalog + viewer 新 section,本輪 reporter manifest **不收** DC(brief 範圍 viewer only — 透析/CKD 案管目前不用 DC%),sync 仍然跑保持紀律,讓 reporter 端 catalog snapshot 同步最新狀態,日後若有 disease group 要用 DC 不用再補
+- 測試:`node sync-patterns.js` 成功(legacy data.html markers + dialysis.html + ckd.html chain build 完成);Neut/Lymph/Mono/Eos/Baso 5 條 pattern 在三個 HTML patterns 區塊都搜得到。reporter 三 disease group 既有行為不變(LAB_TESTS / COMPUTED_TESTS resolver 不含 DC 即不渲染)
+- 相依:hospital-lab-patterns 同輪 commit + push(catalog.js + viewer.js + dist/patterns.json);hospital-lab-viewer 同輪 commit + push
+- 影響:無 disease group 邏輯改動,純 catalog 同步;dialysis / ckd 既有病患清單不受影響(localStorage 不動);使用者開瀏覽器看 disease HTML 不會看到 DC%(reporter manifest 無此 5 條)
+
 ## 2026-06-04 — sync patterns:Platelet regex 加 PLATE alternation
 
 - 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)

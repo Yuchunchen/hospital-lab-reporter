@@ -339,7 +339,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-06-03T21:12:30.366Z
+//   Synced at: 2026-06-17T01:51:08.757Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -432,6 +432,34 @@ const CATALOG = [
       { machine:'*', refLo:150, refHi:400, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhtt', refLo:120, refHi:320, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
     ] },
+
+  // DC 五分類百分比 (differential count, %) — vhyl sample 2026-06-16
+  // order name DC(YL); value line 不帶 (YL) suffix。display-only,無參考值。
+  // vhtt mnemonic 未確認 — 若 vhtt 不同名,於此加 alternation。
+  { id:'Neut',
+    pattern: /\bNEUT:\s*([<>]?\s*[\d.]+)/,
+    displayName:'嗜中性球 (Neutrophil %)', shortLabel:'Neut%',
+    unit:'%', category:'血液' },
+
+  { id:'Lymph',
+    pattern: /\bLYM:\s*([<>]?\s*[\d.]+)/,
+    displayName:'淋巴球 (Lymphocyte %)', shortLabel:'Lym%',
+    unit:'%', category:'血液' },
+
+  { id:'Mono',
+    pattern: /\bMONO:\s*([<>]?\s*[\d.]+)/,
+    displayName:'單核球 (Monocyte %)', shortLabel:'Mono%',
+    unit:'%', category:'血液' },
+
+  { id:'Eos',
+    pattern: /\bEOSINO:\s*([<>]?\s*[\d.]+)/,
+    displayName:'嗜酸性球 (Eosinophil %)', shortLabel:'Eos%',
+    unit:'%', category:'血液' },
+
+  { id:'Baso',
+    pattern: /\bBASO:\s*([<>]?\s*[\d.]+)/,
+    displayName:'嗜鹼性球 (Basophil %)', shortLabel:'Baso%',
+    unit:'%', category:'血液' },
 
   // ═══════════════════════════════════════════════════════════════════════
   // PROTEINS
