@@ -335,7 +335,7 @@ body {
 //   3. cd hospital-lab-reporter && node sync-patterns.js
 //   4. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-06-18T23:03:16.252Z
+// Synced at: 2026-06-23T15:41:39.017Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -1823,24 +1823,36 @@ var COMPUTED_TESTS = REPORTER_COMPUTED;
  * resolveRef.js — shared machine × time × gender reference-range resolver.
  *
  * Given a test id + the current machine + the value's report date + patient
- * gender + the LIVE catalog, returns the reference range to use for the
- * normal/abnormal (黃紅綠) decision:
+ * gender + the LIVE catalog (+ optional patient age), returns the reference
+ * range to use for the normal/abnormal (黃紅綠) decision:
  *
- *   resolveRef(testId, machineSource, reportDate, patientGender, catalogList)
+ *   resolveRef(testId, machineSource, reportDate, patientGender, catalogList, patientAge)
  *     → { refLo: number|null, refHi: number|null }
  *
- * Algorithm (TASK_BRIEF_ref_range_machine_time_dim §2.2):
+ * Algorithm (TASK_BRIEF_ref_range_machine_time_dim §2.2 +
+ *            TASK_BRIEF_ref_range_age_dim §3):
  *   1. Find entry by testId in catalogList.
  *   2. No refHistory → fallback chain:
  *        a. BUN_pre / BUN_post → use BUN's refHistory (inherits, §1.1 special).
  *        b. else → outer refLo/refHi (+ outer loM/hiM/loF/hiF for gender).
  *   3. Has refHistory:
  *        a. candidates = machine ∈ [machineSource, '*'] AND validFrom <= date
- *        b. sort: machine-specific beats '*'; same machine → latest validFrom
+ *                        AND ageOK (age within [ageMin,ageMax], or age-agnostic)
+ *        b. sort (precedence, strong → weak): machine-specific beats '*';
+ *           then age-specific beats age-agnostic; then latest validFrom.
  *        c. take first = base
  *        d. gender override (3 layers): inline refLoM/.. → outer loM/.. → base
  *   4. candidates empty → fallback chain (step 2).
  *   reportDate missing/unparseable → use today + console.warn once per testId.
+ *
+ * patientAge is the age (in years) that applied at the value's report date —
+ * the caller computes it (resolveRef does not touch "current age" logic). It is
+ * optional and added LAST so the 5-arg legacy call sites keep working:
+ * undefined / null / NaN → "age unknown" → only age-agnostic entries match.
+ *
+ * resolveRef.pickEntry(...) — same args — returns the chosen refHistory item
+ * (or null when it fell to the outer fallback). The viewer uses it to render a
+ * minimal "which dimensions did this ref split on" display (age_dim §4.3).
  *
  * Date handling: reportDate may arrive as ROC "115/04/14", Gregorian
  * "20260414203800", ISO "2026-04-14", or a Date — all normalised to Western
@@ -1948,27 +1960,54 @@ var resolveRef = (function () {
     return { refLo: rLo, refHi: rHi };
   }
 
-  // ownerEntry supplies the outer gender fallback; rh is the refHistory list
-  // to resolve against (BUN's list when resolving BUN_pre / BUN_post).
-  function resolveFromHistory(ownerEntry, rh, machineSource, date, gender) {
+  // age within an item's band? age-agnostic items (no bounds) match every age;
+  // unknown age (null) matches ONLY age-agnostic items (age_dim §3).
+  function ageOK(h, age) {
+    var agnostic = (h.ageMin == null && h.ageMax == null);
+    if (age == null) return agnostic;
+    var lo = h.ageMin == null ? -Infinity : h.ageMin;
+    var hi = h.ageMax == null ?  Infinity : h.ageMax;
+    return age >= lo && age <= hi;
+  }
+
+  // Filter refHistory to applicable candidates and return the winner per the
+  // §3 precedence (machine > age > time), or null when none apply.
+  function selectBase(rh, machineSource, date, age) {
     var cands = [];
     for (var i = 0; i < rh.length; i++) {
       var h = rh[i];
-      if ((h.machine === machineSource || h.machine === '*') && h.validFrom <= date) {
+      if ((h.machine === machineSource || h.machine === '*') &&
+          h.validFrom <= date && ageOK(h, age)) {
         cands.push(h);
       }
     }
-    if (!cands.length) return outerFallback(ownerEntry, gender);
+    if (!cands.length) return null;
 
     cands.sort(function (a, b) {
-      var aSpec = a.machine === '*' ? 0 : 1;
-      var bSpec = b.machine === '*' ? 0 : 1;
-      if (aSpec !== bSpec) return bSpec - aSpec;            // machine-specific first
+      var aM = a.machine === '*' ? 0 : 1;
+      var bM = b.machine === '*' ? 0 : 1;
+      if (aM !== bM) return bM - aM;                       // machine-specific first
+      var aA = (a.ageMin == null && a.ageMax == null) ? 0 : 1;
+      var bA = (b.ageMin == null && b.ageMax == null) ? 0 : 1;
+      if (aA !== bA) return bA - aA;                       // age-specific first
       if (a.validFrom !== b.validFrom) return a.validFrom < b.validFrom ? 1 : -1; // latest first
       return 0;
     });
 
-    return resolveGender(cands[0], ownerEntry, gender);
+    return cands[0];
+  }
+
+  // ownerEntry supplies the outer gender fallback; rh is the refHistory list
+  // to resolve against (BUN's list when resolving BUN_pre / BUN_post).
+  function resolveFromHistory(ownerEntry, rh, machineSource, date, gender, age) {
+    var base = selectBase(rh, machineSource, date, age);
+    if (!base) return outerFallback(ownerEntry, gender);
+    return resolveGender(base, ownerEntry, gender);
+  }
+
+  // Coerce a caller-supplied age to a usable number or null (unknown).
+  function normAge(patientAge) {
+    return (typeof patientAge === 'number' && !isNaN(patientAge)) ? patientAge : null;
   }
 
   function warnOnce(testId) {
@@ -1980,12 +2019,13 @@ var resolveRef = (function () {
     }
   }
 
-  return function resolveRef(testId, machineSource, reportDate, patientGender, catalogList) {
+  function resolveRefFn(testId, machineSource, reportDate, patientGender, catalogList, patientAge) {
     var entry = findById(catalogList, testId);
     if (!entry) return { refLo: null, refHi: null };
 
     var date = normalizeRefDate(reportDate);
     if (date === null) { warnOnce(testId); date = todayIso(); }
+    var age = normAge(patientAge);
 
     var rh = entry.refHistory;
     if (!rh || !rh.length) {
@@ -1993,14 +2033,41 @@ var resolveRef = (function () {
       if (testId === 'BUN_pre' || testId === 'BUN_post') {
         var bun = findById(catalogList, 'BUN');
         if (bun && bun.refHistory && bun.refHistory.length) {
-          return resolveFromHistory(bun, bun.refHistory, machineSource, date, patientGender);
+          return resolveFromHistory(bun, bun.refHistory, machineSource, date, patientGender, age);
         }
       }
       return outerFallback(entry, patientGender);
     }
 
-    return resolveFromHistory(entry, rh, machineSource, date, patientGender);
+    return resolveFromHistory(entry, rh, machineSource, date, patientGender, age);
+  }
+
+  // Expose the chosen refHistory item (the "base" before gender override), or
+  // null when resolution fell to the outer fallback. Same arg order as the main
+  // resolver. Used by the viewer to render the minimal ref display (age_dim §4.3).
+  resolveRefFn.pickEntry = function (testId, machineSource, reportDate, patientGender, catalogList, patientAge) {
+    var entry = findById(catalogList, testId);
+    if (!entry) return null;
+
+    var date = normalizeRefDate(reportDate);
+    if (date === null) date = todayIso();
+    var age = normAge(patientAge);
+
+    var rh = entry.refHistory;
+    if (!rh || !rh.length) {
+      if (testId === 'BUN_pre' || testId === 'BUN_post') {
+        var bun = findById(catalogList, 'BUN');
+        if (bun && bun.refHistory && bun.refHistory.length) {
+          return selectBase(bun.refHistory, machineSource, date, age);
+        }
+      }
+      return null;
+    }
+
+    return selectBase(rh, machineSource, date, age);
   };
+
+  return resolveRefFn;
 })();
 
 // ─── Exports (CommonJS for tests + browser global for the bundled snapshot) ──
@@ -2023,7 +2090,7 @@ if (typeof window !== 'undefined') {
 //   2. node sync-patterns.js
 //   3. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-06-18T23:03:16.308Z
+// Synced at: 2026-06-23T15:41:39.038Z
 // Files:    dialysis.js, early-ckd.js
 // ════════════════════════════════════════════════════════════════════════════
 

@@ -1,5 +1,19 @@
 # WORKLOG
 
+## 2026-06-23 — resolveRef 年齡維 sync + age 參數本輪傳 undefined
+
+- 作者:claude(與 YC 共同,Claude Code)
+- 範圍:core(`ui-lab-view.js`)+ sync-script(重產 data.html patterns 區塊 + dialysis/ckd HTML)
+- 變更:修改
+- 檔案:core/ui-lab-view.js、hospital-lab-data.html / -dialysis.html / -ckd.html(build 產出)
+- 原因:patterns 端 resolveRef 加第 6 參數 `patientAge`(年齡維)。reporter alarm 上色呼叫補上
+  age 參數;依 brief §5 / §9.3 決策**本輪傳 `undefined`**(= age-agnostic、zero-regression)。
+- 內容:`resolveRef(test.id, getMachineSource(), d, g, catList, undefined)` + 註明年齡維待補資料來源
+  (reporter 的 patient.age 是目前年齡,per-row ageAtReport 串接延後)。`node sync-patterns.js` 重產。
+- 測試:`node --check core/ui-lab-view.js` 綠;sync 重產 dialysis(224.8 KB)/ ckd(469.6 KB),
+  HTML 內 resolveRef 為新版(grep 含 patientAge / pickEntry / ageOK)。既有透析行為不變(age=undefined)。
+- 相依:需 hospital-lab-patterns 先發版(resolveRef);本輪同步完成。
+
 ## 2026-06-17 — sync patterns:viewer page 2 layout 收斂(reporter 不受影響)
 
 - 作者:claude(與 YC 共同,Claude Code workspace root 跨 repo)

@@ -239,7 +239,10 @@ async function viewPatientLab(chartno) {
               const catList = (typeof CATALOG !== 'undefined') ? CATALOG
                             : (window.HOSPITAL_LAB_PATTERNS_CATALOG || []);
               const g = (sex === 'M' || sex === 'F') ? sex : null;
-              const r = resolveRef(test.id, getMachineSource(), d, g, catList);
+              // age_dim §5: reporter passes age=undefined this round (→ resolveRef
+              // age-agnostic, zero regression). Reporter's patient.age is current
+              // age; threading a per-row ageAtReport is deferred (待補資料來源).
+              const r = resolveRef(test.id, getMachineSource(), d, g, catList, undefined);
               if (r) { hi = r.refHi; lo = r.refLo; }
             } else {
               // Gender-aware fallback (SOP G, unchanged): loM/hiM or loF/hiF.
