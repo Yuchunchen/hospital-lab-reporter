@@ -335,7 +335,7 @@ body {
 //   3. cd hospital-lab-reporter && node sync-patterns.js
 //   4. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-06-24T09:57:43.332Z
+// Synced at: 2026-06-24T15:40:36.060Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -401,7 +401,7 @@ const CATALOG = [
     notes:'Pattern matches both "Hb:" and "HGB:" labels.',
     refHistory: [
       { machine:'*', refLo:12, refHi:18, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:12.3, refHi:18.3, refLoM:12.3, refHiM:18.3, refLoF:11.3, refHiF:15.3, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
+      { machine:'vhtt', refLo:12.3, refHi:18.3, refLoM:12.3, refHiM:18.3, refLoF:11.3, refHiF:15.3, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版 2020→2026 未改;原 2026-05-28 觸發日修為 migration base — see docs/cross-reference-vhtt-2026-05-28.md' },
       { machine:'vhyl', refLo:12, refHi:18, refLoM:14, refHiM:18, refLoF:12, refHiF:16, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
     ] },
 
@@ -416,6 +416,7 @@ const CATALOG = [
     refHistory: [
       { machine:'*', refLo:33, refHi:53, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:38, refHi:54, refLoM:40, refHiM:54, refLoF:38, refHiF:47, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
+      { machine:'vhtt', refLo:33, refHi:53, refLoM:39, refHiM:53, refLoF:33, refHiF:47, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 男39-53 女33-47 穩定)' },
     ] },
 
   { id:'MCV',
@@ -427,6 +428,7 @@ const CATALOG = [
     refHistory: [
       { machine:'*', refLo:79, refHi:99, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:80, refHi:96, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
+      { machine:'vhtt', refLo:79, refHi:99, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 穩定單版 2020→2026)' },
     ] },
 
   { id:'Platelet',
@@ -439,7 +441,7 @@ const CATALOG = [
     notes:'Normalize handles /µL (e.g. 250000) → ×10³/µL (250).',
     refHistory: [
       { machine:'*', refLo:150, refHi:400, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:120, refHi:320, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
+      { machine:'vhtt', refLo:120, refHi:320, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版 2020→2026 未改;原 2026-05-28 觸發日修為 migration base — see docs/cross-reference-vhtt-2026-05-28.md' },
       { machine:'vhyl', refLo:150, refHi:400, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
     ] },
 
@@ -492,6 +494,7 @@ const CATALOG = [
       { machine:'*', refLo:6.0, refHi:8.3, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:6.6, refHi:8.7, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 ref(末見 2025-04-21;migration base 1900)' },
       { machine:'vhyl', refLo:6.4, refHi:8.3, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;原誤標 2026-03-31;30pt（full cohort）)' },
+      { machine:'vhtt', refLo:6.0, refHi:8.3, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 穩定;PROTEIN x1 異版捨)' },
     ] },
 
   { id:'Albumin',
@@ -506,6 +509,7 @@ const CATALOG = [
       { machine:'*', refLo:3.5, refHi:5.0, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:3.97, refHi:4.94, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 ref(末見 2025-04-21;migration base 1900)' },
       { machine:'vhyl', refLo:3.5, refHi:5.2, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;原誤標 2026-03-31;30pt（full cohort）)' },
+      { machine:'vhtt', refLo:3.5, refHi:5.0, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 穩定單版 2020→2026)' },
     ] },
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -520,7 +524,7 @@ const CATALOG = [
     refLo:5, refHi:34, hi:34, lo:null,
     refHistory: [
       { machine:'*', refLo:null, refHi:34, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:13, refHi:39, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
+      { machine:'vhtt', refLo:13, refHi:39, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版 2020→2026 未改;原 2026-05-28 觸發日修為 migration base — see docs/cross-reference-vhtt-2026-05-28.md' },
       { machine:'vhyl', refLo:0, refHi:40, refLoM:0, refHiM:40, refLoF:0, refHiF:32, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里 GOT v1(末見 2025-04-21)' },
       { machine:'vhyl', refLo:11, refHi:34, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里 GOT v2(2025-06-24→2025-12-26)' },
       { machine:'vhyl', refLo:5, refHi:34, validFrom:'2026-02-02', source:'time-dim rescan 2026-06-24 玉里 GOT v3(2026-02-02→;30pt full cohort;原誤標 2026-03-31)' },
@@ -536,7 +540,7 @@ const CATALOG = [
     hi:45, lo:null,
     refHistory: [
       { machine:'*', refLo:null, refHi:45, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:7, refHi:52, refLoM:7, refHiM:52, refLoF:7, refHiF:52, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md (vhtt 印 universal 7-52,inline 性別 mirror 是為了 suppress outer hiM:45/hiF:34 fallback)' },
+      { machine:'vhtt', refLo:7, refHi:52, refLoM:7, refHiM:52, refLoF:7, refHiF:52, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版;原 2026-05-28 觸發日修為 migration base (vhtt 印 universal 7-52,inline 性別 mirror 是為了 suppress outer hiM:45/hiF:34 fallback)' },
       { machine:'vhyl', refLo:0, refHi:41, refLoM:0, refHiM:41, refLoF:0, refHiF:33, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 ref(末見 2025-04-21;migration base 1900)' },
       { machine:'vhyl', refLo:null, refHi:45, refHiM:45, refHiF:34, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;原誤標 2026-03-31;30pt（full cohort）)' },
     ] },
@@ -552,7 +556,7 @@ const CATALOG = [
     notes:'Pattern matches r-GT, R-GT, γ-GT, GGT, RGT — hospitals use various labels.',
     refHistory: [
       { machine:'*', refLo:null, refHi:55, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:9, refHi:64, validFrom:'2026-06-18', source:'YC cross-reference 2026-06-18 — chartno 000015165F r-GT(TT) 正式報告印 9-64 IU/L(無性別分項)' },
+      { machine:'vhtt', refLo:9, refHi:64, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort 僅 1 筆觀測(2025-12-16),證據薄;validFrom 用 migration base 取代觸發日 2026-06-18 — chartno 000015165F r-GT(TT) 9-64 IU/L(無性別分項)' },
       { machine:'vhyl', refLo:5, refHi:61, refLoM:8, refHiM:61, refLoF:5, refHiF:36, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 r-GT(M8-61,F5-36;末見 2025-04-10;30pt)' },
       { machine:'vhyl', refLo:null, refHi:55, refHiM:55, refHiF:38, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 r-GT(M<55,F<38;earliest 2025-06-16;30pt full cohort)' },
     ] },
@@ -565,7 +569,7 @@ const CATALOG = [
     refLo:34, refHi:130, hi:130, lo:34,
     refHistory: [
       { machine:'*', refLo:34, refHi:130, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:34, refHi:104, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
+      { machine:'vhtt', refLo:34, refHi:104, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版 2020→2026 未改;原 2026-05-28 觸發日修為 migration base — see docs/cross-reference-vhtt-2026-05-28.md' },
       { machine:'vhyl', refLo:35, refHi:129, refLoM:40, refHiM:129, refLoF:35, refHiF:104, validFrom:'1900-01-01', source:'auto-crawl time-version 玉里舊 ref(012885I 實掃 2024-08~2025-04-15);真正起始未知,用 1900 作 migration base' },
       { machine:'vhyl', refLo:46, refHi:122, refLoM:50, refHiM:116, refLoF:46, refHiF:122, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;30pt（full cohort）;前單掃 012885I 誤為 2025-09-22)' },
     ] },
@@ -607,6 +611,7 @@ const CATALOG = [
     refHistory: [
       { machine:'*', refLo:null, refHi:200, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:0, refHi:200, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
+      { machine:'vhtt', refLo:0, refHi:200, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 穩定;CHOL+T.CHOL 同值 0-200)' },
     ] },
 
   { id:'HDLC',
@@ -620,6 +625,7 @@ const CATALOG = [
       { machine:'*', refLo:40, refHi:null, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:35, refHi:100, refLoM:35, refHiM:100, refLoF:55, refHiF:100, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 ref(末見 2025-04-21;migration base 1900)' },
       { machine:'vhyl', refLo:40, refHi:null, refLoM:40, refLoF:50, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;原誤標 2026-03-31;30pt（full cohort）)' },
+      { machine:'vhtt', refLo:40, refHi:null, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 單邊 >40 穩定)' },
     ] },
 
   { id:'LDL',
@@ -631,7 +637,7 @@ const CATALOG = [
     meaning:'俗稱「壞膽固醇」',
     refHistory: [
       { machine:'*', refLo:null, refHi:130, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:0, refHi:140, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
+      { machine:'vhtt', refLo:0, refHi:140, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版 2020→2026 未改;原 2026-05-28 觸發日修為 migration base — see docs/cross-reference-vhtt-2026-05-28.md' },
       { machine:'vhyl', refLo:0, refHi:100, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
     ] },
 
@@ -644,6 +650,7 @@ const CATALOG = [
     refHistory: [
       { machine:'*', refLo:null, refHi:150, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:0, refHi:150, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
+      { machine:'vhtt', refLo:0, refHi:150, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 穩定單版 2020→2026)' },
     ] },
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -668,7 +675,7 @@ const CATALOG = [
     notes:'Matches Glucose(<site>), GLU, GLU-AC, Sugar(<site>), AC Sugar, 飯前血糖. Bare "Glucose:" intentionally NOT matched — urine routine Glucose: 4+ would otherwise capture "4" as a serum mg/dL value. 2026-05-12: also reject `+`-qualified gradient values (vhyl URINE ROUTINE(YL) GLU: 4+ was capturing 4).',
     refHistory: [
       { machine:'*', refLo:74, refHi:100, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:74, refHi:106, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
+      { machine:'vhtt', refLo:74, refHi:106, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版 2020→2026 未改(AC:前綴/單位格式變體已收斂);原 2026-05-28 觸發日修為 migration base — see docs/cross-reference-vhtt-2026-05-28.md' },
       { machine:'vhyl', refLo:74, refHi:106, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 ref(末見 2025-04-21;migration base 1900)' },
       { machine:'vhyl', refLo:74, refHi:100, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;原誤標 2026-03-31;30pt（full cohort）)' },
     ] },
@@ -701,7 +708,7 @@ const CATALOG = [
     notes:'Fallback hi:25.7 is the original soft buffer for unknown gender; known-gender uses hiM/hiF for precision.',
     refHistory: [
       { machine:'*', refLo:null, refHi:25.7, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:7, refHi:25, refLoM:7, refHiM:25, refLoF:7, refHiF:25, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md (vhtt 印 universal 7-25,inline 性別 mirror 是為了 suppress outer hiM:20.6/hiF:18.7 fallback)' },
+      { machine:'vhtt', refLo:7, refHi:25, refLoM:7, refHiM:25, refLoF:7, refHiF:25, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版;原 2026-05-28 觸發日修為 migration base (vhtt 印 universal 7-25,inline 性別 mirror 是為了 suppress outer hiM:20.6/hiF:18.7 fallback)' },
       { machine:'vhyl', refLo:6, refHi:23, refLoM:6, refHiM:23, refLoF:6, refHiF:23, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 BUN(6-23,無年齡/性別;inline mirror suppress 外層 hiM:20.6/hiF:18.7;末見 2025-04-21)' },
       { machine:'vhyl', refLo:7, refHi:20.6, refLoM:8.9, refHiM:20.6, refLoF:7, refHiF:18.7, ageMax:49, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 BUN <50y(earliest 2025-06-04;原誤標 2026-03-31)' },
       { machine:'vhyl', refLo:8.4, refHi:25.7, refLoM:8.4, refHiM:25.7, refLoF:9.8, refHiF:20.1, ageMin:50, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 BUN >=50y(earliest 2025-06-04;原誤標 2026-03-31)' },
@@ -741,7 +748,7 @@ const CATALOG = [
     notes:'Pattern matches "Creatinine(serum):" and "CREAT:" but NOT "Creatinine(24hrs Urine):".',
     refHistory: [
       { machine:'*', refLo:null, refHi:1.2, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:0.6, refHi:1.3, refLoM:0.7, refHiM:1.3, refLoF:0.6, refHiF:1.2, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md' },
+      { machine:'vhtt', refLo:0.6, refHi:1.3, refLoM:0.7, refHiM:1.3, refLoF:0.6, refHiF:1.2, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort(19pt)確認穩定單版 2020→2026 未改(血清;尿Cr排除);原 2026-05-28 觸發日修為 migration base — see docs/cross-reference-vhtt-2026-05-28.md' },
       { machine:'vhyl', refLo:0.5, refHi:1.2, refLoM:0.7, refHiM:1.2, refLoF:0.5, refHiF:0.9, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 ref(末見 2025-04-21;migration base 1900)' },
       { machine:'vhyl', refLo:0.5, refHi:1.2, refLoM:0.6, refHiM:1.2, refLoF:0.5, refHiF:1, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;原誤標 2026-03-31;30pt（full cohort）)' },
     ] },
@@ -839,6 +846,7 @@ const CATALOG = [
     refHistory: [
       { machine:'*', refLo:136, refHi:145, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:136, refHi:145, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
+      { machine:'vhtt', refLo:136, refHi:145, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 血清 穩定;尿Na排除)' },
     ] },
 
   { id:'K',
@@ -861,6 +869,7 @@ const CATALOG = [
     refHistory: [
       { machine:'*', refLo:98, refHi:107, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:98, refHi:107, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 (穩定單版,2021→2026 未改;原誤標 2026-03-31)' },
+      { machine:'vhtt', refLo:98, refHi:107, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 血清 穩定;尿Cl排除)' },
     ] },
 
   { id:'Ca',
@@ -873,6 +882,7 @@ const CATALOG = [
       { machine:'*', refLo:8.6, refHi:10.3, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:8.6, refHi:10, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 ref(末見 2025-04-21;migration base 1900)' },
       { machine:'vhyl', refLo:8.4, refHi:10.2, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 ref(earliest 2025-06-04;原誤標 2026-03-31;30pt（full cohort）)' },
+      { machine:'vhtt', refLo:8.6, refHi:10.3, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 穩定單版 2020→2026)' },
     ] },
 
   { id:'FreeCa',
@@ -920,7 +930,7 @@ const CATALOG = [
     lo:50, hi:175,
     refHistory: [
       { machine:'*', refLo:50, refHi:175, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
-      { machine:'vhtt', refLo:50, refHi:175, refLoM:50, refHiM:175, refLoF:50, refHiF:175, validFrom:'2026-05-28', source:'YC SOP C 觸發 2026-05-28 cross-reference 12 chart batch — see docs/cross-reference-vhtt-2026-05-28.md + 委外:新南海 (vhtt 印 universal 50-175,inline 性別 mirror 是為了 suppress outer loM:65/hiF:170 fallback)' },
+      { machine:'vhtt', refLo:50, refHi:175, refLoM:50, refHiM:175, refLoF:50, refHiF:175, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 cohort 僅 2 筆觀測(2025-09-20),證據薄;validFrom 用 migration base 取代觸發日 2026-05-28 + 委外:新南海 (vhtt 印 universal 50-175,inline 性別 mirror 是為了 suppress outer loM:65/hiF:170 fallback)' },
       { machine:'vhyl', refLo:33, refHi:193, refLoM:33, refHiM:193, refLoF:33, refHiF:193, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 Fe(33-193 無性別,inline mirror suppress 外層;末見 2025-04-26)' },
       { machine:'vhyl', refLo:50, refHi:175, refLoM:65, refHiM:175, refLoF:50, refHiF:170, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 Fe(M65-175,F50-170;earliest 2025-07-17;30pt iron-panel 增強 parser)' },
     ] },
@@ -937,6 +947,7 @@ const CATALOG = [
       { machine:'*', refLo:120, refHi:480, validFrom:'1900-01-01', source:'migration 起點 — universal ref 既有值' },
       { machine:'vhyl', refLo:250, refHi:400, refLoM:250, refHiM:400, refLoF:250, refHiF:400, validFrom:'1900-01-01', source:'time-dim rescan 2026-06-24 玉里舊 TIBC(250-400 無性別,inline mirror;末見 2025-04-26)' },
       { machine:'vhyl', refLo:119, refHi:485, refLoM:135, refHiM:485, refLoF:119, refHiF:410, validFrom:'2025-06-04', source:'time-dim rescan 2026-06-24 玉里新 TIBC(M135-485,F119-410;earliest 2025-07-17;30pt;原誤標 2026-06-01)' },
+      { machine:'vhtt', refLo:120, refHi:480, refLoM:134, refHiM:415, refLoF:120, refHiF:480, validFrom:'1900-01-01', source:'auto-crawl cohort 2026-06-24 (19pt 男134-415 女120-480;同 universal)' },
     ] },
 
   // vhyl sample (2026-05-05): "更正報告 FE: 58TIBC: 267.00TS: 22"
@@ -2186,7 +2197,7 @@ if (typeof window !== 'undefined') {
 //   2. node sync-patterns.js
 //   3. Reload hospital-lab-data.html in your browser
 //
-// Synced at: 2026-06-24T09:57:43.364Z
+// Synced at: 2026-06-24T15:40:36.099Z
 // Files:    dialysis.js, early-ckd.js
 // ════════════════════════════════════════════════════════════════════════════
 
