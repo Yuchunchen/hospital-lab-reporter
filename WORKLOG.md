@@ -1,5 +1,20 @@
 # WORKLOG
 
+## 2026-07-23 — sync patterns：CBC Hb/Platelet regex 補 HB / PLT label 變體
+
+- 作者：claude（與 YC 共同，Claude Code）
+- 範圍：sync-script（重跑 sync-patterns.js，重產 data.html patterns 區塊 +
+  dialysis / ckd HTML）
+- 變更：修改
+- 檔案：hospital-lab-data.html（patterns 區塊）、hospital-lab-dialysis.html、
+  hospital-lab-ckd.html（build 產出）
+- 原因：patterns 端補上 CBC Hb/Platelet regex 的 `HB:` / `PLT:` 全大寫 label 變體
+  （vhyl CBC(YL) 印全大寫 HB: 與 PLT:；vhtt 同症狀）。universal pattern，兩台共用。
+  已驗 000105598H / 000044149G 零回歸。
+- 測試：`node sync-patterns.js` 重產成功（dialysis 237.0 KB / ckd 481.8 KB）；
+  內嵌 Hb = `(?:Hb|HGB|HB):`、Platelet = `(?:Platelet|PLATE|PLT):`，與 patterns 端一致。
+- 相依：需 hospital-lab-patterns 先發版（本輪同步完成）；重新整理瀏覽器載入新 patterns。
+
 ## 2026-06-23 — resolveRef 年齡維 sync + age 參數本輪傳 undefined
 
 - 作者:claude(與 YC 共同,Claude Code)
