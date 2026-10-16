@@ -1,5 +1,29 @@
 # WORKLOG
 
+## 2026-10-16 — sync patterns：WBC / RBC lookahead 擋回溯（尿液兩位數 range 誤抓血液值）
+
+- 作者：claude（與 YC 共同；vhtt Cowork 改 patterns，YC 跑 sync）
+- 範圍：sync-script（重跑 sync-patterns.js）
+- 變更：修改
+- 檔案：hospital-lab-data.html、hospital-lab-dialysis.html、hospital-lab-ckd.html（patterns block，auto-generated）
+- 原因：patterns `b8e0832`——WBC / RBC 的 negative lookahead 原本只擋「數字後緊接 -」，`[\d.]+` 回溯後尿液 `WBC: 10-19` 會被截成血液 WBC=1、`RBC: 30-49` 截成 3（vhyl 000170608H）。lookahead 改為 `(?![\d.]|\s*[-–]\s*\d)`。universal。
+- 測試：`node sync-patterns.js` 成功；patterns 端 node 驗證血液值照抓、尿液 range 全拒。
+- 影響：reload extension 生效；OPD 端 24h 內經 dist/patterns.json 自動拿到。（本條為事後補記，sync commit 當時未寫 WORKLOG）
+
+---
+
+## 2026-10-16 — sync patterns：UACR orderNameFilter 補 Urine Creatinine order（vhtt 拆單）
+
+- 作者：claude（與 YC 共同；vhtt Cowork 改 patterns，YC 跑 sync）
+- 範圍：sync-script（重跑 sync-patterns.js）
+- 變更：修改
+- 檔案：hospital-lab-data.html、hospital-lab-dialysis.html、hospital-lab-ckd.html（patterns block，auto-generated）
+- 原因：patterns `e9e5f09`——vhtt 自 115/07/17 起 Microalbumin 與 Urine Creatinine 拆成兩張 order，`ALB/CR:` 印在 `Urine Creatinine(TT)`，原 `orderNameFilter: /microalbumin/i` 把它濾掉，UACR 最新值停在舊值（vhtt 000036059I）。filter 改為 `/microalbumin|urine\s*creatinine|creatinine\(u\)/i`。universal。
+- 測試：`node sync-patterns.js` 成功；patterns 端 node 驗證拆單抓到 158.68、合併單不變、Free PSA `RATIO:` 仍被濾。
+- 影響：reload extension 生效；OPD 端 24h 內自動拿到。（本條為事後補記）
+
+---
+
 ## 2026-07-23 — sync patterns：CBC Hb/Platelet regex 補 HB / PLT label 變體
 
 - 作者：claude（與 YC 共同，Claude Code）
