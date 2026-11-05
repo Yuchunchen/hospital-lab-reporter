@@ -22,6 +22,8 @@
  * matched the catalog's actual orderNameFilter regex anyway) have been
  * removed.
  */
+const ORDER_FILTER_EXEMPT = new Set(['BUN_pre', 'BUN_post']);
+
 function extractLabValues(orders) {
   const results = {};
   LAB_TESTS.forEach(t => { results[t.id] = []; });
@@ -56,6 +58,13 @@ function extractLabValues(orders) {
     for (const test of LAB_TESTS) {
       // Date filter: all-time for hepatitis/HIV/RPR, 12 months for everything else
       if (!ALL_TIME_IDS.has(test.id) && dateObj < cutoff) continue;
+
+      // Catalog orderNameFilter (2026-11-05): e.g. CREAT excludes urine orders
+      // whose `CREAT:` is urine Cr. BUN_pre / BUN_post are exempt — their
+      // catalog filters (/,/ and /^BUN$/) are viewer-era; classifyBUNPrePost()
+      // needs every BUN in both arrays and re-buckets by signOffTime/orderName.
+      if (test.orderNameFilter && !ORDER_FILTER_EXEMPT.has(test.id)
+          && !test.orderNameFilter.test(orderName)) continue;
 
       const match = text.match(test.pattern);
       if (!match) continue;

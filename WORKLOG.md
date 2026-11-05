@@ -1,5 +1,31 @@
 # WORKLOG
 
+## 2026-11-05 — extractLabValues 開始吃 catalog `orderNameFilter`（CREAT 不再混入尿 Cr）+ sync patterns
+
+- 作者：claude（Claude Code，vhtt；brief `TASK_BRIEF_reporter_orderNameFilter`，與 YC 共同）
+- 範圍：core + sync-script + build（dialysis / ckd 兩個 html 重產）
+- 變更：修改
+- 檔案：core/lab-extract.js、hospital-lab-dialysis.html、hospital-lab-ckd.html（build）、hospital-lab-data.html（legacy，只有 sync 的 patterns 區塊）
+- 原因：patterns `4bbee93` 給 CREAT / eGFR 加了 `orderNameFilter` 排除尿液單（vhtt 腎利先鋒計畫 `Urine Creatinine(TT) URINE` 印 `CREAT: 101` 被當血清 Cr）。但 reporter `extractLabValues()` 從來沒檢查 `orderNameFilter`，catalog 修正只修到 viewer。
+- 內容：
+  - 內層迴圈在 `text.match(test.pattern)` 前加 `if (test.orderNameFilter && !ORDER_FILTER_EXEMPT.has(test.id) && !test.orderNameFilter.test(orderName)) continue;`
+  - `ORDER_FILTER_EXEMPT = new Set(['BUN_pre', 'BUN_post'])`（YC 2026-11-05 選「程式端豁免」）：兩者 catalog filter（`/,/`、`/^BUN$/i`）是 viewer 時代設定；`classifyBUNPrePost()` 需要每筆 BUN 都進兩個 array 再依簽收時間／醫令名重分，開 filter 會改變 URR / KiDiTi。
+  - legacy `hospital-lab-data.html` 抽值邏輯**不動**（brief 預設；非 end-user），只有 sync 帶進新 catalog。
+- 實際生效範圍：目前 `LAB_TESTS`（兩個 html 都是 resolve 後的 `REPORTER_MANIFEST`）帶 `orderNameFilter` 的只有 BUN_pre / BUN_post / CREAT → 本次行為改變**只有 CREAT**（eGFR 及 staging 由 `computeDerivedValues` 從 CREAT 衍生，跟著修正）。UACR / FreePSA / UrineOB / UrineGlucose 不在 `LAB_TESTS`，brief T5 不適用。
+- 測試（node fixture，vm 載入 catalog + reporter manifest + computed + date-utils + lab-extract + compute，新舊 lab-extract 對照）：
+  - T1 同日血清 `Creatinine(serum): 0.9` + 尿 Cr 單 `CREAT: 101` → CREAT 只剩 [0.9]（修改前 [0.9, 101]）✓
+  - T6 M/72 → eGFR 90.7（reporter 留一位小數；viewer `Math.round` 成 91）、GFRStage 正常 ✓
+  - T2 `Urine total protein(TT) URINE` `T.PROT/CREAT`、合併式 `Urine Microalbumin(TT),Urine Creatinine(TT)`、vhyl `Creatinine(U)CRTN(YL)` → 都不進 CREAT ✓
+  - T3 空醫令名照抓；vhyl `CR洗後分開印(YL)` 照抓 ✓
+  - T4 dialysis fixture（vhtt composite + 單獨 BUN、vhyl 洗後分開印、無時間戳 tie 走 Method B）BUN_pre / BUN_post / URR / CREAT / eGFR 修改前後 snapshot **完全相同** ✓
+  - 兩個 build html 內嵌 script `new Function` 解析通過。
+  - **未真機驗證（T7）**：需院內網路開 reporter 重抓 brief 所列 vhtt 個案，並抽一位透析病人比對 URR / KiDiTi 匯出。
+- 使用者動作：IndexedDB 存的是**抽好的值**（`labDataPut`），raw orders 另存在 orders cache；`fetchAndStore` 每次都對完整 orders 重抽 → 按「全部更新」（增量即可，不需強制重抓）就會換成正確值；沒按之前畫面仍是舊值。
+- ⚠️ 順手發現（未修、另開 brief）：CKD html 的 `LAB_TESTS` 也是 `REPORTER_MANIFEST`（透析 41 項），`groups/early-ckd.js` `labManifest` 只決定畫面顯示 → CKD manifest 裡的 **BUN（generic）、UrineProtein、UrineOB、UrineGlucose、UrineCr、UPCR、UACR 七項從未被抽值**；CKD lab 表與腎平台 xlsx 這幾欄應為空，UACRStage / KDIGORisk / TaiwanCKD 缺 damage marker。以 code 閱讀 + fixture 確認 LAB_TESTS 組成，未在真機畫面確認。
+- 相依：patterns `4bbee93` 先發版（已完成）；viewer 已 sync（`report.js` / `dashboard.js` 本來就吃 filter）。
+
+---
+
 ## 2026-10-16 — sync patterns：WBC / RBC lookahead 擋回溯（尿液兩位數 range 誤抓血液值）
 
 - 作者：claude（與 YC 共同；vhtt Cowork 改 patterns，YC 跑 sync）

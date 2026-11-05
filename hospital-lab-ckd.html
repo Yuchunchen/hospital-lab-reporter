@@ -339,7 +339,7 @@ body {
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
 // PATTERNS BLOCK (built by build.js, source: hospital-lab-patterns repo)
-//   Synced at: 2026-10-16T04:28:54.058Z
+//   Synced at: 2026-11-05T10:43:55.578Z
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 
@@ -744,8 +744,14 @@ const CATALOG = [
     meaning:'透析後 BUN — 通常 6–7，與 BUN_pre 配對計算 URR',
     notes:'Filter selects orders where orderName is exactly "BUN" (standalone post-dialysis draw).' },
 
+  // 2026-11-05：vhtt 腎利先鋒計畫 `Urine Creatinine(TT) URINE` 單印 `CREAT: 101`
+  // （尿 Cr），被 `CREAT:` alternation 誤抓；同日 dedup 蓋掉血清值 → eGFR 算成 0。
+  // `orderNameFilter` 排除尿液單（urine / vhyl `Creatinine(U)`）；同時擋掉
+  // `Urine total protein` 的 `T.PROT/CREAT:`。實例：vhtt [病歷號] 115/10/29。
+  // eGFR entry 共用同一 pattern，須同步帶同一 filter。
   { id:'CREAT',
     pattern: /(?:Creatinine\(serum\)|CREAT):\s*([<>]?\s*[\d.]+)/i,
+    orderNameFilter: /^(?!.*(?:urine|creatinine\(u\))).*/i,
     displayName:'肌酸酐 (Creatinine, Cr)', shortLabel:'Cr',
     unit:'mg/dL', category:'腎功能',
     ref:'男 0.6–1.2，女 0.5–1.0 mg/dL',
@@ -777,6 +783,7 @@ const CATALOG = [
 
   { id:'eGFR',
     pattern: /(?:Creatinine\(serum\)|CREAT):\s*([<>]?\s*[\d.]+)/i,
+    orderNameFilter: /^(?!.*(?:urine|creatinine\(u\))).*/i,   // 同 CREAT：排除尿液單（2026-11-05）
     computed:'eGFR',
     displayName:'腎絲球過濾率 (eGFR)', shortLabel:'eGFR',
     unit:'mL/min/1.73m²', category:'腎功能',
@@ -3906,6 +3913,8 @@ async function enrichMissingValues(labOrders, chartno, manifest, opts) {
  * matched the catalog's actual orderNameFilter regex anyway) have been
  * removed.
  */
+const ORDER_FILTER_EXEMPT = new Set(['BUN_pre', 'BUN_post']);
+
 function extractLabValues(orders) {
   const results = {};
   LAB_TESTS.forEach(t => { results[t.id] = []; });
@@ -3940,6 +3949,13 @@ function extractLabValues(orders) {
     for (const test of LAB_TESTS) {
       // Date filter: all-time for hepatitis/HIV/RPR, 12 months for everything else
       if (!ALL_TIME_IDS.has(test.id) && dateObj < cutoff) continue;
+
+      // Catalog orderNameFilter (2026-11-05): e.g. CREAT excludes urine orders
+      // whose `CREAT:` is urine Cr. BUN_pre / BUN_post are exempt — their
+      // catalog filters (/,/ and /^BUN$/) are viewer-era; classifyBUNPrePost()
+      // needs every BUN in both arrays and re-buckets by signOffTime/orderName.
+      if (test.orderNameFilter && !ORDER_FILTER_EXEMPT.has(test.id)
+          && !test.orderNameFilter.test(orderName)) continue;
 
       const match = text.match(test.pattern);
       if (!match) continue;
