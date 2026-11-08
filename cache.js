@@ -10,7 +10,7 @@
  * Cache structure:
  *   data/cache/{chartno}.json
  *   {
- *     chartno: "[病歷號]",
+ *     chartno: "000000123X",
  *     fetched_at: "2026-04-30T10:00:00.000Z",
  *     expires_at: "2026-05-07T10:00:00.000Z",
  *     orders: [ ... raw order objects ... ],

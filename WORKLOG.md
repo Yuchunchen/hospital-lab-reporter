@@ -1,5 +1,20 @@
 # WORKLOG
 
+## 2026-11-08 — 隱私：遮蔽病歷號（WORKLOG 與程式註解範例）
+
+- 作者：claude（Claude 雲端工作區，與 YC 共同；YC 2026-11-08 指示「將病歷碼隱匿」）
+- 範圍：core + docs（不含 build 產出）
+- 變更：修改
+- 檔案：WORKLOG.md、CLAUDE.md、core/body.html、core/chart-format.js、core/fetch.js、cache.js、fetcher.js、public/index.html
+- 原因：本 repo 為公開 repo，WORKLOG 與程式註解、輸入框提示含真實病歷號（違反本檔「個案 chartNo 不可 commit」）。
+- 內容：
+  - WORKLOG：每個病歷號（含省略前導 0 的短格式）依檔內出現順序改為 `[病歷號-A]`、`[病歷號-B]`…；標籤只在本檔內一致，不同檔案的同名標籤不是同一人。
+  - 程式註解、placeholder、錯誤訊息範例：改為假值 `000000123X`／短格式 `123X`。
+  - 工具：`redact_mrn.py`（可重跑、結果固定；只輸出計數不輸出號碼）。
+- 未做：`hospital-lab-dialysis.html`、`hospital-lab-ckd.html`、`hospital-lab-data.html` 為 build／sync 產出，其中病歷號來自 patterns catalog 註解與 core/body.html；待 patterns repo 遮蔽並 release 後，跑 `node sync-patterns.js` 一併重產。git 歷史仍含舊值，另案處理。
+- 測試：遮蔽後非產出檔掃描「4–9 位數字＋1 英文字母」只剩假值與官方規格 PDF／XLS 內文；`王小明` 為既有假名保留。行為面只改 `core/chart-format.js` 錯誤訊息文字。
+- 相依：patterns repo 遮蔽 → release → 本 repo sync。
+
 ## 2026-11-05 — extractLabValues 開始吃 catalog `orderNameFilter`（CREAT 不再混入尿 Cr）+ sync patterns
 
 - 作者：claude（Claude Code，vhtt；brief `TASK_BRIEF_reporter_orderNameFilter`，與 YC 共同）
@@ -32,7 +47,7 @@
 - 範圍：sync-script（重跑 sync-patterns.js）
 - 變更：修改
 - 檔案：hospital-lab-data.html、hospital-lab-dialysis.html、hospital-lab-ckd.html（patterns block，auto-generated）
-- 原因：patterns `b8e0832`——WBC / RBC 的 negative lookahead 原本只擋「數字後緊接 -」，`[\d.]+` 回溯後尿液 `WBC: 10-19` 會被截成血液 WBC=1、`RBC: 30-49` 截成 3（vhyl [病歷號]）。lookahead 改為 `(?![\d.]|\s*[-–]\s*\d)`。universal。
+- 原因：patterns `b8e0832`——WBC / RBC 的 negative lookahead 原本只擋「數字後緊接 -」，`[\d.]+` 回溯後尿液 `WBC: 10-19` 會被截成血液 WBC=1、`RBC: 30-49` 截成 3（vhyl [病歷號-A]）。lookahead 改為 `(?![\d.]|\s*[-–]\s*\d)`。universal。
 - 測試：`node sync-patterns.js` 成功；patterns 端 node 驗證血液值照抓、尿液 range 全拒。
 - 影響：reload extension 生效；OPD 端 24h 內經 dist/patterns.json 自動拿到。（本條為事後補記，sync commit 當時未寫 WORKLOG）
 
@@ -44,7 +59,7 @@
 - 範圍：sync-script（重跑 sync-patterns.js）
 - 變更：修改
 - 檔案：hospital-lab-data.html、hospital-lab-dialysis.html、hospital-lab-ckd.html（patterns block，auto-generated）
-- 原因：patterns `e9e5f09`——vhtt 自 115/07/17 起 Microalbumin 與 Urine Creatinine 拆成兩張 order，`ALB/CR:` 印在 `Urine Creatinine(TT)`，原 `orderNameFilter: /microalbumin/i` 把它濾掉，UACR 最新值停在舊值（vhtt [病歷號]）。filter 改為 `/microalbumin|urine\s*creatinine|creatinine\(u\)/i`。universal。
+- 原因：patterns `e9e5f09`——vhtt 自 115/07/17 起 Microalbumin 與 Urine Creatinine 拆成兩張 order，`ALB/CR:` 印在 `Urine Creatinine(TT)`，原 `orderNameFilter: /microalbumin/i` 把它濾掉，UACR 最新值停在舊值（vhtt [病歷號-B]）。filter 改為 `/microalbumin|urine\s*creatinine|creatinine\(u\)/i`。universal。
 - 測試：`node sync-patterns.js` 成功；patterns 端 node 驗證拆單抓到 158.68、合併單不變、Free PSA `RATIO:` 仍被濾。
 - 影響：reload extension 生效；OPD 端 24h 內自動拿到。（本條為事後補記）
 
@@ -60,7 +75,7 @@
   hospital-lab-ckd.html（build 產出）
 - 原因：patterns 端補上 CBC Hb/Platelet regex 的 `HB:` / `PLT:` 全大寫 label 變體
   （vhyl CBC(YL) 印全大寫 HB: 與 PLT:；vhtt 同症狀）。universal pattern，兩台共用。
-  已驗 [病歷號] / [病歷號] 零回歸。
+  已驗 [病歷號-C] / [病歷號-D] 零回歸。
 - 測試：`node sync-patterns.js` 重產成功（dialysis 237.0 KB / ckd 481.8 KB）；
   內嵌 Hb = `(?:Hb|HGB|HB):`、Platelet = `(?:Platelet|PLATE|PLT):`，與 patterns 端一致。
 - 相依：需 hospital-lab-patterns 先發版（本輪同步完成）；重新整理瀏覽器載入新 patterns。
@@ -130,7 +145,7 @@
 - 檔案:
   - `hospital-lab-data.html`、`hospital-lab-dialysis.html`、`hospital-lab-ckd.html`:`node sync-patterns.js` 重產(catalog Platelet 行差異;CKD HTML 雖 manifest 不含 Platelet 但 catalog 整包共用,patterns 區塊照重出)
 - 原因:patterns repo 改 catalog Platelet regex 加 PLATE alternation(`/Platelet:/` → `/(?:Platelet|PLATE):/`),reporter 三 HTML 的 patterns 區塊需重 bundle。修因:ernode CBC 套餐 reportText 用 `PLATE:` label,舊 regex 漏抓,dialysis KiDiTi 匯出 field 6(Platelet)空格
-- 測試:`node sync-patterns.js` 成功(legacy data.html markers + dialysis.html 216.7KB + ckd.html 461.5KB chain build);`Select-String hospital-lab-dialysis.html "Platelet|PLATE"` 第 424 行 pattern 已含 alternation。真機驗證(瀏覽器開 dialysis HTML → vhtt `[病歷號]` → 全部更新 → KiDiTi 匯出 field 6 5 月有 89)留待 YC 在 vhtt 機器上跑(brief T6)
+- 測試:`node sync-patterns.js` 成功(legacy data.html markers + dialysis.html 216.7KB + ckd.html 461.5KB chain build);`Select-String hospital-lab-dialysis.html "Platelet|PLATE"` 第 424 行 pattern 已含 alternation。真機驗證(瀏覽器開 dialysis HTML → vhtt `[病歷號-E]` → 全部更新 → KiDiTi 匯出 field 6 5 月有 89)留待 YC 在 vhtt 機器上跑(brief T6)
 - 相依:hospital-lab-patterns 同輪 commit + push;hospital-lab-viewer 同輪 commit + push
 - 影響:dialysis group 受影響(Platelet 漏抓修復 + KiDiTi field 6 補完整);CKD manifest 不含 Platelet 不影響輸出;既有病患清單不受影響(localStorage 不動);reporter 6h orders cache 要點「全部更新」清才會用新 regex 重 parse
 
@@ -240,7 +255,7 @@
 - 原因:patterns repo 同日修 RBC + GluAC regex,加 negative lookahead 擋
   vhyl URINE ROUTINE(YL) `RBC: 0-2` 和 `GLU: 4+` 誤匹配。詳見 patterns
   WORKLOG 2026-05-12 entry。
-- 觸發 case:vhyl/[病歷號](RBC=0)+ vhyl/[病歷號](Sugar=4)。
+- 觸發 case:vhyl/[病歷號-F](RBC=0)+ vhyl/[病歷號-G](Sugar=4)。
 - 測試:re-extract 後兩例都還原為正常血液 RBC 4.76–5.07 和血糖 125–137。
 - 相依:patterns repo 同日 commit。
 
@@ -289,7 +304,7 @@
   的 `Glucose: 4+` 誤匹配、把 `4` 抓成空腹血糖 mg/dL，存進
   `labs_dialysis[chartno].GluAC[]`，污染 lab 表 + URR/CaxP 旁的血糖欄。
 - 測試：YC 載入新版 HTML 後，vhtt 同日有尿液常規 + 血糖的病人（如
-  [病歷號] 115/02/26），`localStorage.getItem('labs_dialysis')` 裡
+  [病歷號-H] 115/02/26），`localStorage.getItem('labs_dialysis')` 裡
   該日期 GluAC 應為實際血糖值或缺漏，不再有尿糖 `4+` 衍生的 4。
   CKD HTML 也會走新 pattern（CKD manifest 也有 GluAC）。
 - 相依：patterns repo 同日 commit（catalog GluAC pattern 收緊）。
@@ -690,7 +705,7 @@
 - 原因：patterns repo 同日 catalog 6 條肝炎 regex 全加 i flag，修 vhtt
   全大寫 `ANTI-HCV` match 不到的 bug。本 repo 透過
   `node sync-patterns.js` 拉新版進 patterns 區塊（HTML 行 322–1213）。
-- 測試：等 YC 重整 HTML + ↻ 重抓 [病歷號] → 「檢驗資料」分頁
+- 測試：等 YC 重整 HTML + ↻ 重抓 [病歷號-I] → 「檢驗資料」分頁
   AntiHCV 應從 missing → 顯示 `Non-Reactive`（reporter 用 raw 定性
   顯示，不走 viewer 的 computed display dispatcher）。
 - 相依：patterns repo 同日 commit（catalog hepatitis 6 條 i flag）。
@@ -702,7 +717,7 @@
 - 變更：修改
 - 檔案：`hospital-lab-data.html`
 - 原因：113/11/27 那筆 `Al鋁: <2`（外送單位低於偵測下限）原本被
-  `parseFloat('<2')` → NaN → drop，導致 [病歷號] 表格 Al 列從應有 6 筆變
+  `parseFloat('<2')` → NaN → drop，導致 [病歷號-I] 表格 Al 列從應有 6 筆變
   5 筆。`<2` 在臨床上不是 missing — 是「抽了，低於偵測，安全」的有效
   訊號，丟掉等於失去資訊。
 - 修正：`extractLabValues` 對 capture group 開頭是 `<` 或 `>` 時，把
@@ -716,7 +731,7 @@
   - CSV 匯出：`csvCell(val)` 字串化 → CSV 出現 literal `<2`
   - normalize（unit conversion）對 `<>` 值跳過 — 目前所有帶 normalize
     的 test 都是 CBC 數量級轉換，沒人會把帶 `<>` 的值丟過去
-- 測試：等 YC 重整 HTML + ↻ 重抓 [病歷號]：
+- 測試：等 YC 重整 HTML + ↻ 重抓 [病歷號-I]：
   - 「檢驗資料」分頁 Al 列預期從 5 筆 → **6 筆**，113/11/27 的
     `<2` 應顯示為「<2」字樣、無紅／藍 alarm 顏色（low/hi 比較跳過）
   - CSV 該列 Al value 欄應為 literal `<2`
@@ -732,7 +747,7 @@
 - 範圍：dialysis（HTML body enrichMissingValues 候選邏輯）
 - 變更：修改
 - 檔案：`hospital-lab-data.html`
-- 原因：實機測 [病歷號] 揭露兩個 production bug：
+- 原因：實機測 [病歷號-I] 揭露兩個 production bug：
   1. 主 reportText 已含全 6 筆 Al，只是歷史 5 筆 label 是外送 `BALR0101:`
      而不是 `Al鋁:`。catalog regex 漏 → 誤判 missing → 觸發 sub-page chase
      → CORS blocked。**根本不該觸發 sub-page**（patterns repo 已修 regex）。
@@ -744,7 +759,7 @@
   — 只 chase 明確 opt-in 的 test（catalog 加了 subpage config）。
   Non-subpage missing 的 test 視為「主頁面找不到就算了」，避免 brute-fetch。
   UACR（viewer 用）已在 patterns repo 加 subpage.orderNameMatch opt-in。
-- 測試：YC 在 [病歷號] 實機驗證通過：
+- 測試：YC 在 [病歷號-I] 實機驗證通過：
   - console: `presentIds` 含 Aluminum、`chaseTests=['Aluminum']`、
     `qualified=0`、`queue size: 0`（6 筆 Al order 主 regex 全對到，
     完全不需 sub-page chase，0 fetch、0 CORS error）
@@ -818,7 +833,7 @@
   - 載入 §3.1 任一有資料病人 → 表格出現「微量元素 / Al」列
   - 第二次載入 → F12 Network 0 OpdOrderReport 請求（cache 命中）
   - CSV 匯出檢查：含 `Al value/unit/lower/higher` 4 欄
-  - 載入 [病歷號]：應顯示 `<2`（保留字串、不轉數值比較）
+  - 載入 [病歷號-J]：應顯示 `<2`（保留字串、不轉數值比較）
 - 相依：依賴 `hospital-lab-patterns` 同日的 catalog Aluminum + reporter
   manifest TRACE category；已透過 `node sync-patterns.js` 拉進 HTML 的
   patterns 區塊。`enrichMissingValues` 是 manifest-driven，未來新增
@@ -947,7 +962,7 @@
   - `hospital-lab-data.html`：跑 `node sync-patterns.js` 重新打包
     inline groups 區塊，把上述修正同步進 HTML。
 - 原因：
-  - 使用者回報 `[病歷號]` 的 BUN(AD) 在 reporter 報表畫面正常顯示，
+  - 使用者回報 `[病歷號-K]` 的 BUN(AD) 在 reporter 報表畫面正常顯示，
     但「匯出 CSV」產生的 `dialysis_export_*.csv` 中所有
     `BUN (AD) value / lower / higher` 全空，只有 `BUN (AD) unit` 有值
     （unit 從 catalog 直接抓）。BUN(BD) 全部正常。
@@ -989,7 +1004,7 @@
     1. 重新整理 `hospital-lab-data.html`（拿到新版 inline groups）。
     2. 不需要重抓資料 — 修法只影響 reader 端。
     3. 點「匯出 CSV」→ 開啟 CSV，確認 `BUN (AD) value` 欄位有值。
-    4. 比對 `[病歷號]` 螢幕 vs CSV 的 BUN(AD)，應一致。
+    4. 比對 `[病歷號-K]` 螢幕 vs CSV 的 BUN(AD)，應一致。
 - 相依：
   - `hospital-lab-patterns` 不需動。
   - `hospital-lab-viewer` 不需動。
@@ -1087,7 +1102,7 @@
   - reporter manifest（patterns/reporter.js）沒列入 `HBsAgDisplay` /
     `AntiHBsDisplay` / `*Titer`，所以 `_resolveManifest()` resolve 出
     的 `LAB_TESTS` 仍只含舊有 raw 條目，UI 表格不會多欄。
-  - 瀏覽器手測（由 YC 執行）：fetch vhyl `[病歷號]`，確認 HBsAg /
+  - 瀏覽器手測（由 YC 執行）：fetch vhyl `[病歷號-L]`，確認 HBsAg /
     Anti-HBs / Anti-HCV 表格欄位仍顯示 raw `Non-Reactive` /
     `Reactive`，沒有被誤套成 viewer 的「正常 (HBsAg 0.21)」格式。
 - 相依：
@@ -1167,7 +1182,7 @@
     - `viewPatientLab()`：alarm 計算分支加 gender pick + fallback
       註解，邏輯與 TASK_BRIEF 第 7 節範例對齊。
 - 原因：
-  - vhyl [病歷號]（女）Fe 58 被 viewer 誤判過低 → patterns repo
+  - vhyl [病歷號-L]（女）Fe 58 被 viewer 誤判過低 → patterns repo
     引入 `loM/hiM/loF/hiF` 後，viewer 已修；本 phase 把 reporter
     也同步上去。
   - 使用者選擇 (α) 方案：接受 reporter 透析表開始亮 RBC / Hb / HCT /
@@ -1216,8 +1231,8 @@
     （`__HOSPITAL_LAB_GROUPS_*__`）也刷新時間戳，內容無實質變動。
     新版 `Synced at: 2026-05-05T15:09:27.196Z`。
 - 原因：
-  - 使用者回報 vhyl 病人 [病歷號] 的 HBsAg / Anti-HCV / AFP、
-    [病歷號] 的 Fe 在 reporter 漏顯示；連帶發現 TSAT 舊 regex
+  - 使用者回報 vhyl 病人 [病歷號-L] 的 HBsAg / Anti-HCV / AFP、
+    [病歷號-M] 的 Fe 在 reporter 漏顯示；連帶發現 TSAT 舊 regex
     `/SAT:/` 對 vhyl 的 `TS:` label 不命中。
   - patterns repo 已於 2026-05-05 push commit `58eed17`，依跨 repo
     副作用清單，reporter 必須重 sync（reporter 是 inline pattern block，
@@ -1227,9 +1242,9 @@
     `// vhyl sample (...)` 註解都已帶入。
   - patterns repo 端的 `npm run release` + spot-check（18/18 pass）已
     覆蓋 regex 行為驗證；reporter 端只是純粹 re-bundle，無新 logic。
-  - 預期：reporter 重 fetch [病歷號] 後，HBsAg / Anti-HCV / AFP / TSAT
+  - 預期：reporter 重 fetch [病歷號-L] 後，HBsAg / Anti-HCV / AFP / TSAT
     在表格與 CSV 都會出值（`Non-Reactive` / `Non-Reactive` / `< 2.00` /
-    `22`）；[病歷號] 的 Fe 若仍漏 → 表示該病人未抽 Fe，另案。
+    `22`）；[病歷號-M] 的 Fe 若仍漏 → 表示該病人未抽 Fe，另案。
 - 相依：
   - `hospital-lab-patterns@58eed17`、`hospital-lab-viewer` 已同步在
     2026-05-05 sync + push。三個 repo 一起推完才完整覆蓋 vhyl 修正。
@@ -1414,8 +1429,8 @@
     - `resolveBUN()` / `resolveBUNByLegacyOrderName()` 保留但已成 dead
       code（沒有 caller），用作將來備援。
 - 原因：
-  - 使用者測試 patient `[病歷號]` 後發現 `BUN(AD)` 仍空白；DevTools
-    探查顯示 `localStorage.labs_dialysis['[病歷號]'].BUN_pre` 與
+  - 使用者測試 patient `[病歷號-N]` 後發現 `BUN(AD)` 仍空白；DevTools
+    探查顯示 `localStorage.labs_dialysis['[病歷號-N]'].BUN_pre` 與
     `.BUN_post` 內容**完全相同**（每筆 BUN 同時出現在兩個 bucket）。
   - 根因：revision 1 把 catalog 層的 `composite` / `standalone_bun`
     filter 移除了（兩個 testId 共用同一個 regex），但**沒有補上後製
@@ -1442,16 +1457,16 @@
   - **尚待 YC 在實機瀏覽器手動驗證：**
     1. 重新整理 `hospital-lab-data.html` → 病人清單頁應看到三個按鈕
        （`新增清單` 綠、`更新資料` 藍、`匯出 CSV` 大顆橘）。
-    2. 點 `更新資料` 一次（清單已有 `[病歷號]`）→ 狀態列顯示
+    2. 點 `更新資料` 一次（清單已有 `[病歷號-N]`）→ 狀態列顯示
        「更新中... N / M」、按鈕 disable。
-    3. 完成後點 `[病歷號]` 進入 lab view → `BUN (BD)` 與 `BUN (AD)`
+    3. 完成後點 `[病歷號-N]` 進入 lab view → `BUN (BD)` 與 `BUN (AD)`
        兩列在 2026-04-08 應分別顯示 62 / 19，URR 應 ≈ 69.4。
     4. DevTools console：
-       `JSON.parse(localStorage.labs_dialysis)['[病歷號]'].BUN_pre.length`
+       `JSON.parse(localStorage.labs_dialysis)['[病歷號-N]'].BUN_pre.length`
        應與 `BUN_post.length` 接近（≈18-20），且
        `pre.filter(r=>r.date==='2026-04-08')[0].value === 62`，
        `post.filter(r=>r.date==='2026-04-08')[0].value === 19`。
-    5. 按 `匯出 CSV` → 開檔確認 `[病歷號], 202604` 那 row 的
+    5. 按 `匯出 CSV` → 開檔確認 `[病歷號-N], 202604` 那 row 的
        `BUN (BD) value=62`、`BUN (AD) value=19`、`URR value≈69.4`。
 - 相依：
   - 不需要 `hospital-lab-patterns` 先發版（patterns block 內容未變）。
@@ -1564,7 +1579,7 @@
     1. 開啟 `hospital-lab-data.html` → 病人清單分頁 UI 已是新樣貌
        （textarea + 更新 + 匯出 CSV，列表含 dialysisDays / shift selects
        與 ✕）；舊 JSON 按鈕全部消失。
-    2. 貼一個已知 chartNo（如 `[病歷號]`）→ 按「更新」→ 出現該病患
+    2. 貼一個已知 chartNo（如 `[病歷號-O]`）→ 按「更新」→ 出現該病患
        row，name / sex / age 自動填入；dialysisDays / shift = 未設定。
     3. 貼三筆 newline-separated chartNos → 更新 → 三筆 row，皆自動填入。
     4. 點選 chartNo → 檢驗資料表渲染，BUN(BD) / BUN(AD) / URR 顯示正確。
@@ -1660,7 +1675,7 @@
     完全相同。
   - **尚待 YC 在實機瀏覽器手動驗證：**
     1. 重新整理 → 更新全部資料（讓新的 reportDateTime 寫進 storage）
-    2. 開 [病歷號] 檢驗資料表 → BUN(BD) 與 BUN(AD) 應為不同數字、
+    2. 開 [病歷號-N] 檢驗資料表 → BUN(BD) 與 BUN(AD) 應為不同數字、
        URR 不再永遠 0
     3. DevTools console 除了預期的 `[dialysis.resolveBUN]` warning
        （3+ 筆或缺 reportDateTime 的叢集）外應乾淨
@@ -1755,7 +1770,7 @@
   - 與紙本對齊：紙本表格決定哪些檢驗每月做、哪些一年做、哪些只在入院做；
     CSV 必須能直接套進透析室既有工作流程，所以採紙本的順序與字樣，並
     保留紙本的「未抽就留白」斜線語意。
-  - Kt/V 與 Aluminum 的延後是為了等 ground truth 資料：vhyl 的 [病歷號]
+  - Kt/V 與 Aluminum 的延後是為了等 ground truth 資料：vhyl 的 [病歷號-N]
     探查顯示 0 筆 Aluminum 紀錄，先不收。若日後在 patterns repo 把它們加回
     reporter manifest，再重啟並把對應紙本欄位接回即可（重啟條件記錄在
     patterns repo 的 `TASK_BRIEF.md`）。
@@ -1769,7 +1784,7 @@
   - `new Function(inlineScript)` 解析內嵌 JS 通過。
   - **尚待 YC 在實機瀏覽器手動驗證：**
     1. 開啟 `hospital-lab-data.html`，舊有病患清單仍顯示
-    2. 點選 chartNo `[病歷號]` → 檢驗資料表渲染（採 manifest 過濾，
+    2. 點選 chartNo `[病歷號-O]` → 檢驗資料表渲染（採 manifest 過濾，
        BUN(BD)/BUN(AD) 等紙本字樣出現）
     3. 點「匯出 CSV」→ 開啟 .csv，確認：
        - 表頭採紙本字樣（`BUN (BD)`、`Anti-HBS`、`α-FP`、`VDRL/RPR` 等）
@@ -1833,7 +1848,7 @@
     - 預先放入 `hd_patients` / `hd_labData` 後，`patients_dialysis` /
       `labs_dialysis` 被自動複製
     - 舊 key 保留為 fallback
-    - 病人陣列內容（chartno=[病歷號]）byte-identical
+    - 病人陣列內容（chartno=[病歷號-O]）byte-identical
   - **尚待 YC 在實機瀏覽器手動驗證：**
     1. 開啟 `hospital-lab-data.html`，舊有病患清單仍存在
     2. 點選一筆病患 → 檢驗資料表渲染外觀與 refactor 前一致

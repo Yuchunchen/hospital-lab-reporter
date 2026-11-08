@@ -11,13 +11,13 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Normalize chart number to 9-digit + 1-letter format (e.g. "[病歷號]" -> "[病歷號]").
+ * Normalize chart number to 9-digit + 1-letter format (e.g. "123X" -> "000000123X").
  */
 function formatChartNo(raw) {
   const s = raw.trim();
   if (!s) throw new Error('請輸入病歷號');
   const last = s[s.length - 1];
-  if (!/[a-zA-Z]/.test(last)) throw new Error('病歷號須以英文字母結尾 (如 [病歷號])');
+  if (!/[a-zA-Z]/.test(last)) throw new Error('病歷號須以英文字母結尾 (如 123X)');
   const letter = last.toUpperCase();
   const digitStr = s.slice(0, -1).replace(/\D/g, '');
   if (!digitStr) throw new Error('病歷號中未找到數字');

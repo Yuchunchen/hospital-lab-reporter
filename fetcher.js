@@ -19,7 +19,7 @@ function formatChartNo(raw) {
   const s = raw.trim();
   if (!s) throw new Error('請輸入病歷號');
   const last = s[s.length - 1];
-  if (!/[a-zA-Z]/.test(last)) throw new Error('病歷號須以英文字母結尾 (如 [病歷號])');
+  if (!/[a-zA-Z]/.test(last)) throw new Error('病歷號須以英文字母結尾 (如 123X)');
   const letter = last.toUpperCase();
   const digitStr = s.slice(0, -1).replace(/\D/g, '');
   if (!digitStr) throw new Error('病歷號中未找到數字');
@@ -59,7 +59,7 @@ function toSortableDate(d) {
 
 /**
  * Parse patient info from ernode HTML header.
- * Header: "全部醫囑 [病歷號] 王小明 M 51 歲"
+ * Header: "全部醫囑 000000123X 王小明 M 51 歲"
  */
 function parsePatientInfo($, chartno) {
   const headerEl = $('table.Header');

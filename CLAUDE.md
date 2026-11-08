@@ -79,7 +79,7 @@ patients.js / csv-compiler.js / lab-mapping.js`）非主要執行路徑，可忽
 - **Endpoint**: `/order/get_lab_orders?chartno={chartno}&opsid={opsid}`
 - **回傳格式**: HTML 頁面（非 JSON），以 DOMParser 解析。
 - **分頁處理**: 偵測頁面中的 `>>` 連結，自動抓取後續頁面直到無更多資料。
-- **病歷號格式**: 9 位數字 + 1 個英文字母（如 `[病歷號]`）。輸入時自動補零、大寫。
+- **病歷號格式**: 9 位數字 + 1 個英文字母（如 `000000123X`）。輸入時自動補零、大寫。
 - **日期系統**: 民國年（如 115/04/14 = 2026/04/14），解析函數 `parseDateTaiwan()` 與 `parseDateResdttm()`。
 
 ### 檢驗項目 (LAB_TESTS / CKD_MANIFEST)

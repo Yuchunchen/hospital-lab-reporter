@@ -12,7 +12,7 @@
 
 /**
  * Parse patient info from the ernode HTML header.
- * Header text example: "全部醫囑 [病歷號] 王小明 M 51 歲"
+ * Header text example: "全部醫囑 000000123X 王小明 M 51 歲"
  */
 function parsePatientInfo(doc, chartno) {
   const headerText = doc.querySelector('table.Header')?.textContent || '';
@@ -87,7 +87,7 @@ function parseOrdersPage(html, chartno, baseUrl) {
 
 /**
  * Fetch all pages of lab orders for a given chart number.
- * @param {string} chartno - Formatted chart number (e.g. "[病歷號]")
+ * @param {string} chartno - Formatted chart number (e.g. "000000123X")
  * @param {Function} onProgress - Callback(fetched, total)
  * @returns {Promise<{orders: Array, patientInfo: Object}>}
  */
