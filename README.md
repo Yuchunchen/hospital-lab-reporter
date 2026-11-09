@@ -30,7 +30,8 @@ hospital-lab-reporter/
 ├── csv-compiler.js           ← (server-side, not primary path)
 ├── lab-mapping.js            ← (server-side, not primary path)
 ├── package.json              ← Node dependencies for sync
-├── CLAUDE.md                 ← Per-repo rules for Claude
+├── AGENTS.md                 ← Per-repo rules (Claude / Codex 共用)
+├── CLAUDE.md                 ← @AGENTS.md 匯入（Claude 專屬補充）
 └── WORKLOG.md                ← Change log (繁體中文)
 ```
 

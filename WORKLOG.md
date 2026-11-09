@@ -1,5 +1,16 @@
 # WORKLOG
 
+## 2026-11-10 — 規則檔改名 AGENTS.md，CLAUDE.md 改為匯入
+
+- 作者：claude（Claude 桌面對話連結 VHYL；YC 2026-11-10 指示由 Claude 完成）
+- 變更：修改
+- 範圍：docs（repo 規則檔）
+- 檔案：AGENTS.md（自 CLAUDE.md 改名）、CLAUDE.md、README.md
+- 原因：Codex 只讀 AGENTS.md，原規則只在 CLAUDE.md，Codex 看不到。依 Claude Code 官方 memory 文件：共用規則寫 AGENTS.md，CLAUDE.md 以 `@AGENTS.md` 匯入，Claude 不會重複載入。
+- 內容：`git mv CLAUDE.md AGENTS.md`，規則內文未改，只把「三個 repo CLAUDE.md 共用同一份」改為 AGENTS.md；新 CLAUDE.md 只有 `@AGENTS.md`。 README 檔案樹同步。
+- 測試：Claude Code 在本 repo 啟動時載入 CLAUDE.md＋AGENTS.md；未改程式碼與 build 產出。
+- 相依：patterns、viewer 同日做同樣改名；不需 sync。
+
 ## 2026-11-08 — 隱私：遮蔽病歷號（WORKLOG 與程式註解範例）
 
 - 作者：claude（Claude 雲端工作區，與 YC 共同；YC 2026-11-08 指示「將病歷碼隱匿」）
