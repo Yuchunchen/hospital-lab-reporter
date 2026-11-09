@@ -1,5 +1,16 @@
 # WORKLOG
 
+## 2026-11-10 — AGENTS.md 精簡：架構與設計參考搬到 docs/ARCHITECTURE.md
+
+- 作者：claude（Claude 桌面對話連結 VHYL；YC 2026-11-10 指示由 Claude 完成，本變更以 PR 交 YC 決定是否合併）
+- 範圍：docs（repo 規則檔）
+- 變更：修改
+- 檔案：AGENTS.md、docs/ARCHITECTURE.md（新增）
+- 原因：AGENTS.md 586 行，Claude 與 Codex 每次啟動全部載入；官方建議 200 行內，過長會降低遵循度。大部分是架構說明而非規則。
+- 內容：只搬移不改字。AGENTS.md 留簡介、Build、工作協定、病人資料分離原則、Coding behavior contract、不要做的事；其餘原文搬到 docs/ARCHITECTURE.md。稽核發現的矛盾與過時描述列在 PR 說明，未修改。
+- 測試：腳本比對兩檔非空白行與原檔完全相同（只多出 3 行指標／標題）；Claude Code 在本分支載入 AGENTS.md。未改程式碼與 build 產出。
+- 相依：無。
+
 ## 2026-11-10 — 規則檔改名 AGENTS.md，CLAUDE.md 改為匯入
 
 - 作者：claude（Claude 桌面對話連結 VHYL；YC 2026-11-10 指示由 Claude 完成）
